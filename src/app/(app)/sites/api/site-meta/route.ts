@@ -1,53 +1,56 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { TowerType } from "@prisma/client";
 
-type TowerType = "GBC" | "KNET";
+type Body = {
+  siteId?: string;
+
+  // send only what you want to change
+  towerType?: TowerType | "";     // "" means "don't change" (or treat as not provided)
+  towerHeight?: number | "";      // "" means clear
+  gps?: string | "";              // "" means clear
+};
 
 export async function PATCH(req: Request) {
   try {
-    const body = (await req.json()) as {
-      siteId?: string;
-      towerType?: TowerType | null;
-      towerHeight?: number | null;
-      gps?: string | null;
-    };
+    const body = (await req.json()) as Body;
 
     if (!body.siteId) {
       return NextResponse.json({ error: "siteId is required" }, { status: 400 });
     }
 
     const data: {
-      towerType?: TowerType | null;
+      towerType?: TowerType;
       towerHeight?: number | null;
       gps?: string | null;
     } = {};
 
-    if ("towerType" in body) {
-      const v = body.towerType;
-      if (v !== null && v !== "GBC" && v !== "KNET") {
-        return NextResponse.json({ error: "Invalid towerType" }, { status: 400 });
-      }
-      data.towerType = v ?? null;
+    // towerType (enum) — NEVER set null
+    if (body.towerType === "GBC" || body.towerType === "KNET") {
+      data.towerType = body.towerType;
     }
 
-    if ("towerHeight" in body) {
-      const v = body.towerHeight;
-      if (v !== null && typeof v !== "number") {
-        return NextResponse.json({ error: "towerHeight must be a number or null" }, { status: 400 });
-      }
-      if (typeof v === "number" && !Number.isFinite(v)) {
-        return NextResponse.json({ error: "towerHeight must be a valid number" }, { status: 400 });
-      }
-      data.towerHeight = v ?? null;
+    // towerHeight — allow clear
+    if (typeof body.towerHeight === "number") {
+      data.towerHeight = Number.isFinite(body.towerHeight)
+        ? Math.trunc(body.towerHeight)
+        : null;
+    } else if (body.towerHeight === "") {
+      data.towerHeight = null;
     }
 
-    if ("gps" in body) {
-      const v = body.gps;
-      if (v !== null && typeof v !== "string") {
-        return NextResponse.json({ error: "gps must be a string or null" }, { status: 400 });
-      }
-      const trimmed = typeof v === "string" ? v.trim() : null;
-      data.gps = trimmed ? trimmed : null;
+    // gps — allow clear
+    if (typeof body.gps === "string") {
+      const v = body.gps.trim();
+      data.gps = v ? v : null;
+    }
+
+    // If nothing to update
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields provided" },
+        { status: 400 }
+      );
     }
 
     const updated = await prisma.site.update({
@@ -56,8 +59,12 @@ export async function PATCH(req: Request) {
       select: { id: true, towerType: true, towerHeight: true, gps: true },
     });
 
-    return NextResponse.json(updated);
-  } catch (e) {
-    return NextResponse.json({ error: "Failed to update site meta" }, { status: 500 });
+    return NextResponse.json({ ok: true, site: updated });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Failed to update site meta" },
+      { status: 500 }
+    );
   }
 }
