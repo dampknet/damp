@@ -15,6 +15,10 @@ type TxAssetRow = {
   partNumber: string | null;
 };
 
+// ✅ Strong tuple types for your grouped blocks
+type Block = readonly [string, TxAssetRow[]];
+type Blocks = Block[];
+
 function muxTitle(mux: Mux) {
   return mux === "TX_MUX_1_2" ? "TX MUX 1/2" : "TX MUX 3";
 }
@@ -46,7 +50,6 @@ function getSpecString(specs: Prisma.JsonValue, key: string): string | null {
  * while keeping non-numbered items stable.
  */
 function numericSuffix(name: string): number | null {
-  // matches ending number e.g. "Amplifier 12" -> 12
   const m = name.trim().match(/(\d+)\s*$/);
   if (!m) return null;
   const n = Number(m[1]);
@@ -55,7 +58,6 @@ function numericSuffix(name: string): number | null {
 
 function sortAssetsNaturally(list: TxAssetRow[]) {
   return [...list].sort((a, b) => {
-    // primary: compare by "base name" (remove trailing number)
     const aNum = numericSuffix(a.assetName);
     const bNum = numericSuffix(b.assetName);
 
@@ -64,14 +66,11 @@ function sortAssetsNaturally(list: TxAssetRow[]) {
 
     if (aBase !== bBase) return aBase.localeCompare(bBase);
 
-    // secondary: if both have numbers, compare numbers
     if (aNum !== null && bNum !== null) return aNum - bNum;
 
-    // if only one has a number, keep the non-numbered first (optional, nicer)
     if (aNum === null && bNum !== null) return -1;
     if (aNum !== null && bNum === null) return 1;
 
-    // fallback: plain string compare
     return a.assetName.localeCompare(b.assetName);
   });
 }
@@ -117,13 +116,13 @@ export default async function SiteTransmitterPage({
       specs: true,
       partNumber: true,
     },
-    orderBy: { assetName: "asc" }, // fine, we do natural sorting per-group below
+    orderBy: { assetName: "asc" },
   })) as TxAssetRow[];
 
   const systemAsset =
     systemSubId ? txAssets.find((a) => a.subcategoryId === systemSubId) : null;
 
-  function group(mux: Mux) {
+  function group(mux: Mux): Blocks {
     const grouped = new Map<string, TxAssetRow[]>();
 
     for (const a of txAssets) {
@@ -137,7 +136,6 @@ export default async function SiteTransmitterPage({
       grouped.set(subName, [...(grouped.get(subName) ?? []), a]);
     }
 
-    // ✅ Natural sort inside every component group (fixes Amplifier 1..10 order)
     for (const [comp, list] of grouped.entries()) {
       grouped.set(comp, sortAssetsNaturally(list));
     }
@@ -174,6 +172,12 @@ export default async function SiteTransmitterPage({
 
   const systemStatus = systemAsset?.status ?? "ACTIVE";
 
+  // ✅ Strongly typed pairs so `blocks` is ALWAYS Blocks (not string | Blocks)
+  const muxPairs: Array<readonly [Mux, Blocks]> = [
+    ["TX_MUX_1_2", mux12],
+    ["TX_MUX_3", mux3],
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-10">
@@ -188,32 +192,24 @@ export default async function SiteTransmitterPage({
           {site.name} — Transmitter
         </h1>
 
-        {/* Transmitter System header */}
         <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
           <div className="text-base font-semibold text-gray-900">
             Transmitter System
           </div>
 
           <div className="mt-2 text-sm text-gray-700">
-            Serial:{" "}
-            <span className="font-semibold">{showVal(systemSerial)}</span>
+            Serial: <span className="font-semibold">{showVal(systemSerial)}</span>
             <span className="mx-2 text-gray-300">•</span>
-            Part No:{" "}
-            <span className="font-semibold">{showVal(systemPart)}</span>
+            Part No: <span className="font-semibold">{showVal(systemPart)}</span>
             <span className="mx-2 text-gray-300">•</span>
             Status: <span className="font-semibold">{systemStatus}</span>
           </div>
         </div>
 
-        {/* MUX sections */}
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {[
-            ["TX_MUX_1_2", mux12],
-            ["TX_MUX_3", mux3],
-          ].map(([muxKey, blocks]) => {
-            const mux = muxKey as Mux;
+          {muxPairs.map(([mux, blocks]) => {
             const totalItems = blocks.reduce(
-              (acc, [, arr]) => acc + arr.length,
+              (acc: number, [, arr]: Block) => acc + arr.length,
               0
             );
 
@@ -226,44 +222,33 @@ export default async function SiteTransmitterPage({
                   <div className="text-sm font-semibold text-gray-900">
                     {muxTitle(mux)}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {totalItems} items
-                  </div>
+                  <div className="text-xs text-gray-500">{totalItems} items</div>
                 </div>
 
                 <div className="h-px bg-gray-100" />
 
                 <div className="space-y-4 p-5">
                   {blocks.length === 0 ? (
-                    <div className="text-sm text-gray-600">
-                      No components yet.
-                    </div>
+                    <div className="text-sm text-gray-600">No components yet.</div>
                   ) : (
-                    blocks.map(([compName, list]) => (
-                      <div
-                        key={compName}
-                        className="overflow-hidden rounded-xl border"
-                      >
+                    blocks.map(([compName, list]: Block) => (
+                      <div key={compName} className="overflow-hidden rounded-xl border">
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="text-sm font-semibold text-gray-900">
                             {compName}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {list.length}
-                          </div>
+                          <div className="text-xs text-gray-500">{list.length}</div>
                         </div>
 
                         <div className="h-px bg-gray-100" />
 
                         <div className="divide-y">
-                          {list.map((a) => (
+                          {list.map((a: TxAssetRow) => (
                             <div
                               key={a.id}
                               className="flex items-center justify-between px-4 py-2"
                             >
-                              <div className="text-sm text-gray-800">
-                                {a.assetName}
-                              </div>
+                              <div className="text-sm text-gray-800">{a.assetName}</div>
                               <div className="text-xs text-gray-600">
                                 {a.serialNumber ?? "-"}
                                 <span className="mx-2 text-gray-300">•</span>
