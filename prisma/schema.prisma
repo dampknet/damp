@@ -1,0 +1,140 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum AssetStatus {
+  ACTIVE
+  FAULTY
+  DECOMMISSIONED
+}
+
+/** Site transmitter cooling type */
+enum TransmitterType {
+  AIR
+  LIQUID
+}
+
+/** Site operational status */
+enum SiteStatus {
+  ACTIVE
+  DOWN
+}
+
+model UserProfile {
+  id        String   @id
+  email     String   @unique
+  fullName  String?
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TowerType {
+  GBC
+  KNET
+}
+
+model Site {
+  id              String          @id @default(cuid())
+  name            String          @unique
+  regMFreq        String?
+  power           Int?
+  transmitterType TransmitterType @default(AIR)
+  status          SiteStatus      @default(ACTIVE)
+  towerType       TowerType       @default(GBC)
+  towerHeight     Int?
+  gps             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets    Asset[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subcategories Subcategory[]
+  assets        Asset[]
+}
+
+model Subcategory {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category   Category @relation(fields: [categoryId], references: [id])
+  assets     Asset[]
+
+  @@unique([categoryId, name])
+}
+
+model Asset {
+  id            String      @id @default(cuid())
+  siteId        String
+  categoryId    String
+  subcategoryId String?
+
+  /** human readable label in UI e.g. "Amplifier 1", "Exciter 2", "Humidifier" */
+  assetName     String
+
+  serialNumber  String?
+  manufacturer  String?
+  model         String?
+  partNumber    String?
+  status        AssetStatus @default(ACTIVE)
+
+  /**
+   * extra metadata (deviceType, mux group, rack component etc.)
+   * { "mux": "TX_MUX_1_2" }
+   */
+  specs         Json        @default("{}")
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  site          Site        @relation(fields: [siteId], references: [id])
+  category      Category    @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  @@index([siteId])
+  @@index([categoryId])
+  @@index([serialNumber])
+}
+
+enum StoreStatus {
+  RECEIVED
+  NOT_RECEIVED
+}
+
+model StoreItem {
+  id          String      @id @default(cuid())
+  itemNo      Int         @unique
+  description String
+  quantity    Int
+  status      StoreStatus
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([status])
+  @@index([itemNo])
+}
+
