@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import PrintExportBar from "@/components/PrintExportButton";
+import PrintExportButton from "@/components/PrintExportButton";
 
 type SearchParams = { q?: string };
 
@@ -51,6 +51,10 @@ export default async function SiteSubcategoryPage({
     orderBy: { updatedAt: "desc" },
   });
 
+  const pageTitleParts = [`${site.name} — ${sub.name}`];
+  if (q) pageTitleParts.push(`Search: ${q}`);
+  const pageTitle = pageTitleParts.join(" — ");
+
   const csvRows = assets.map((a: (typeof assets)[number]) => ({
     Site: site.name,
     Category: category?.name ?? "",
@@ -63,24 +67,47 @@ export default async function SiteSubcategoryPage({
     UpdatedAt: a.updatedAt.toISOString(),
   }));
 
+  const exportCols = [
+    { key: "Site", label: "Site" },
+    { key: "Category", label: "Category" },
+    { key: "Subcategory", label: "Subcategory" },
+    { key: "Name", label: "Device" },
+    { key: "Serial", label: "Serial" },
+    { key: "Manufacturer", label: "Manufacturer" },
+    { key: "Model", label: "Model" },
+    { key: "Status", label: "Status" },
+    { key: "UpdatedAt", label: "Updated At" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 print:bg-white">
       <div className="mx-auto max-w-6xl px-4 py-10 print:py-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link href={`/sites/${site.id}`} className="text-sm text-gray-600 hover:underline print:hidden">
+            <Link
+              href={`/sites/${site.id}`}
+              className="text-sm text-gray-600 hover:underline print:hidden"
+            >
               ← Back to Site
             </Link>
+
             <h1 className="mt-2 text-2xl font-semibold text-gray-900">
               {site.name} — {sub.name}
             </h1>
+
             <p className="mt-1 text-sm text-gray-600">
-              Category: <span className="font-medium">{category?.name ?? "-"}</span>
+              Category:{" "}
+              <span className="font-medium">{category?.name ?? "-"}</span>
             </p>
           </div>
 
           <div className="print:hidden">
-            <PrintExportBar filename={`${site.name}-${sub.name}.csv`} rows={csvRows} />
+            <PrintExportButton
+              title={pageTitle}
+              filename={`${site.name}-${sub.name}.csv`}
+              rows={csvRows}
+              columns={exportCols}
+            />
           </div>
         </div>
 
@@ -129,7 +156,9 @@ export default async function SiteSubcategoryPage({
               ) : (
                 assets.map((a: (typeof assets)[number]) => (
                   <tr key={a.id} className="border-t">
-                    <td className="px-4 py-3 font-medium text-gray-900">{a.assetName}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {a.assetName}
+                    </td>
                     <td className="px-4 py-3">{a.serialNumber ?? "-"}</td>
                     <td className="px-4 py-3">{a.manufacturer ?? "-"}</td>
                     <td className="px-4 py-3">{a.model ?? "-"}</td>
