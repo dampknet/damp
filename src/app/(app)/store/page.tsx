@@ -1,11 +1,9 @@
-// src/app/store/page.tsx  (UPDATED WHOLE FILE)
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import PrintExportButton from "@/components/PrintExportButton";
 import StoreStatusSelect from "@/components/StoreStatusSelect";
-import StoreDeleteButton from "@/components/StoreDeleteButton";
-
+import DeleteStoreItemDialog from "@/components/DeleteStoreItemDialog";
 
 type SearchParams = {
   q?: string;
@@ -43,10 +41,19 @@ export default async function StorePage({
       ],
     },
     orderBy: { itemNo: "asc" },
+    select: {
+      id: true,
+      itemNo: true,
+      description: true,
+      quantity: true,
+      status: true,
+    },
   });
 
-  const receivedCount = await prisma.storeItem.count({ where: { status: "RECEIVED" } });
-  const notReceivedCount = await prisma.storeItem.count({ where: { status: "NOT_RECEIVED" } });
+  const [receivedCount, notReceivedCount] = await Promise.all([
+    prisma.storeItem.count({ where: { status: "RECEIVED" } }),
+    prisma.storeItem.count({ where: { status: "NOT_RECEIVED" } }),
+  ]);
 
   const statusLabel =
     status === "ALL" ? "All" : status === "RECEIVED" ? "Received" : "Not received";
@@ -70,6 +77,12 @@ export default async function StorePage({
     { key: "Status", label: "Status" },
   ];
 
+  // ✅ Mini list for delete dialog dropdown
+  const itemMini = items.map((it) => ({
+    id: it.id,
+    itemNo: it.itemNo,
+  }));
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -82,9 +95,17 @@ export default async function StorePage({
                 Inventory list (search, filter, print, export).
               </p>
 
+              <div className="mt-2 text-xs text-gray-500">
+                Role: <span className="font-semibold">{role}</span>
+                {!canEdit ? " (view only)" : ""}
+              </div>
+
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
-                  Total: <span className="ml-1 font-semibold">{receivedCount + notReceivedCount}</span>
+                  Total:{" "}
+                  <span className="ml-1 font-semibold">
+                    {receivedCount + notReceivedCount}
+                  </span>
                 </span>
 
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
@@ -92,13 +113,19 @@ export default async function StorePage({
                 </span>
 
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-                  Not received: <span className="ml-1 font-semibold">{notReceivedCount}</span>
+                  Not received:{" "}
+                  <span className="ml-1 font-semibold">{notReceivedCount}</span>
                 </span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <PrintExportButton title={printTitle} rows={exportRows} columns={exportCols} />
+
+              {/* ✅ DELETE MOVED TO TOP (also hide in print) */}
+              <div className="print:hidden">
+                <DeleteStoreItemDialog items={itemMini} canEdit={canEdit} />
+              </div>
 
               {canEdit ? (
                 <Link
@@ -134,6 +161,7 @@ export default async function StorePage({
                 defaultValue={status}
                 className="rounded-xl border bg-white px-3 py-2 text-sm"
                 aria-label="Filter by status"
+                title="Filter by status"
               >
                 <option value="ALL">All</option>
                 <option value="RECEIVED">Received</option>
@@ -184,7 +212,6 @@ export default async function StorePage({
                   <th className="px-5 py-3 font-medium">Description</th>
                   <th className="w-28 px-5 py-3 font-medium">Qty</th>
                   <th className="w-56 px-5 py-3 font-medium">Status</th>
-                  <th className="w-24 px-5 py-3 font-medium">Delete</th>
                 </tr>
               </thead>
 
@@ -193,7 +220,9 @@ export default async function StorePage({
                   <tr>
                     <td className="px-5 py-10 text-center text-gray-600" colSpan={4}>
                       <div className="mx-auto max-w-md">
-                        <div className="text-base font-semibold text-gray-900">No items found</div>
+                        <div className="text-base font-semibold text-gray-900">
+                          No items found
+                        </div>
                         <p className="mt-1 text-sm text-gray-600">
                           Try a different keyword, or clear filters.
                         </p>
@@ -203,7 +232,9 @@ export default async function StorePage({
                 ) : (
                   items.map((it) => (
                     <tr key={it.id} className="align-top hover:bg-gray-50">
-                      <td className="px-5 py-3 font-semibold text-gray-900">{it.itemNo}</td>
+                      <td className="px-5 py-3 font-semibold text-gray-900">
+                        {it.itemNo}
+                      </td>
 
                       <td className="px-5 py-3 text-gray-700">
                         <pre className="whitespace-pre-wrap font-sans text-sm leading-6">
@@ -220,12 +251,6 @@ export default async function StorePage({
                           canEdit={canEdit}
                         />
                       </td>
-
-                      <td className="px-5 py-3">
-                        <StoreDeleteButton itemId={it.id} itemNo={it.itemNo} canEdit={canEdit} />
-                      </td>
-
-
                     </tr>
                   ))
                 )}

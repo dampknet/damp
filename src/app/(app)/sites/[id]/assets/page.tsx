@@ -217,10 +217,6 @@ export default async function SiteAssetsPage({
             </tbody>
           </table>
         </div>
-
-        <p className="mt-3 text-xs text-gray-500 print:hidden">
-          Next: we can also add inline edits for Manufacturer + Model + Part Number.
-        </p>
       </div>
     </div>
   );

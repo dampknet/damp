@@ -102,9 +102,11 @@ const DEVICE_CATEGORIES = [
 
 /**
  * Transmitter subcategories
+ * ✅ NEW: "TX MUX" so we can store serials for TX MUX 1/2/3
  */
 const TX_SUBCATEGORIES = [
   "Transmitter System",
+  "TX MUX", // ✅ NEW
   "Exciter",
   "Exciter/System Control",
   "Amplifier",
@@ -117,12 +119,14 @@ const TX_SUBCATEGORIES = [
 
 /**
  * Rack subcategories
+ * ✅ NEW: Dehydrator
  */
 const RACK_SUBCATEGORIES = [
   "Harmonic (PVR)",
   "Enensys",
   "Modem",
   "Mikrotik Routerboard",
+  "Dehydrator", // ✅ NEW
 ];
 
 function txAmpCounts(power) {
@@ -203,11 +207,36 @@ async function seedSiteAssets(siteRow, ids) {
   const { siteId, siteName, power } = siteRow;
 
   // Standalone devices
-  await ensureAsset({ siteId, categoryId: ids.category.Genset, assetName: "Genset", specs: { deviceType: "GENSET" } });
-  await ensureAsset({ siteId, categoryId: ids.category.AVR, assetName: "AVR", specs: { deviceType: "AVR" } });
-  await ensureAsset({ siteId, categoryId: ids.category["Fuel Tank"], assetName: "Fuel Tank", specs: { deviceType: "FUEL_TANK" } });
-  await ensureAsset({ siteId, categoryId: ids.category["ISO Transformer"], assetName: "ISO Transformer", specs: { deviceType: "ISO_TRANSFORMER" } });
-  await ensureAsset({ siteId, categoryId: ids.category.Solar, assetName: "Solar", specs: { deviceType: "SOLAR" } });
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category.Genset,
+    assetName: "Genset",
+    specs: { deviceType: "GENSET" },
+  });
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category.AVR,
+    assetName: "AVR",
+    specs: { deviceType: "AVR" },
+  });
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category["Fuel Tank"],
+    assetName: "Fuel Tank",
+    specs: { deviceType: "FUEL_TANK" },
+  });
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category["ISO Transformer"],
+    assetName: "ISO Transformer",
+    specs: { deviceType: "ISO_TRANSFORMER" },
+  });
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category.Solar,
+    assetName: "Solar",
+    specs: { deviceType: "SOLAR" },
+  });
 
   // Rack system + components
   await ensureAsset({
@@ -218,7 +247,16 @@ async function seedSiteAssets(siteRow, ids) {
   });
 
   const harmonicSerial =
-    siteName === "Akatsi" ? "311615135" :siteName === "Akosombo" ? "56481818" :siteName === "Axim" ? "56472805" :siteName === "Bawku" ? "311618193" : null;
+    siteName === "Akatsi"
+      ? "311615135"
+      : siteName === "Akosombo"
+      ? "56481818"
+      : siteName === "Axim"
+      ? "56472805"
+      : siteName === "Bawku"
+      ? "311618193"
+      : null;
+
   const harmonicPart = siteName === "Akatsi" ? "099-0580-251" : null;
 
   await ensureAsset({
@@ -257,6 +295,15 @@ async function seedSiteAssets(siteRow, ids) {
     specs: { rackComponent: "MIKROTIK_ROUTERBOARD" },
   });
 
+  // ✅ NEW: Dehydrator (Equipment Rack)
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category["Equipment Rack"],
+    subcategoryId: ids.rackSub.Dehydrator,
+    assetName: "Dehydrator",
+    specs: { rackComponent: "DEHYDRATOR" },
+  });
+
   // ----- TRANSMITTER -----
 
   // Always ensure system card exists (do not delete it)
@@ -276,13 +323,43 @@ async function seedSiteAssets(siteRow, ids) {
     specs: txSystemSpecs,
   });
 
+  // ✅ NEW: TX MUX serial rows (these will show in "View All Devices" and be editable)
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category.Transmitter,
+    subcategoryId: ids.txSub["TX MUX"],
+    assetName: "TX MUX 1",
+    serialNumber: null,
+    specs: { deviceType: "TX_MUX", mux: "TX_MUX_1_2" },
+  });
+
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category.Transmitter,
+    subcategoryId: ids.txSub["TX MUX"],
+    assetName: "TX MUX 2",
+    serialNumber: null,
+    specs: { deviceType: "TX_MUX", mux: "TX_MUX_1_2" },
+  });
+
+  await ensureAsset({
+    siteId,
+    categoryId: ids.category.Transmitter,
+    subcategoryId: ids.txSub["TX MUX"],
+    assetName: "TX MUX 3",
+    serialNumber: null,
+    specs: { deviceType: "TX_MUX", mux: "TX_MUX_3" },
+  });
+
   // ✅ IMPORTANT: wipe old transmitter COMPONENTS so counts become correct
   await prisma.asset.deleteMany({
     where: {
       siteId,
       categoryId: ids.category.Transmitter,
-      // keep only the "Transmitter System" row
-      NOT: { subcategoryId: ids.txSub["Transmitter System"] },
+      // keep only the "Transmitter System" row and TX MUX rows
+      NOT: {
+        subcategoryId: { in: [ids.txSub["Transmitter System"], ids.txSub["TX MUX"]] },
+      },
     },
   });
 
@@ -353,34 +430,37 @@ async function main() {
   const ids = { category: categoryRecords, txSub, rackSub };
 
   // Upsert sites + seed assets
-for (const s of sites) {
-  const site = await prisma.site.upsert({
-    where: { name: s.name },
-    update: {
-      regMFreq: s.regMFreq,
-      power: s.power,
-      transmitterType: s.transmitterType,
-      status: "ACTIVE",
+  for (const s of sites) {
+    const site = await prisma.site.upsert({
+      where: { name: s.name },
+      update: {
+        regMFreq: s.regMFreq,
+        power: s.power,
+        transmitterType: s.transmitterType,
+        status: "ACTIVE",
 
-      // ✅ NEW
-      towerType: towerTypeFor(s.name),
-      towerHeight: null,
-      gps: null,
-    },
-    create: {
-      ...s,
-      status: "ACTIVE",
+        // tower meta
+        towerType: towerTypeFor(s.name),
+        towerHeight: null,
+        gps: null,
+      },
+      create: {
+        ...s,
+        status: "ACTIVE",
 
-      // ✅ NEW
-      towerType: towerTypeFor(s.name),
-      towerHeight: null,
-      gps: null,
-    },
-    select: { id: true, name: true, power: true },
-  });
+        // tower meta
+        towerType: towerTypeFor(s.name),
+        towerHeight: null,
+        gps: null,
+      },
+      select: { id: true, name: true, power: true },
+    });
 
-  await seedSiteAssets({ siteId: site.id, siteName: site.name, power: site.power }, ids);
-}
+    await seedSiteAssets(
+      { siteId: site.id, siteName: site.name, power: site.power },
+      ids
+    );
+  }
 
   console.log("✅ Sites + devices seeded successfully");
 }
@@ -393,4 +473,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

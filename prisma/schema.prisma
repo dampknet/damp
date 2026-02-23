@@ -57,6 +57,9 @@ model Site {
   towerType       TowerType       @default(GBC)
   towerHeight     Int?
   gps             String?
+  txMux1Serial String?
+  txMux2Serial String?
+  txMux3Serial String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

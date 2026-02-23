@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, AssetStatus } from "@prisma/client";
+import { getCurrentProfile } from "@/lib/auth";
+import SiteMuxSerialInlineEdit from "@/components/SiteMuxSerialInlineEdit";
 
 type Mux = "TX_MUX_1_2" | "TX_MUX_3";
+type MuxKey = "MUX1" | "MUX2" | "MUX3";
 
 type TxAssetRow = {
   id: string;
@@ -15,7 +18,6 @@ type TxAssetRow = {
   partNumber: string | null;
 };
 
-// ✅ Strong tuple types for your grouped blocks
 type Block = readonly [string, TxAssetRow[]];
 type Blocks = Block[];
 
@@ -45,10 +47,6 @@ function getSpecString(specs: Prisma.JsonValue, key: string): string | null {
   return typeof v === "string" && v.trim() ? v : null;
 }
 
-/**
- * Sort "Amplifier 1, Amplifier 2, ... Amplifier 10" correctly (numeric),
- * while keeping non-numbered items stable.
- */
 function numericSuffix(name: string): number | null {
   const m = name.trim().match(/(\d+)\s*$/);
   if (!m) return null;
@@ -82,9 +80,19 @@ export default async function SiteTransmitterPage({
 }) {
   const { id } = await params;
 
+  const profile = await getCurrentProfile();
+  const role = profile?.role ?? "VIEWER";
+  const canEdit = role === "ADMIN" || role === "EDITOR";
+
   const site = await prisma.site.findUnique({
     where: { id },
-    select: { id: true, name: true },
+    select: {
+      id: true,
+      name: true,
+      txMux1Serial: true,
+      txMux2Serial: true,
+      txMux3Serial: true,
+    },
   });
 
   if (!site) return notFound();
@@ -172,7 +180,6 @@ export default async function SiteTransmitterPage({
 
   const systemStatus = systemAsset?.status ?? "ACTIVE";
 
-  // ✅ Strongly typed pairs so `blocks` is ALWAYS Blocks (not string | Blocks)
   const muxPairs: Array<readonly [Mux, Blocks]> = [
     ["TX_MUX_1_2", mux12],
     ["TX_MUX_3", mux3],
@@ -181,10 +188,7 @@ export default async function SiteTransmitterPage({
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-10">
-        <Link
-          href={`/sites/${site.id}`}
-          className="text-sm text-gray-600 hover:underline"
-        >
+        <Link href={`/sites/${site.id}`} className="text-sm text-gray-600 hover:underline">
           ← Back to {site.name}
         </Link>
 
@@ -193,9 +197,7 @@ export default async function SiteTransmitterPage({
         </h1>
 
         <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="text-base font-semibold text-gray-900">
-            Transmitter System
-          </div>
+          <div className="text-base font-semibold text-gray-900">Transmitter System</div>
 
           <div className="mt-2 text-sm text-gray-700">
             Serial: <span className="font-semibold">{showVal(systemSerial)}</span>
@@ -203,6 +205,11 @@ export default async function SiteTransmitterPage({
             Part No: <span className="font-semibold">{showVal(systemPart)}</span>
             <span className="mx-2 text-gray-300">•</span>
             Status: <span className="font-semibold">{systemStatus}</span>
+          </div>
+
+          <div className="mt-2 text-xs text-gray-500">
+            Role: <span className="font-semibold">{role}</span>
+            {!canEdit ? " (view only)" : ""}
           </div>
         </div>
 
@@ -213,16 +220,53 @@ export default async function SiteTransmitterPage({
               0
             );
 
-            return (
-              <div
-                key={mux}
-                className="overflow-hidden rounded-2xl border bg-white shadow-sm"
-              >
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div className="text-sm font-semibold text-gray-900">
-                    {muxTitle(mux)}
+            // ✅ MUX serial rows
+            const muxSerialUI =
+              mux === "TX_MUX_1_2" ? (
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-700">
+                  <div className="inline-flex items-center gap-2">
+                    <span className="text-gray-500">MUX 1 Serial:</span>
+                    <SiteMuxSerialInlineEdit
+                      siteId={site.id}
+                      mux={"MUX1"}
+                      initialSerial={site.txMux1Serial ?? null}
+                      canEdit={canEdit}
+                    />
                   </div>
-                  <div className="text-xs text-gray-500">{totalItems} items</div>
+
+                  <div className="inline-flex items-center gap-2">
+                    <span className="text-gray-500">MUX 2 Serial:</span>
+                    <SiteMuxSerialInlineEdit
+                      siteId={site.id}
+                      mux={"MUX2"}
+                      initialSerial={site.txMux2Serial ?? null}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700">
+                  <span className="text-gray-500">MUX 3 Serial:</span>
+                  <SiteMuxSerialInlineEdit
+                    siteId={site.id}
+                    mux={"MUX3"}
+                    initialSerial={site.txMux3Serial ?? null}
+                    canEdit={canEdit}
+                  />
+                </div>
+              );
+
+            return (
+              <div key={mux} className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+                <div className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {muxTitle(mux)}
+                    </div>
+                    <div className="text-xs text-gray-500">{totalItems} items</div>
+                  </div>
+
+                  <div className="mt-2">{muxSerialUI}</div>
                 </div>
 
                 <div className="h-px bg-gray-100" />
