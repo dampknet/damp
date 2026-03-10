@@ -3,10 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, AssetStatus } from "@prisma/client";
 import { getCurrentProfile } from "@/lib/auth";
-import SiteMuxSerialInlineEdit from "@/components/SiteMuxSerialInlineEdit";
 
 type Mux = "TX_MUX_1_2" | "TX_MUX_3";
-type MuxKey = "MUX1" | "MUX2" | "MUX3";
 
 type TxAssetRow = {
   id: string;
@@ -82,16 +80,12 @@ export default async function SiteTransmitterPage({
 
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
 
   const site = await prisma.site.findUnique({
     where: { id },
     select: {
       id: true,
       name: true,
-      txMux1Serial: true,
-      txMux2Serial: true,
-      txMux3Serial: true,
     },
   });
 
@@ -112,6 +106,7 @@ export default async function SiteTransmitterPage({
   const subNameById = new Map(txSubs.map((s) => [s.id, s.name] as const));
   const subIdByName = new Map(txSubs.map((s) => [s.name, s.id] as const));
   const systemSubId = subIdByName.get("Transmitter System") ?? null;
+  const muxSubId = subIdByName.get("TX MUX") ?? null;
 
   const txAssets = (await prisma.asset.findMany({
     where: { siteId: site.id, categoryId: txCategory.id },
@@ -130,6 +125,27 @@ export default async function SiteTransmitterPage({
   const systemAsset =
     systemSubId ? txAssets.find((a) => a.subcategoryId === systemSubId) : null;
 
+  const mux1Asset =
+    muxSubId
+      ? txAssets.find(
+          (a) => a.subcategoryId === muxSubId && a.assetName === "TX MUX 1"
+        )
+      : null;
+
+  const mux2Asset =
+    muxSubId
+      ? txAssets.find(
+          (a) => a.subcategoryId === muxSubId && a.assetName === "TX MUX 2"
+        )
+      : null;
+
+  const mux3Asset =
+    muxSubId
+      ? txAssets.find(
+          (a) => a.subcategoryId === muxSubId && a.assetName === "TX MUX 3"
+        )
+      : null;
+
   function group(mux: Mux): Blocks {
     const grouped = new Map<string, TxAssetRow[]>();
 
@@ -140,6 +156,7 @@ export default async function SiteTransmitterPage({
       const subName = a.subcategoryId ? subNameById.get(a.subcategoryId) : null;
       if (!subName) continue;
       if (subName === "Transmitter System") continue;
+      if (subName === "TX MUX") continue;
 
       grouped.set(subName, [...(grouped.get(subName) ?? []), a]);
     }
@@ -188,7 +205,10 @@ export default async function SiteTransmitterPage({
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-10">
-        <Link href={`/sites/${site.id}`} className="text-sm text-gray-600 hover:underline">
+        <Link
+          href={`/sites/${site.id}`}
+          className="text-sm text-gray-600 hover:underline"
+        >
           ← Back to {site.name}
         </Link>
 
@@ -197,7 +217,9 @@ export default async function SiteTransmitterPage({
         </h1>
 
         <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="text-base font-semibold text-gray-900">Transmitter System</div>
+          <div className="text-base font-semibold text-gray-900">
+            Transmitter System
+          </div>
 
           <div className="mt-2 text-sm text-gray-700">
             Serial: <span className="font-semibold">{showVal(systemSerial)}</span>
@@ -209,7 +231,6 @@ export default async function SiteTransmitterPage({
 
           <div className="mt-2 text-xs text-gray-500">
             Role: <span className="font-semibold">{role}</span>
-            {!canEdit ? " (view only)" : ""}
           </div>
         </div>
 
@@ -220,44 +241,37 @@ export default async function SiteTransmitterPage({
               0
             );
 
-            // ✅ MUX serial rows
             const muxSerialUI =
               mux === "TX_MUX_1_2" ? (
-                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-700">
-                  <div className="inline-flex items-center gap-2">
-                    <span className="text-gray-500">MUX 1 Serial:</span>
-                    <SiteMuxSerialInlineEdit
-                      siteId={site.id}
-                      mux={"MUX1"}
-                      initialSerial={site.txMux1Serial ?? null}
-                      canEdit={canEdit}
-                    />
+                <div className="space-y-2 text-xs text-gray-700">
+                  <div>
+                    <span className="text-gray-500">MUX 1 Serial:</span>{" "}
+                    <span className="font-medium">{showVal(mux1Asset?.serialNumber)}</span>
+                    <span className="mx-2 text-gray-300">•</span>
+                    <span className="font-medium">{mux1Asset?.status ?? "ACTIVE"}</span>
                   </div>
 
-                  <div className="inline-flex items-center gap-2">
-                    <span className="text-gray-500">MUX 2 Serial:</span>
-                    <SiteMuxSerialInlineEdit
-                      siteId={site.id}
-                      mux={"MUX2"}
-                      initialSerial={site.txMux2Serial ?? null}
-                      canEdit={canEdit}
-                    />
+                  <div>
+                    <span className="text-gray-500">MUX 2 Serial:</span>{" "}
+                    <span className="font-medium">{showVal(mux2Asset?.serialNumber)}</span>
+                    <span className="mx-2 text-gray-300">•</span>
+                    <span className="font-medium">{mux2Asset?.status ?? "ACTIVE"}</span>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700">
-                  <span className="text-gray-500">MUX 3 Serial:</span>
-                  <SiteMuxSerialInlineEdit
-                    siteId={site.id}
-                    mux={"MUX3"}
-                    initialSerial={site.txMux3Serial ?? null}
-                    canEdit={canEdit}
-                  />
+                <div className="text-xs text-gray-700">
+                  <span className="text-gray-500">MUX 3 Serial:</span>{" "}
+                  <span className="font-medium">{showVal(mux3Asset?.serialNumber)}</span>
+                  <span className="mx-2 text-gray-300">•</span>
+                  <span className="font-medium">{mux3Asset?.status ?? "ACTIVE"}</span>
                 </div>
               );
 
             return (
-              <div key={mux} className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+              <div
+                key={mux}
+                className="overflow-hidden rounded-2xl border bg-white shadow-sm"
+              >
                 <div className="px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-sm font-semibold text-gray-900">
@@ -276,7 +290,10 @@ export default async function SiteTransmitterPage({
                     <div className="text-sm text-gray-600">No components yet.</div>
                   ) : (
                     blocks.map(([compName, list]: Block) => (
-                      <div key={compName} className="overflow-hidden rounded-xl border">
+                      <div
+                        key={compName}
+                        className="overflow-hidden rounded-xl border"
+                      >
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="text-sm font-semibold text-gray-900">
                             {compName}

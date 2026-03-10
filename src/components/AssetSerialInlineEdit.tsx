@@ -24,21 +24,21 @@ export default function AssetSerialInlineEdit({
   async function save(next: string) {
     setSaving(true);
     try {
+      const cleaned = next.trim();
+
       const res = await fetch("/sites/api/asset-serial", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           assetId,
-          serialNumber: next.trim() || null,
+          serialNumber: cleaned || null,
         }),
       });
 
       if (!res.ok) {
-        // rollback UI
         setValue(initialSerial ?? "");
       } else {
-        // accept
-        setValue(next.trim());
+        setValue(cleaned);
       }
     } finally {
       setSaving(false);
@@ -46,7 +46,9 @@ export default function AssetSerialInlineEdit({
     }
   }
 
-  if (!canEdit) return <span>{value || "-"}</span>;
+  if (!canEdit) {
+    return <span>{value || "-"}</span>;
+  }
 
   return (
     <div className="flex items-center gap-2">

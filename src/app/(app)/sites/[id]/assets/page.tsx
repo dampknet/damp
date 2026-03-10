@@ -1,221 +1,330 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import PrintExportButton from "@/components/PrintExportButton";
+import type { Prisma, AssetStatus } from "@prisma/client";
 import { getCurrentProfile } from "@/lib/auth";
-import AssetSerialInlineEdit from "@/components/AssetSerialInlineEdit";
 
-type SearchParams = {
-  q?: string;
-  status?: "ACTIVE" | "FAULTY" | "DECOMMISSIONED" | "";
+type Mux = "TX_MUX_1_2" | "TX_MUX_3";
+
+type TxAssetRow = {
+  id: string;
+  assetName: string;
+  subcategoryId: string | null;
+  serialNumber: string | null;
+  status: AssetStatus;
+  specs: Prisma.JsonValue;
+  partNumber: string | null;
 };
 
-export default async function SiteAssetsPage({
+type Block = readonly [string, TxAssetRow[]];
+type Blocks = Block[];
+
+function muxTitle(mux: Mux) {
+  return mux === "TX_MUX_1_2" ? "TX MUX 1/2" : "TX MUX 3";
+}
+
+function showVal(v: unknown) {
+  if (typeof v === "string" && v.trim()) return v;
+  return "-";
+}
+
+function jsonObj(v: Prisma.JsonValue): Record<string, unknown> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  return v as Record<string, unknown>;
+}
+
+function getMuxFromSpecs(specs: Prisma.JsonValue): Mux | null {
+  const o = jsonObj(specs);
+  const mux = o?.mux;
+  return mux === "TX_MUX_1_2" || mux === "TX_MUX_3" ? mux : null;
+}
+
+function getSpecString(specs: Prisma.JsonValue, key: string): string | null {
+  const o = jsonObj(specs);
+  const v = o?.[key];
+  return typeof v === "string" && v.trim() ? v : null;
+}
+
+function numericSuffix(name: string): number | null {
+  const m = name.trim().match(/(\d+)\s*$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function sortAssetsNaturally(list: TxAssetRow[]) {
+  return [...list].sort((a, b) => {
+    const aNum = numericSuffix(a.assetName);
+    const bNum = numericSuffix(b.assetName);
+
+    const aBase = a.assetName.replace(/\s*\d+\s*$/, "").trim();
+    const bBase = b.assetName.replace(/\s*\d+\s*$/, "").trim();
+
+    if (aBase !== bBase) return aBase.localeCompare(bBase);
+
+    if (aNum !== null && bNum !== null) return aNum - bNum;
+
+    if (aNum === null && bNum !== null) return -1;
+    if (aNum !== null && bNum === null) return 1;
+
+    return a.assetName.localeCompare(b.assetName);
+  });
+}
+
+export default async function SiteTransmitterPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<SearchParams>;
 }) {
   const { id } = await params;
 
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
-
-  const sp = (await searchParams) ?? {};
-  const q = (sp.q ?? "").trim();
-  const status = (sp.status ?? "").trim() as SearchParams["status"];
 
   const site = await prisma.site.findUnique({
     where: { id },
-    select: { id: true, name: true },
+    select: {
+      id: true,
+      name: true,
+    },
   });
+
   if (!site) return notFound();
 
-  const assets = await prisma.asset.findMany({
-    where: {
-      siteId: site.id,
-      ...(status ? { status } : {}),
-      ...(q
-        ? {
-            OR: [
-              { assetName: { contains: q, mode: "insensitive" } },
-              { serialNumber: { contains: q, mode: "insensitive" } },
-              { manufacturer: { contains: q, mode: "insensitive" } },
-              { model: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      category: { select: { name: true } },
-      subcategory: { select: { name: true } },
-    },
+  const txCategory = await prisma.category.findUnique({
+    where: { name: "Transmitter" },
+    select: { id: true },
   });
 
-  const pageTitleParts = [`${site.name} — All Devices`];
-  if (status) pageTitleParts.push(`Status: ${status}`);
-  if (q) pageTitleParts.push(`Search: ${q}`);
-  const pageTitle = pageTitleParts.join(" — ");
+  if (!txCategory) return notFound();
 
-  const csvRows = assets.map((a: (typeof assets)[number]) => ({
-    Site: site.name,
-    Category: a.category?.name ?? "",
-    Subcategory: a.subcategory?.name ?? "",
-    Name: a.assetName,
-    Serial: a.serialNumber ?? "",
-    Manufacturer: a.manufacturer ?? "",
-    Model: a.model ?? "",
-    Status: a.status,
-    UpdatedAt: a.updatedAt.toISOString(),
-  }));
+  const txSubs = await prisma.subcategory.findMany({
+    where: { categoryId: txCategory.id },
+    select: { id: true, name: true },
+  });
 
-  const exportCols = [
-    { key: "Site", label: "Site" },
-    { key: "Category", label: "Category" },
-    { key: "Subcategory", label: "Subcategory" },
-    { key: "Name", label: "Device" },
-    { key: "Serial", label: "Serial" },
-    { key: "Manufacturer", label: "Manufacturer" },
-    { key: "Model", label: "Model" },
-    { key: "Status", label: "Status" },
-    { key: "UpdatedAt", label: "Updated At" },
+  const subNameById = new Map(txSubs.map((s) => [s.id, s.name] as const));
+  const subIdByName = new Map(txSubs.map((s) => [s.name, s.id] as const));
+  const systemSubId = subIdByName.get("Transmitter System") ?? null;
+  const muxSubId = subIdByName.get("TX MUX") ?? null;
+
+  const txAssets = (await prisma.asset.findMany({
+    where: { siteId: site.id, categoryId: txCategory.id },
+    select: {
+      id: true,
+      assetName: true,
+      subcategoryId: true,
+      serialNumber: true,
+      status: true,
+      specs: true,
+      partNumber: true,
+    },
+    orderBy: { assetName: "asc" },
+  })) as TxAssetRow[];
+
+  const systemAsset =
+    systemSubId ? txAssets.find((a) => a.subcategoryId === systemSubId) : null;
+
+  const mux1Asset =
+    muxSubId
+      ? txAssets.find(
+          (a) => a.subcategoryId === muxSubId && a.assetName === "TX MUX 1"
+        )
+      : null;
+
+  const mux2Asset =
+    muxSubId
+      ? txAssets.find(
+          (a) => a.subcategoryId === muxSubId && a.assetName === "TX MUX 2"
+        )
+      : null;
+
+  const mux3Asset =
+    muxSubId
+      ? txAssets.find(
+          (a) => a.subcategoryId === muxSubId && a.assetName === "TX MUX 3"
+        )
+      : null;
+
+  function group(mux: Mux): Blocks {
+    const grouped = new Map<string, TxAssetRow[]>();
+
+    for (const a of txAssets) {
+      const m = getMuxFromSpecs(a.specs);
+      if (m !== mux) continue;
+
+      const subName = a.subcategoryId ? subNameById.get(a.subcategoryId) : null;
+      if (!subName) continue;
+      if (subName === "Transmitter System") continue;
+      if (subName === "TX MUX") continue;
+
+      grouped.set(subName, [...(grouped.get(subName) ?? []), a]);
+    }
+
+    for (const [comp, list] of grouped.entries()) {
+      grouped.set(comp, sortAssetsNaturally(list));
+    }
+
+    const order = [
+      "Exciter",
+      "Exciter/System Control",
+      "Amplifier",
+      "Pump",
+      "Channel Combiner",
+      "Heat Exchanger",
+      "Humidifier",
+      "System Control",
+    ];
+
+    return order
+      .filter((k) => grouped.has(k))
+      .map((k) => [k, grouped.get(k)!] as const);
+  }
+
+  const mux12 = group("TX_MUX_1_2");
+  const mux3 = group("TX_MUX_3");
+
+  const systemSerial =
+    systemAsset?.serialNumber ??
+    getSpecString(systemAsset?.specs ?? null, "serial") ??
+    null;
+
+  const systemPart =
+    systemAsset?.partNumber ??
+    getSpecString(systemAsset?.specs ?? null, "partNumber") ??
+    getSpecString(systemAsset?.specs ?? null, "partNo") ??
+    null;
+
+  const systemStatus = systemAsset?.status ?? "ACTIVE";
+
+  const muxPairs: Array<readonly [Mux, Blocks]> = [
+    ["TX_MUX_1_2", mux12],
+    ["TX_MUX_3", mux3],
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 print:bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-10 print:py-0">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Link
-              href={`/sites/${site.id}`}
-              className="text-sm text-gray-600 hover:underline print:hidden"
-            >
-              ← Back to Site
-            </Link>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <Link
+          href={`/sites/${site.id}`}
+          className="text-sm text-gray-600 hover:underline"
+        >
+          ← Back to {site.name}
+        </Link>
 
-            <h1 className="mt-2 text-2xl font-semibold text-gray-900">
-              {site.name} — All Devices
-            </h1>
+        <h1 className="mt-3 text-2xl font-semibold text-gray-900">
+          {site.name} — Transmitter
+        </h1>
 
-            <p className="mt-1 text-sm text-gray-600">
-              Search, filter, print or export.
-            </p>
-
-            <div className="mt-2 text-xs text-gray-500 print:hidden">
-              Role: <span className="font-semibold">{role}</span>
-              {!canEdit ? " (view only)" : ""}
-            </div>
+        <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="text-base font-semibold text-gray-900">
+            Transmitter System
           </div>
 
-          <div className="print:hidden">
-            <PrintExportButton
-              title={pageTitle}
-              filename={`${site.name}-devices.csv`}
-              rows={csvRows}
-              columns={exportCols}
-            />
+          <div className="mt-2 text-sm text-gray-700">
+            Serial: <span className="font-semibold">{showVal(systemSerial)}</span>
+            <span className="mx-2 text-gray-300">•</span>
+            Part No: <span className="font-semibold">{showVal(systemPart)}</span>
+            <span className="mx-2 text-gray-300">•</span>
+            Status: <span className="font-semibold">{systemStatus}</span>
+          </div>
+
+          <div className="mt-2 text-xs text-gray-500">
+            Role: <span className="font-semibold">{role}</span>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="mt-6 rounded-xl border bg-white p-4 print:hidden">
-          <form className="grid gap-3 sm:grid-cols-3">
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Search name, serial, model, manufacturer…"
-              className="rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
-            />
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {muxPairs.map(([mux, blocks]) => {
+            const totalItems = blocks.reduce(
+              (acc: number, [, arr]: Block) => acc + arr.length,
+              0
+            );
 
-            <select
-              name="status"
-              aria-label="Filter by status"
-              defaultValue={status ?? ""}
-              className="rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
-              title="Filter by status"
-            >
-              <option value="">All statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="FAULTY">Faulty</option>
-              <option value="DECOMMISSIONED">Decommissioned</option>
-            </select>
+            const muxSerialUI =
+              mux === "TX_MUX_1_2" ? (
+                <div className="space-y-2 text-xs text-gray-700">
+                  <div>
+                    <span className="text-gray-500">MUX 1 Serial:</span>{" "}
+                    <span className="font-medium">{showVal(mux1Asset?.serialNumber)}</span>
+                    <span className="mx-2 text-gray-300">•</span>
+                    <span className="font-medium">{mux1Asset?.status ?? "ACTIVE"}</span>
+                  </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
-              >
-                Apply
-              </button>
-
-              <Link
-                href={`/sites/${site.id}/assets`}
-                className="w-full rounded-lg border bg-white px-4 py-2 text-center text-sm font-medium hover:bg-gray-50"
-              >
-                Reset
-              </Link>
-            </div>
-          </form>
-        </div>
-
-        {/* PRINT HEADER */}
-        <div className="print-only mt-6">
-          <div id="print-title" className="text-lg font-semibold text-gray-900">
-            {pageTitle}
-          </div>
-          <div className="mt-1 text-xs text-gray-500">
-            Printed on {new Date().toLocaleString()}
-          </div>
-        </div>
-        <div className="print-only h-px bg-gray-200" />
-
-        {/* Table */}
-        <div className="print-area mt-4 overflow-hidden rounded-xl border bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 text-left text-gray-700">
-              <tr>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Sub</th>
-                <th className="px-4 py-3">Device</th>
-                <th className="px-4 py-3">Serial</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {assets.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-10 text-center text-gray-600" colSpan={5}>
-                    No devices yet for this site.
-                  </td>
-                </tr>
+                  <div>
+                    <span className="text-gray-500">MUX 2 Serial:</span>{" "}
+                    <span className="font-medium">{showVal(mux2Asset?.serialNumber)}</span>
+                    <span className="mx-2 text-gray-300">•</span>
+                    <span className="font-medium">{mux2Asset?.status ?? "ACTIVE"}</span>
+                  </div>
+                </div>
               ) : (
-                assets.map((a: (typeof assets)[number]) => (
-                  <tr key={a.id} className="border-t">
-                    <td className="px-4 py-3">{a.category?.name ?? "-"}</td>
-                    <td className="px-4 py-3">{a.subcategory?.name ?? "-"}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {a.assetName}
-                    </td>
+                <div className="text-xs text-gray-700">
+                  <span className="text-gray-500">MUX 3 Serial:</span>{" "}
+                  <span className="font-medium">{showVal(mux3Asset?.serialNumber)}</span>
+                  <span className="mx-2 text-gray-300">•</span>
+                  <span className="font-medium">{mux3Asset?.status ?? "ACTIVE"}</span>
+                </div>
+              );
 
-                    {/* ✅ Editable serial for ADMIN/EDITOR, read-only for VIEWER */}
-                    <td className="px-4 py-3">
-                      <AssetSerialInlineEdit
-                        assetId={a.id}
-                        initialSerial={a.serialNumber ?? null}
-                        canEdit={canEdit}
-                      />
-                    </td>
+            return (
+              <div
+                key={mux}
+                className="overflow-hidden rounded-2xl border bg-white shadow-sm"
+              >
+                <div className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {muxTitle(mux)}
+                    </div>
+                    <div className="text-xs text-gray-500">{totalItems} items</div>
+                  </div>
 
-                    <td className="px-4 py-3">{a.status}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                  <div className="mt-2">{muxSerialUI}</div>
+                </div>
+
+                <div className="h-px bg-gray-100" />
+
+                <div className="space-y-4 p-5">
+                  {blocks.length === 0 ? (
+                    <div className="text-sm text-gray-600">No components yet.</div>
+                  ) : (
+                    blocks.map(([compName, list]: Block) => (
+                      <div
+                        key={compName}
+                        className="overflow-hidden rounded-xl border"
+                      >
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {compName}
+                          </div>
+                          <div className="text-xs text-gray-500">{list.length}</div>
+                        </div>
+
+                        <div className="h-px bg-gray-100" />
+
+                        <div className="divide-y">
+                          {list.map((a: TxAssetRow) => (
+                            <div
+                              key={a.id}
+                              className="flex items-center justify-between px-4 py-2"
+                            >
+                              <div className="text-sm text-gray-800">{a.assetName}</div>
+                              <div className="text-xs text-gray-600">
+                                {a.serialNumber ?? "-"}
+                                <span className="mx-2 text-gray-300">•</span>
+                                {a.status}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
