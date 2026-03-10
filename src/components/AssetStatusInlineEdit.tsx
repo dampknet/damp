@@ -1,38 +1,87 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+"use client";
 
-export async function PATCH(req: Request) {
-  try {
-    const profile = await getCurrentProfile();
-    const role = profile?.role ?? "VIEWER";
-    const canEdit = role === "ADMIN" || role === "EDITOR";
-    if (!canEdit) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+import * as React from "react";
 
-    const body = (await req.json()) as {
-      assetId?: string;
-      serialNumber?: string | null;
-    };
+type AssetStatus = "ACTIVE" | "FAULTY" | "DECOMMISSIONED";
 
-    if (!body.assetId) {
-      return NextResponse.json({ error: "assetId is required" }, { status: 400 });
-    }
+type Props = {
+  assetId: string;
+  initialStatus: AssetStatus;
+  canEdit?: boolean;
+};
 
-    const serial = body.serialNumber?.trim() || null;
+function badgeClass(status: AssetStatus) {
+  const base =
+    "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
 
-    await prisma.asset.update({
-      where: { id: body.assetId },
-      data: { serialNumber: serial },
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "Failed to update serial number" },
-      { status: 500 }
-    );
+  if (status === "ACTIVE") {
+    return `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
   }
+
+  if (status === "FAULTY") {
+    return `${base} border-amber-200 bg-amber-50 text-amber-800`;
+  }
+
+  return `${base} border-red-200 bg-red-50 text-red-700`;
+}
+
+export default function AssetStatusInlineEdit({
+  assetId,
+  initialStatus,
+  canEdit = true,
+}: Props) {
+  const [status, setStatus] = React.useState<AssetStatus>(initialStatus);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
+
+  async function update(next: AssetStatus) {
+    const prev = status;
+    setStatus(next);
+    setSaving(true);
+
+    try {
+      const res = await fetch("/sites/api/asset-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assetId,
+          status: next,
+        }),
+      });
+
+      if (!res.ok) {
+        setStatus(prev);
+      }
+    } catch {
+      setStatus(prev);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!canEdit) {
+    return <span className={badgeClass(status)}>{status}</span>;
+  }
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <span className={badgeClass(status)}>{status}</span>
+
+      <select
+        value={status}
+        onChange={(e) => update(e.target.value as AssetStatus)}
+        disabled={saving}
+        className="rounded-md border bg-white px-2 py-1 text-xs"
+        aria-label="Update asset status"
+        title="Update asset status"
+      >
+        <option value="ACTIVE">ACTIVE</option>
+        <option value="FAULTY">FAULTY</option>
+        <option value="DECOMMISSIONED">DECOMMISSIONED</option>
+      </select>
+    </div>
+  );
 }
