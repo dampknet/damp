@@ -22,14 +22,6 @@ function ttBadge(tt: "AIR" | "LIQUID") {
     : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
 }
 
-function formatChangedAt(date: Date | null) {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 export default async function SitesPage({
   searchParams,
 }: {
@@ -68,8 +60,6 @@ export default async function SitesPage({
       power: true,
       transmitterType: true,
       status: true,
-      statusReason: true,
-      statusChangedAt: true,
       towerType: true,
       towerHeight: true,
       gps: true,
@@ -87,6 +77,7 @@ export default async function SitesPage({
   const exportRows = sites.map((s) => {
     const tx = (s.transmitterType ?? "AIR") as "AIR" | "LIQUID";
     const tw = (s.towerType ?? "GBC") as "GBC" | "KNET";
+
     return {
       Site: s.name,
       "REG M FREQ": s.regMFreq ?? "",
@@ -96,8 +87,6 @@ export default async function SitesPage({
       "Tower Height": s.towerHeight ?? "",
       GPS: s.gps ?? "",
       Status: s.status,
-      "Status Reason": s.statusReason ?? "",
-      "Changed At": s.statusChangedAt ? s.statusChangedAt.toISOString() : "",
     };
   });
 
@@ -110,8 +99,6 @@ export default async function SitesPage({
     { key: "Tower Height", label: "Tower Height" },
     { key: "GPS", label: "GPS" },
     { key: "Status", label: "Status" },
-    { key: "Status Reason", label: "Status Reason" },
-    { key: "Changed At", label: "Changed At" },
   ];
 
   const siteMini = sites.map((s) => ({ id: s.id, name: s.name }));
@@ -119,7 +106,6 @@ export default async function SitesPage({
   return (
     <div className="min-h-screen bg-[#f5f2ed]">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        {/* Header */}
         <div className="no-print rounded-3xl border border-[#e0dbd2] bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -130,7 +116,8 @@ export default async function SitesPage({
                 Sites
               </h1>
               <p className="mt-2 text-sm font-medium text-[#8b857c]">
-                Search, filter by transmitter type, open a site, and manage assets.
+                Search, filter by transmitter type, open a site, and manage
+                assets.
               </p>
 
               <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]">
@@ -169,7 +156,6 @@ export default async function SitesPage({
             </div>
           </div>
 
-          {/* Search */}
           <div className="mt-6">
             <form className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex w-full items-center gap-2 rounded-xl border border-[#e0dbd2] bg-white px-3 py-2">
@@ -214,13 +200,9 @@ export default async function SitesPage({
           </div>
         </div>
 
-        {/* Table */}
         <div className="print-area mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm">
           <div className="print-only px-5 py-4">
-            <div
-              id="print-title"
-              className="text-lg font-semibold text-gray-900"
-            >
+            <div id="print-title" className="text-lg font-semibold text-gray-900">
               {printTitle}
             </div>
             <div className="mt-1 text-xs text-gray-500">
@@ -250,7 +232,6 @@ export default async function SitesPage({
                   <th className="px-5 py-3 font-semibold">Height(m)</th>
                   <th className="px-5 py-3 font-semibold">GPS</th>
                   <th className="px-5 py-3 font-semibold text-right">Status</th>
-                  <th className="px-5 py-3 font-semibold">Reason / Changed</th>
                   <th className="px-5 py-3 font-semibold text-right no-print">
                     Open
                   </th>
@@ -262,7 +243,7 @@ export default async function SitesPage({
                   <tr>
                     <td
                       className="px-5 py-12 text-center text-[#8b857c]"
-                      colSpan={10}
+                      colSpan={9}
                     >
                       No sites found
                     </td>
@@ -291,7 +272,9 @@ export default async function SitesPage({
                         <td className="px-5 py-3">
                           <SiteTowerTypeSelect
                             siteId={s.id}
-                            initialTowerType={(s.towerType ?? "GBC") as "GBC" | "KNET"}
+                            initialTowerType={(s.towerType ?? "GBC") as
+                              | "GBC"
+                              | "KNET"}
                             canEdit={canEdit}
                           />
                         </td>
@@ -322,17 +305,6 @@ export default async function SitesPage({
                             initialStatus={s.status}
                             canEdit={canEdit}
                           />
-                        </td>
-
-                        <td className="px-5 py-3">
-                          <div className="max-w-55">
-                            <div className="truncate text-xs font-medium text-[#5b564d]">
-                              {s.statusReason || "-"}
-                            </div>
-                            <div className="mt-1 text-[11px] text-[#9c9890]">
-                              {formatChangedAt(s.statusChangedAt)}
-                            </div>
-                          </div>
                         </td>
 
                         <td className="px-5 py-3 text-right no-print">

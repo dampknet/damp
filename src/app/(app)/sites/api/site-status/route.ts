@@ -30,17 +30,13 @@ export async function PATCH(req: Request) {
     }
 
     const reason = String(body.reason ?? "").trim();
-
     if (!reason) {
-      return NextResponse.json(
-        { error: "Reason is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Reason is required" }, { status: 400 });
     }
 
     const currentSite = await prisma.site.findUnique({
       where: { id: body.siteId },
-      select: { id: true, name: true, status: true },
+      select: { id: true, name: true },
     });
 
     if (!currentSite) {
@@ -61,16 +57,17 @@ export async function PATCH(req: Request) {
           id: true,
           name: true,
           status: true,
-          statusReason: true,
-          statusChangedAt: true,
         },
       });
 
       await tx.activityLog.create({
         data: {
           type: "SITE_STATUS_CHANGED",
-          title: `${site.name} marked ${body.status}`,
-          details: `Reason: ${reason}`,
+          title:
+            body.status === "DOWN"
+              ? `${site.name} down due to ${reason}`
+              : `${site.name} active again due to ${reason}`,
+          details: null,
           entityType: "SITE",
           entityId: site.id,
           actorEmail: profile?.email ?? null,
