@@ -5,8 +5,6 @@ import { getCurrentProfile } from "@/lib/auth";
 import PrintExportButton from "@/components/PrintExportButton";
 import SiteStatusSelect from "@/components/SiteStatusSelect";
 import DeleteSiteDialog from "@/components/DeleteSiteDialog";
-
-// ✅ NEW inline editors (separate columns, edit beside value)
 import SiteTowerTypeSelect from "@/components/SiteTowerTypeSelect";
 import SiteHeightInlineEdit from "@/components/SiteHeightInlineEdit";
 import SiteGpsInlineEdit from "@/components/SiteGpsInlineEdit";
@@ -22,6 +20,14 @@ function ttBadge(tt: "AIR" | "LIQUID") {
   return tt === "AIR"
     ? `${base} border-sky-200 bg-sky-50 text-sky-800`
     : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+}
+
+function formatChangedAt(date: Date | null) {
+  if (!date) return "-";
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 export default async function SitesPage({
@@ -62,8 +68,8 @@ export default async function SitesPage({
       power: true,
       transmitterType: true,
       status: true,
-
-      // ✅ tower meta
+      statusReason: true,
+      statusChangedAt: true,
       towerType: true,
       towerHeight: true,
       gps: true,
@@ -90,6 +96,8 @@ export default async function SitesPage({
       "Tower Height": s.towerHeight ?? "",
       GPS: s.gps ?? "",
       Status: s.status,
+      "Status Reason": s.statusReason ?? "",
+      "Changed At": s.statusChangedAt ? s.statusChangedAt.toISOString() : "",
     };
   });
 
@@ -102,29 +110,36 @@ export default async function SitesPage({
     { key: "Tower Height", label: "Tower Height" },
     { key: "GPS", label: "GPS" },
     { key: "Status", label: "Status" },
+    { key: "Status Reason", label: "Status Reason" },
+    { key: "Changed At", label: "Changed At" },
   ];
 
   const siteMini = sites.map((s) => ({ id: s.id, name: s.name }));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <div className="no-print rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="min-h-screen bg-[#f5f2ed]">
+      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+        {/* Header */}
+        <div className="no-print rounded-3xl border border-[#e0dbd2] bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Sites</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Search, filter by transmitter type, open a site, and manage
-                assets.
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]">
+                Site Directory
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight text-[#1a1814]">
+                Sites
+              </h1>
+              <p className="mt-2 text-sm font-medium text-[#8b857c]">
+                Search, filter by transmitter type, open a site, and manage assets.
               </p>
 
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1 text-xs font-medium text-gray-700">
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Role: {role}
                 {profile?.email ? (
                   <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-600">{profile.email}</span>
+                    <span className="text-[#b5aea4]">•</span>
+                    <span className="text-[#7a746a]">{profile.email}</span>
                   </>
                 ) : null}
               </div>
@@ -142,22 +157,23 @@ export default async function SitesPage({
               {canEdit ? (
                 <Link
                   href="/sites/new"
-                  className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
+                  className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2d2924]"
                 >
                   Add Site
                 </Link>
               ) : (
-                <div className="rounded-xl border bg-white px-4 py-2 text-sm font-medium text-gray-500">
+                <div className="rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-medium text-[#8b857c]">
                   View only
                 </div>
               )}
             </div>
           </div>
 
+          {/* Search */}
           <div className="mt-6">
             <form className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2">
-                <span className="text-gray-400">🔎</span>
+              <div className="flex w-full items-center gap-2 rounded-xl border border-[#e0dbd2] bg-white px-3 py-2">
+                <span className="text-[#b0a79b]">🔎</span>
                 <input
                   name="q"
                   defaultValue={q}
@@ -170,8 +186,9 @@ export default async function SitesPage({
               <select
                 name="tt"
                 defaultValue={tt}
-                className="rounded-xl border bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
                 aria-label="Filter by transmitter type"
+                title="Filter by transmitter type"
               >
                 <option value="ALL">All types</option>
                 <option value="AIR">Air-cooled (A)</option>
@@ -180,7 +197,7 @@ export default async function SitesPage({
 
               <button
                 type="submit"
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+                className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
               >
                 Search
               </button>
@@ -188,7 +205,7 @@ export default async function SitesPage({
               {q || (tt && tt !== "ALL") ? (
                 <Link
                   href="/sites"
-                  className="text-sm font-medium text-gray-700 hover:underline"
+                  className="text-sm font-semibold text-[#5b564d] hover:underline"
                 >
                   Clear
                 </Link>
@@ -197,7 +214,8 @@ export default async function SitesPage({
           </div>
         </div>
 
-        <div className="print-area mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm">
+        {/* Table */}
+        <div className="print-area mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm">
           <div className="print-only px-5 py-4">
             <div
               id="print-title"
@@ -212,58 +230,56 @@ export default async function SitesPage({
           <div className="print-only h-px bg-gray-200" />
 
           <div className="flex items-center justify-between px-5 py-4">
-            <div className="text-sm font-semibold text-gray-900">Sites</div>
-            <div className="text-xs text-gray-500">{sites.length} shown</div>
+            <div className="text-sm font-semibold text-[#1a1814]">Sites</div>
+            <div className="text-xs font-medium text-[#8b857c]">
+              {sites.length} shown
+            </div>
           </div>
 
-          <div className="h-px bg-gray-100" />
+          <div className="h-px bg-[#eee7dd]" />
 
-          <div className="overflow-x-auto">
+          <div className="max-h-[72vh] overflow-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-600">
+              <thead className="sticky top-0 z-20 bg-[#f8f4ee] text-left text-[#5b564d] shadow-sm">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Site</th>
-                  <th className="px-5 py-3 font-medium">REG M FREQ</th>
-                  <th className="px-5 py-3 font-medium">Power</th>
-                  <th className="px-5 py-3 font-medium">Tx</th>
-
-                  {/* ✅ separate columns */}
-                  <th className="px-5 py-3 font-medium">Tower</th>
-                  <th className="px-5 py-3 font-medium">Height(m)</th>
-                  <th className="px-5 py-3 font-medium">GPS</th>
-
-                  <th className="px-5 py-3 font-medium text-right">Status</th>
-                  <th className="px-5 py-3 font-medium text-right no-print">
+                  <th className="px-5 py-3 font-semibold">Site</th>
+                  <th className="px-5 py-3 font-semibold">REG M FREQ</th>
+                  <th className="px-5 py-3 font-semibold">Power</th>
+                  <th className="px-5 py-3 font-semibold">Tx</th>
+                  <th className="px-5 py-3 font-semibold">Tower</th>
+                  <th className="px-5 py-3 font-semibold">Height(m)</th>
+                  <th className="px-5 py-3 font-semibold">GPS</th>
+                  <th className="px-5 py-3 font-semibold text-right">Status</th>
+                  <th className="px-5 py-3 font-semibold">Reason / Changed</th>
+                  <th className="px-5 py-3 font-semibold text-right no-print">
                     Open
                   </th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-[#eee7dd]">
                 {sites.length === 0 ? (
                   <tr>
                     <td
-                      className="px-5 py-10 text-center text-gray-600"
-                      colSpan={9}
+                      className="px-5 py-12 text-center text-[#8b857c]"
+                      colSpan={10}
                     >
                       No sites found
                     </td>
                   </tr>
                 ) : (
                   sites.map((s) => {
-                    const tx = (s.transmitterType ?? "AIR") as
-                      | "AIR"
-                      | "LIQUID";
+                    const tx = (s.transmitterType ?? "AIR") as "AIR" | "LIQUID";
 
                     return (
-                      <tr key={s.id} className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium text-gray-900">
+                      <tr key={s.id} className="hover:bg-[#fcfaf7]">
+                        <td className="px-5 py-3 font-semibold text-[#1a1814]">
                           {s.name}
                         </td>
-                        <td className="px-5 py-3 text-gray-700">
+                        <td className="px-5 py-3 text-[#5d584f]">
                           {s.regMFreq ?? "-"}
                         </td>
-                        <td className="px-5 py-3 text-gray-700">
+                        <td className="px-5 py-3 text-[#5d584f]">
                           {typeof s.power === "number" ? s.power : "-"}
                         </td>
                         <td className="px-5 py-3">
@@ -272,19 +288,15 @@ export default async function SitesPage({
                           </span>
                         </td>
 
-                        {/* ✅ Tower type edit beside value */}
                         <td className="px-5 py-3">
                           <SiteTowerTypeSelect
                             siteId={s.id}
-                            initialTowerType={(s.towerType ?? "GBC") as
-                              | "GBC"
-                              | "KNET"}
+                            initialTowerType={(s.towerType ?? "GBC") as "GBC" | "KNET"}
                             canEdit={canEdit}
                           />
                         </td>
 
-                        {/* ✅ Height edit beside value */}
-                        <td className="px-5 py-3 text-gray-700">
+                        <td className="px-5 py-3 text-[#5d584f]">
                           <SiteHeightInlineEdit
                             siteId={s.id}
                             initialHeight={
@@ -296,8 +308,7 @@ export default async function SitesPage({
                           />
                         </td>
 
-                        {/* ✅ GPS edit beside value + link to Google maps */}
-                        <td className="px-5 py-3 text-gray-700">
+                        <td className="px-5 py-3 text-[#5d584f]">
                           <SiteGpsInlineEdit
                             siteId={s.id}
                             initialGps={s.gps ?? null}
@@ -313,10 +324,21 @@ export default async function SitesPage({
                           />
                         </td>
 
+                        <td className="px-5 py-3">
+                          <div className="max-w-55">
+                            <div className="truncate text-xs font-medium text-[#5b564d]">
+                              {s.statusReason || "-"}
+                            </div>
+                            <div className="mt-1 text-[11px] text-[#9c9890]">
+                              {formatChangedAt(s.statusChangedAt)}
+                            </div>
+                          </div>
+                        </td>
+
                         <td className="px-5 py-3 text-right no-print">
                           <Link
                             href={`/sites/${s.id}`}
-                            className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
+                            className="rounded-md border border-[#e0dbd2] px-3 py-1.5 text-xs font-semibold text-[#1a1814] hover:bg-[#f7f3ed]"
                           >
                             Open
                           </Link>
