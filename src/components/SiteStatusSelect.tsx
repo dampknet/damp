@@ -10,17 +10,46 @@ type Props = {
 };
 
 function badgeClass(status: SiteStatus) {
-  const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
+  const base =
+    "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
+
   return status === "ACTIVE"
     ? `${base} border-emerald-200 bg-emerald-50 text-emerald-700`
     : `${base} border-red-200 bg-red-50 text-red-700`;
 }
 
-export default function SiteStatusSelect({ siteId, initialStatus, canEdit = true }: Props) {
+export default function SiteStatusSelect({
+  siteId,
+  initialStatus,
+  canEdit = true,
+}: Props) {
   const [status, setStatus] = React.useState<SiteStatus>(initialStatus);
   const [saving, setSaving] = React.useState(false);
 
+  React.useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
+
   async function update(next: SiteStatus) {
+    if (next === status) return;
+
+    const reason = window.prompt(
+      next === "DOWN"
+        ? "Why is this site DOWN?"
+        : "Why are you marking this site ACTIVE again?"
+    );
+
+    if (reason === null) {
+      return;
+    }
+
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      window.alert("Reason is required.");
+      return;
+    }
+
+    const prev = status;
     setStatus(next);
     setSaving(true);
 
@@ -28,13 +57,18 @@ export default function SiteStatusSelect({ siteId, initialStatus, canEdit = true
       const res = await fetch("/sites/api/site-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId, status: next }),
+        body: JSON.stringify({
+          siteId,
+          status: next,
+          reason: trimmedReason,
+        }),
       });
 
       if (!res.ok) {
-        // rollback
-        setStatus(initialStatus);
+        setStatus(prev);
       }
+    } catch {
+      setStatus(prev);
     } finally {
       setSaving(false);
     }
@@ -54,6 +88,7 @@ export default function SiteStatusSelect({ siteId, initialStatus, canEdit = true
         disabled={saving}
         className="rounded-md border bg-white px-2 py-1 text-xs"
         aria-label="Update site status"
+        title="Update site status"
       >
         <option value="ACTIVE">ACTIVE</option>
         <option value="DOWN">DOWN</option>

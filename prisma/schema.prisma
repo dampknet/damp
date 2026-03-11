@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -33,6 +33,15 @@ enum SiteStatus {
   DOWN
 }
 
+enum TowerType {
+  GBC
+  KNET
+}
+
+enum ActivityType {
+  SITE_STATUS_CHANGED
+}
+
 model UserProfile {
   id        String   @id
   email     String   @unique
@@ -42,11 +51,6 @@ model UserProfile {
   updatedAt DateTime @updatedAt
 }
 
-enum TowerType {
-  GBC
-  KNET
-}
-
 model Site {
   id              String          @id @default(cuid())
   name            String          @unique
@@ -54,17 +58,33 @@ model Site {
   power           Int?
   transmitterType TransmitterType @default(AIR)
   status          SiteStatus      @default(ACTIVE)
+  statusReason    String?
+  statusChangedAt DateTime?
   towerType       TowerType       @default(GBC)
   towerHeight     Int?
   gps             String?
-  txMux1Serial String?
-  txMux2Serial String?
-  txMux3Serial String?
+  txMux1Serial    String?
+  txMux2Serial    String?
+  txMux3Serial    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assets    Asset[]
+  assets Asset[]
+}
+
+model ActivityLog {
+  id         String       @id @default(cuid())
+  type       ActivityType
+  title      String
+  details    String?
+  entityType String?
+  entityId   String?
+  actorEmail String?
+  createdAt  DateTime     @default(now())
+
+  @@index([createdAt])
+  @@index([type])
 }
 
 model Category {
@@ -84,14 +104,14 @@ model Subcategory {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  category   Category @relation(fields: [categoryId], references: [id])
-  assets     Asset[]
+  category Category @relation(fields: [categoryId], references: [id])
+  assets   Asset[]
 
   @@unique([categoryId, name])
 }
 
 model Asset {
-  id            String      @id @default(cuid())
+  id            String       @id @default(cuid())
   siteId        String
   categoryId    String
   subcategoryId String?
@@ -103,20 +123,20 @@ model Asset {
   manufacturer  String?
   model         String?
   partNumber    String?
-  status        AssetStatus @default(ACTIVE)
+  status        AssetStatus  @default(ACTIVE)
 
   /**
    * extra metadata (deviceType, mux group, rack component etc.)
    * { "mux": "TX_MUX_1_2" }
    */
-  specs         Json        @default("{}")
+  specs         Json         @default("{}")
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  site          Site        @relation(fields: [siteId], references: [id])
-  category      Category    @relation(fields: [categoryId], references: [id])
-  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  site        Site         @relation(fields: [siteId], references: [id])
+  category    Category     @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
 
   @@index([siteId])
   @@index([categoryId])
@@ -141,5 +161,3 @@ model StoreItem {
   @@index([status])
   @@index([itemNo])
 }
-
-
