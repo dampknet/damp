@@ -41,7 +41,7 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Dashboard22</h1>
           <p className="mt-1 text-sm text-gray-600">
             Welcome{profile?.email ? `, ${profile.email}` : ""}. Role:{" "}
             <span className="font-semibold">{role}</span>
