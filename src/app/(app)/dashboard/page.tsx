@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 
@@ -19,6 +20,7 @@ function formatRelative(date: Date) {
   if (days === 1) return "yesterday";
   return `${days}d ago`;
 }
+
 function progressWidthClass(width: number) {
   const safe = Math.max(0, Math.min(100, width));
   const rounded = Math.round(safe / 5) * 5;
@@ -117,7 +119,6 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#f5f2ed]">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        {/* Header */}
         <div className="mb-8 flex flex-col gap-5 border-b border-[#e0dbd2] pb-7 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]">
@@ -148,9 +149,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* KPI row */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
+            href="/sites"
             label="Total Sites"
             value={String(sites)}
             stripe="bg-[#1d5fa8]"
@@ -160,36 +161,38 @@ export default async function DashboardPage() {
           />
 
           <KpiCard
+            href="/sites?group=status"
             label="Active / Down"
             value={`${sitesActive} / ${sitesDown}`}
             stripe="bg-[#2a7d52]"
             tag={`${sitesDown} offline`}
             tagClass="bg-[#fdecea] text-[#c0392b]"
-            meta="need attention"
+            meta="view grouped status"
           />
 
           <KpiCard
+            href="/sites?group=tt"
             label="Air / Liquid"
             value={`${airSites} / ${liquidSites}`}
             stripe="bg-[#b08b2c]"
             tag={`${airPct}% air`}
             tagClass="bg-[#fdf6e3] text-[#b08b2c]"
-            meta={`${100 - airPct}% liquid`}
+            meta="view grouped cooling"
           />
 
           <KpiCard
+            href="/sites?group=tower"
             label="KNET / GBC"
             value={`${knetSites} / ${gbcSites}`}
             stripe="bg-[#c8611a]"
             tag={`${knetPct}% KNET`}
             tagClass="bg-[#fdf0e6] text-[#c8611a]"
-            meta={`${100 - knetPct}% GBC`}
+            meta="view grouped towers"
           />
         </div>
 
-        {/* Mid row */}
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <Card title="Assets" rightTag={`${assets} total`}>
+          <Card title="Assets" rightTag={`${assets} total`} href="/assets">
             <ProgressRow
               label="Utilization"
               value={`${sites ? percent(assets, Math.max(assets, 1)) : 0}%`}
@@ -211,8 +214,16 @@ export default async function DashboardPage() {
           </Card>
 
           <Card title="Store" rightTag={`${storeTotal} items`}>
-            <StoreRow label="Received" value={String(received)} valueClass="text-[#2a7d52]" />
-            <StoreRow label="Pending" value={String(notReceived)} valueClass="text-[#c8611a]" />
+            <StoreRow
+              label="Received"
+              value={String(received)}
+              valueClass="text-[#2a7d52]"
+            />
+            <StoreRow
+              label="Pending"
+              value={String(notReceived)}
+              valueClass="text-[#c8611a]"
+            />
 
             <div className="mt-4">
               <ProgressRow
@@ -246,13 +257,18 @@ export default async function DashboardPage() {
           </Card>
         </div>
 
-        {/* Bottom row */}
         <div className="mt-5 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
           <Card
             title="Recent Activity"
             action={
-              <span className="text-xs font-bold text-[#c8611a]">Latest updates</span>
+              <Link
+                href="/activity"
+                className="text-xs font-bold text-[#c8611a] hover:underline"
+              >
+                View all →
+              </Link>
             }
+            href="/activity"
           >
             <div className="space-y-1">
               {recentActivity.length === 0 ? (
@@ -306,7 +322,7 @@ export default async function DashboardPage() {
               iconColor="text-[#b08b2c]"
             />
             <QuickAction
-              href="/sites"
+              href="/sites?group=status"
               title="Review Down Sites"
               subtitle={`${sitesDown} currently offline`}
               iconBg="bg-[#fdecea]"
@@ -316,7 +332,8 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-6 text-xs font-medium text-[#9c9890]">
-          Signed in as <span className="font-semibold text-[#1a1814]">{role}</span>
+          Signed in as{" "}
+          <span className="font-semibold text-[#1a1814]">{role}</span>
           {profile?.email ? <> • {profile.email}</> : null}
         </div>
       </div>
@@ -325,6 +342,7 @@ export default async function DashboardPage() {
 }
 
 function KpiCard({
+  href,
   label,
   value,
   stripe,
@@ -332,6 +350,7 @@ function KpiCard({
   tagClass,
   meta,
 }: {
+  href?: string;
   label: string;
   value: string;
   stripe: string;
@@ -339,7 +358,7 @@ function KpiCard({
   tagClass: string;
   meta: string;
 }) {
-  return (
+  const content = (
     <div className="overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className={`h-1 ${stripe}`} />
       <div className="p-5">
@@ -350,13 +369,23 @@ function KpiCard({
           {value}
         </div>
         <div className="mt-4 flex items-center gap-2 border-t border-[#eee7dd] pt-3">
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tagClass}`}>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tagClass}`}
+          >
             {tag}
           </span>
           <span className="text-xs font-medium text-[#9c9890]">{meta}</span>
         </div>
       </div>
     </div>
+  );
+
+  if (!href) return content;
+
+  return (
+    <Link href={href} className="block">
+      {content}
+    </Link>
   );
 }
 
@@ -365,13 +394,15 @@ function Card({
   rightTag,
   action,
   children,
+  href,
 }: {
   title: string;
   rightTag?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  href?: string;
 }) {
-  return (
+  const content = (
     <div className="rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="text-lg font-semibold tracking-tight text-[#1a1814]">
@@ -387,6 +418,14 @@ function Card({
       </div>
       {children}
     </div>
+  );
+
+  if (!href) return content;
+
+  return (
+    <Link href={href} className="block">
+      {content}
+    </Link>
   );
 }
 
@@ -430,7 +469,11 @@ function MiniStat({
       <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#9c9890]">
         {label}
       </div>
-      <div className={`mt-1 text-2xl font-semibold tracking-tight ${valueClass ?? "text-[#1a1814]"}`}>
+      <div
+        className={`mt-1 text-2xl font-semibold tracking-tight ${
+          valueClass ?? "text-[#1a1814]"
+        }`}
+      >
         {value}
       </div>
     </div>
@@ -449,7 +492,11 @@ function StoreRow({
   return (
     <div className="flex items-center justify-between border-b border-[#eee7dd] py-3 last:border-b-0">
       <div className="text-sm font-medium text-[#5d584f]">{label}</div>
-      <div className={`text-xl font-semibold tracking-tight ${valueClass ?? "text-[#1a1814]"}`}>
+      <div
+        className={`text-xl font-semibold tracking-tight ${
+          valueClass ?? "text-[#1a1814]"
+        }`}
+      >
         {value}
       </div>
     </div>
@@ -479,7 +526,9 @@ function QuickAction({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-[#1a1814]">{title}</div>
-        <div className="mt-0.5 text-xs font-medium text-[#8b857c]">{subtitle}</div>
+        <div className="mt-0.5 text-xs font-medium text-[#8b857c]">
+          {subtitle}
+        </div>
       </div>
       <span className="text-lg text-[#9c9890]">›</span>
     </Link>
