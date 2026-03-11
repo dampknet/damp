@@ -111,56 +111,95 @@ export default function SiteStatusSelect({
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-[#e0dbd2] bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-[#1a1814]">
-              Change Site Status
-            </h3>
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-[#e7dfd4] bg-white shadow-2xl">
+            <div className="border-b border-[#efe7dc] bg-[#fcf8f2] px-6 py-5">
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${
+                    pendingStatus === "DOWN"
+                      ? "bg-red-50 text-red-700"
+                      : "bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  <span className="text-lg font-bold">
+                    {pendingStatus === "DOWN" ? "!" : "✓"}
+                  </span>
+                </div>
 
-            <p className="mt-2 text-sm text-[#6f6a62]">
-              You are changing this site to{" "}
-              <span className="font-semibold text-[#1a1814]">
-                {pendingStatus}
-              </span>
-              . Please provide a reason.
-            </p>
-
-            <div className="mt-4">
-              <label
-                htmlFor="site-status-reason"
-                className="mb-1 block text-sm font-medium text-[#4f4a43]"
-              >
-                Reason
-              </label>
-              <textarea
-                id="site-status-reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={4}
-                autoFocus
-                placeholder={
-                  pendingStatus === "DOWN"
-                    ? "e.g. faulty maintenance, power outage, transmitter issue..."
-                    : "e.g. maintenance completed, power restored..."
-                }
-                className="w-full rounded-xl border border-[#d9d3c8] px-3 py-2 text-sm outline-none focus:border-[#1a1814]"
-              />
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold tracking-tight text-[#1a1814]">
+                    Change Site Status
+                  </h3>
+                  <p className="mt-1 text-sm text-[#6f6a62]">
+                    You are about to mark this site as{" "}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        pendingStatus === "DOWN"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {pendingStatus}
+                    </span>
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
+            <div className="px-6 py-5">
+              <div className="rounded-2xl border border-[#eee6db] bg-[#faf7f2] px-4 py-3">
+                <div className="text-sm font-medium text-[#4f4a43]">
+                  Add a clear reason for this change.
+                </div>
+                <div className="mt-1 text-xs text-[#8b857c]">
+                  This will appear in recent activity on the dashboard.
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <label
+                  htmlFor="site-status-reason"
+                  className="mb-2 block text-sm font-semibold text-[#2c2823]"
+                >
+                  Reason
+                </label>
+
+                <textarea
+                  id="site-status-reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={5}
+                  autoFocus
+                  placeholder={
+                    pendingStatus === "DOWN"
+                      ? "e.g. Site down due to faulty maintenance, power outage, transmitter issue..."
+                      : "e.g. Site restored after maintenance completed, power returned..."
+                  }
+                  className="w-full rounded-2xl border border-[#d9d3c8] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#1a1814] focus:ring-2 focus:ring-[#1a1814]/5"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[#efe7dc] bg-[#fcf8f2] px-6 py-4">
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-xl border border-[#d9d3c8] bg-white px-4 py-2 text-sm font-medium text-[#4f4a43] hover:bg-[#f8f4ee]"
+                className="rounded-xl border border-[#d9d3c8] bg-white px-4 py-2 text-sm font-medium text-[#4f4a43] transition hover:bg-[#f8f4ee]"
               >
                 Cancel
               </button>
+
               <button
                 type="button"
                 onClick={confirmChange}
-                className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+                className={`rounded-xl px-4 py-2 text-sm font-semibold text-white transition ${
+                  pendingStatus === "DOWN"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-[#1a1814] hover:bg-black"
+                }`}
               >
-                Confirm
+                Confirm Change
               </button>
             </div>
           </div>
