@@ -125,7 +125,7 @@ export default function DashboardClient({
                   : "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
               }
             >
-              {dark ? "● Live · March 2026" : "March 2026"}
+              {dark ? "● Live · March 2026" : "● Live ·March 2026"}
             </div>
 
             <h1
