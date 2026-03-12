@@ -72,7 +72,7 @@ export default function SettingsMenu({ email, role }: Props) {
 
           <div className="hidden text-left sm:block">
             <div
-              className={`text-xs font-semibold ${
+              className={`max-w-37.5 truncate text-xs font-semibold ${
                 isDark ? "text-slate-100" : "text-gray-900"
               }`}
             >
@@ -118,7 +118,7 @@ export default function SettingsMenu({ email, role }: Props) {
 
             <div className="min-w-0">
               <div
-                className={`truncate text-sm font-semibold ${
+                className={`max-w-45 truncate text-sm font-semibold ${
                   isDark ? "text-slate-100" : "text-[#1a1814]"
                 }`}
               >
@@ -158,7 +158,7 @@ export default function SettingsMenu({ email, role }: Props) {
                 isDark ? "text-slate-500" : "text-[#8b857c]"
               }`}
             >
-              Switch the dashboard appearance
+              Switch dashboard appearance
             </div>
           </div>
 
