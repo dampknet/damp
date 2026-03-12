@@ -47,7 +47,7 @@ export default function AssetSerialInlineEdit({
   }
 
   if (!canEdit) {
-    return <span>{value || "-"}</span>;
+    return <span className="text-sm text-gray-900 dark:text-slate-100">{value || "-"}</span>;
   }
 
   return (
@@ -57,7 +57,7 @@ export default function AssetSerialInlineEdit({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="w-48 rounded-md border bg-white px-2 py-1 text-xs outline-none focus:border-gray-400"
+            className="w-48 rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none focus:border-gray-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-white/20"
             placeholder="Enter serial..."
             autoFocus
           />
@@ -65,7 +65,7 @@ export default function AssetSerialInlineEdit({
             type="button"
             disabled={saving}
             onClick={() => save(value)}
-            className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-60"
+            className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
           >
             {saving ? "Saving..." : "Save"}
           </button>
@@ -76,18 +76,18 @@ export default function AssetSerialInlineEdit({
               setValue(initialSerial ?? "");
               setEditing(false);
             }}
-            className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-60"
+            className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
           >
             Cancel
           </button>
         </>
       ) : (
         <>
-          <span className="text-sm">{value || "-"}</span>
+          <span className="text-sm text-gray-900 dark:text-slate-100">{value || "-"}</span>
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+            className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
           >
             Edit
           </button>

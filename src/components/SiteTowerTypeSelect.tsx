@@ -13,9 +13,10 @@ type Props = {
 function towerBadge(t: TowerType) {
   const base =
     "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
+
   return t === "KNET"
-    ? `${base} border-blue-200 bg-blue-50 text-blue-700`
-    : `${base} border-gray-200 bg-gray-50 text-gray-700`;
+    ? `${base} border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300`
+    : `${base} border-gray-200 bg-gray-50 text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300`;
 }
 
 export default function SiteTowerTypeSelect({
@@ -56,7 +57,7 @@ export default function SiteTowerTypeSelect({
         value={towerType}
         onChange={(e) => update(e.target.value as TowerType)}
         disabled={saving}
-        className="rounded-md border bg-white px-2 py-1 text-xs"
+        className="rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
         aria-label="Update tower type"
         title="Update tower type"
       >

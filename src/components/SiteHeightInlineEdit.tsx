@@ -19,8 +19,7 @@ export default function SiteHeightInlineEdit({
   const [saving, setSaving] = React.useState(false);
 
   async function save() {
-    const next =
-      draft.trim() === "" ? null : Number(draft.trim());
+    const next = draft.trim() === "" ? null : Number(draft.trim());
 
     if (next !== null && (!Number.isFinite(next) || next < 0)) return;
 
@@ -47,16 +46,22 @@ export default function SiteHeightInlineEdit({
   }
 
   if (!canEdit) {
-    return <span>{typeof height === "number" ? height : "-"}</span>;
+    return (
+      <span className="text-gray-700 dark:text-slate-300">
+        {typeof height === "number" ? height : "-"}
+      </span>
+    );
   }
 
   if (!editing) {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="text-gray-700">{typeof height === "number" ? height : "-"}</span>
+        <span className="text-gray-700 dark:text-slate-300">
+          {typeof height === "number" ? height : "-"}
+        </span>
         <button
           type="button"
-          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+          className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
           onClick={() => {
             setDraft(height?.toString() ?? "");
             setEditing(true);
@@ -75,14 +80,14 @@ export default function SiteHeightInlineEdit({
         onChange={(e) => setDraft(e.target.value)}
         inputMode="decimal"
         placeholder="e.g. 45"
-        className="w-24 rounded-md border bg-white px-2 py-1 text-xs outline-none"
+        className="w-24 rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
         aria-label="Tower height in meters"
         title="Tower height in meters"
         disabled={saving}
       />
       <button
         type="button"
-        className="rounded-md bg-black px-2 py-1 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+        className="rounded-md bg-black px-2 py-1 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-60 dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
         onClick={save}
         disabled={saving}
       >
@@ -90,7 +95,7 @@ export default function SiteHeightInlineEdit({
       </button>
       <button
         type="button"
-        className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+        className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
         onClick={() => {
           setDraft(height?.toString() ?? "");
           setEditing(false);

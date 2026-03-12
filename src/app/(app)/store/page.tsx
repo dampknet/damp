@@ -77,52 +77,55 @@ export default async function StorePage({
     { key: "Status", label: "Status" },
   ];
 
-  // ✅ Mini list for delete dialog dropdown
   const itemMini = items.map((it) => ({
     id: it.id,
     itemNo: it.itemNo,
   }));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)]">
       <div className="mx-auto max-w-6xl px-4 py-8">
-        {/* Header (NO PRINT) */}
-        <div className="no-print rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="no-print rounded-2xl border bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-none dark:backdrop-blur-xl">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Store</h1>
-              <p className="mt-1 text-sm text-gray-600">
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                Store
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-slate-500">
                 Inventory list (search, filter, print, export).
               </p>
 
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-gray-500 dark:text-slate-500">
                 Role: <span className="font-semibold">{role}</span>
                 {!canEdit ? " (view only)" : ""}
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
-                  Total:{" "}
+                <span className="inline-flex items-center rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  Total:
                   <span className="ml-1 font-semibold">
                     {receivedCount + notReceivedCount}
                   </span>
                 </span>
 
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
                   Received: <span className="ml-1 font-semibold">{receivedCount}</span>
                 </span>
 
-                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-                  Not received:{" "}
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                  Not received:
                   <span className="ml-1 font-semibold">{notReceivedCount}</span>
                 </span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <PrintExportButton title={printTitle} rows={exportRows} columns={exportCols} />
+              <PrintExportButton
+                title={printTitle}
+                rows={exportRows}
+                columns={exportCols}
+              />
 
-              {/* ✅ DELETE MOVED TO TOP (also hide in print) */}
               <div className="print:hidden">
                 <DeleteStoreItemDialog items={itemMini} canEdit={canEdit} />
               </div>
@@ -130,28 +133,27 @@ export default async function StorePage({
               {canEdit ? (
                 <Link
                   href="/store/new"
-                  className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
+                  className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
                 >
                   + Add Item
                 </Link>
               ) : (
-                <div className="rounded-xl border bg-white px-4 py-2 text-sm font-medium text-gray-500">
+                <div className="rounded-xl border bg-white px-4 py-2 text-sm font-medium text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-500">
                   View only
                 </div>
               )}
             </div>
           </div>
 
-          {/* Search + Filter */}
           <div className="mt-6">
             <form className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2">
-                <span className="text-gray-400">🔎</span>
+              <div className="flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                <span className="text-gray-400 dark:text-slate-600">🔎</span>
                 <input
                   name="q"
                   defaultValue={q}
                   placeholder="Search by item number or description…"
-                  className="w-full bg-transparent text-sm outline-none"
+                  className="w-full bg-transparent text-sm outline-none dark:text-slate-100 dark:placeholder:text-slate-500"
                   aria-label="Search store items"
                 />
               </div>
@@ -159,7 +161,7 @@ export default async function StorePage({
               <select
                 name="status"
                 defaultValue={status}
-                className="rounded-xl border bg-white px-3 py-2 text-sm"
+                className="rounded-xl border bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                 aria-label="Filter by status"
                 title="Filter by status"
               >
@@ -170,13 +172,16 @@ export default async function StorePage({
 
               <button
                 type="submit"
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
               >
                 Search
               </button>
 
               {(q || (status && status !== "ALL")) ? (
-                <Link href="/store" className="text-sm font-medium text-gray-700 hover:underline">
+                <Link
+                  href="/store"
+                  className="text-sm font-medium text-gray-700 hover:underline dark:text-slate-400"
+                >
                   Clear
                 </Link>
               ) : null}
@@ -184,9 +189,7 @@ export default async function StorePage({
           </div>
         </div>
 
-        {/* Table (PRINT AREA) */}
-        <div className="print-area mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm">
-          {/* Print Header */}
+        <div className="print-area mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-none dark:backdrop-blur-xl">
           <div className="print-only px-5 py-4">
             <div id="print-title" className="text-lg font-semibold text-gray-900">
               {printTitle}
@@ -198,15 +201,19 @@ export default async function StorePage({
           <div className="print-only h-px bg-gray-200" />
 
           <div className="flex items-center justify-between px-5 py-4">
-            <div className="text-sm font-semibold text-gray-900">Store Items</div>
-            <div className="text-xs text-gray-500">{items.length} shown</div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+              Store Items
+            </div>
+            <div className="text-xs text-gray-500 dark:text-slate-500">
+              {items.length} shown
+            </div>
           </div>
 
-          <div className="h-px bg-gray-100" />
+          <div className="h-px bg-gray-100 dark:bg-white/8" />
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-600">
+              <thead className="bg-gray-50 text-left text-gray-600 dark:bg-[#101720] dark:text-slate-400">
                 <tr>
                   <th className="w-20 px-5 py-3 font-medium">Item</th>
                   <th className="px-5 py-3 font-medium">Description</th>
@@ -215,15 +222,15 @@ export default async function StorePage({
                 </tr>
               </thead>
 
-              <tbody className="divide-y">
+              <tbody className="divide-y dark:divide-white/8">
                 {items.length === 0 ? (
                   <tr>
-                    <td className="px-5 py-10 text-center text-gray-600" colSpan={4}>
+                    <td className="px-5 py-10 text-center text-gray-600 dark:text-slate-500" colSpan={4}>
                       <div className="mx-auto max-w-md">
-                        <div className="text-base font-semibold text-gray-900">
+                        <div className="text-base font-semibold text-gray-900 dark:text-slate-100">
                           No items found
                         </div>
-                        <p className="mt-1 text-sm text-gray-600">
+                        <p className="mt-1 text-sm text-gray-600 dark:text-slate-500">
                           Try a different keyword, or clear filters.
                         </p>
                       </div>
@@ -231,18 +238,20 @@ export default async function StorePage({
                   </tr>
                 ) : (
                   items.map((it) => (
-                    <tr key={it.id} className="align-top hover:bg-gray-50">
-                      <td className="px-5 py-3 font-semibold text-gray-900">
+                    <tr key={it.id} className="align-top hover:bg-gray-50 dark:hover:bg-white/5">
+                      <td className="px-5 py-3 font-semibold text-gray-900 dark:text-slate-100">
                         {it.itemNo}
                       </td>
 
-                      <td className="px-5 py-3 text-gray-700">
+                      <td className="px-5 py-3 text-gray-700 dark:text-slate-300">
                         <pre className="whitespace-pre-wrap font-sans text-sm leading-6">
                           {it.description}
                         </pre>
                       </td>
 
-                      <td className="px-5 py-3 text-gray-900">{it.quantity}</td>
+                      <td className="px-5 py-3 text-gray-900 dark:text-slate-100">
+                        {it.quantity}
+                      </td>
 
                       <td className="px-5 py-3">
                         <StoreStatusSelect
@@ -259,7 +268,7 @@ export default async function StorePage({
           </div>
         </div>
 
-        <p className="no-print mt-3 text-xs text-gray-500">
+        <p className="no-print mt-3 text-xs text-gray-500 dark:text-slate-500">
           Tip: Print/Export only what you searched/filtered — the table only.
         </p>
       </div>

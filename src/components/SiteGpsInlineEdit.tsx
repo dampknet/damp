@@ -14,13 +14,13 @@ function GpsDisplay({ gps }: { gps: string | null }) {
       href={`https://www.google.com/maps?q=${encodeURIComponent(gps)}`}
       target="_blank"
       rel="noreferrer"
-      className="text-sm font-medium text-blue-600 hover:underline"
+      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
       title="Open in Google Maps"
     >
       {gps}
     </a>
   ) : (
-    <span>-</span>
+    <span className="text-gray-700 dark:text-slate-300">-</span>
   );
 }
 
@@ -69,7 +69,7 @@ export default function SiteGpsInlineEdit({
         <GpsDisplay gps={gps} />
         <button
           type="button"
-          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+          className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
           onClick={() => {
             setDraft(gps ?? "");
             setEditing(true);
@@ -87,14 +87,14 @@ export default function SiteGpsInlineEdit({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder='e.g. "5.6037,-0.1870" or any text'
-        className="w-64 rounded-md border bg-white px-2 py-1 text-xs outline-none"
+        className="w-64 rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
         aria-label="GPS coordinates"
         title="GPS coordinates"
         disabled={saving}
       />
       <button
         type="button"
-        className="rounded-md bg-black px-2 py-1 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+        className="rounded-md bg-black px-2 py-1 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-60 dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
         onClick={save}
         disabled={saving}
       >
@@ -102,7 +102,7 @@ export default function SiteGpsInlineEdit({
       </button>
       <button
         type="button"
-        className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+        className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
         onClick={() => {
           setDraft(gps ?? "");
           setEditing(false);

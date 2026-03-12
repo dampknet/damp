@@ -32,8 +32,8 @@ function ttBadge(tt: "AIR" | "LIQUID") {
   const base =
     "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
   return tt === "AIR"
-    ? `${base} border-sky-200 bg-sky-50 text-sky-800`
-    : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+    ? `${base} border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300`
+    : `${base} border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300`;
 }
 
 function sectionTitle(group: SearchParams["group"]) {
@@ -95,16 +95,16 @@ export default async function SitesPage({
 
   const printTitleParts: string[] = [sectionTitle(group)];
 
-if (q) printTitleParts.push(`Search: ${q}`);
-if (tt !== "ALL" && group !== "tt") {
-  printTitleParts.push(tt === "AIR" ? "Air-cooled" : "Liquid-cooled");
-}
-if (ss && ss !== "ALL" && group !== "status") {
-  printTitleParts.push(ss);
-}
-if (tw && tw !== "ALL" && group !== "tower") {
-  printTitleParts.push(tw);
-}
+  if (q) printTitleParts.push(`Search: ${q}`);
+  if (tt !== "ALL" && group !== "tt") {
+    printTitleParts.push(tt === "AIR" ? "Air-cooled" : "Liquid-cooled");
+  }
+  if (ss && ss !== "ALL" && group !== "status") {
+    printTitleParts.push(ss);
+  }
+  if (tw && tw !== "ALL" && group !== "tower") {
+    printTitleParts.push(tw);
+  }
   const printTitle = printTitleParts.join(" — ");
 
   const exportRows = sites.map((s, index) => {
@@ -146,29 +146,29 @@ if (tw && tw !== "ALL" && group !== "tower") {
   const gbcSites = sites.filter((s) => s.towerType === "GBC");
 
   return (
-    <div className="min-h-screen bg-[#f5f2ed]">
+    <div className="min-h-screen bg-[#f5f2ed] dark:bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)]">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        <div className="no-print rounded-3xl border border-[#e0dbd2] bg-white p-6 shadow-sm">
+        <div className="no-print rounded-3xl border border-[#e0dbd2] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-none dark:backdrop-blur-xl">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]">
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a] dark:text-[#f97316]">
                 Site Directory
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-[#1a1814]">
+              <h1 className="text-3xl font-semibold tracking-tight text-[#1a1814] dark:text-slate-100">
                 {sectionTitle(group)}
               </h1>
-              <p className="mt-2 text-sm font-medium text-[#8b857c]">
+              <p className="mt-2 text-sm font-medium text-[#8b857c] dark:text-slate-500">
                 Search, filter by transmitter type, open a site, and manage
                 assets.
               </p>
 
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]">
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d] dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Role: {role}
                 {profile?.email ? (
                   <>
-                    <span className="text-[#b5aea4]">•</span>
-                    <span className="text-[#7a746a]">{profile.email}</span>
+                    <span className="text-[#b5aea4] dark:text-slate-600">•</span>
+                    <span className="text-[#7a746a] dark:text-slate-500">{profile.email}</span>
                   </>
                 ) : null}
               </div>
@@ -186,12 +186,12 @@ if (tw && tw !== "ALL" && group !== "tower") {
               {canEdit ? (
                 <Link
                   href="/sites/new"
-                  className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2d2924]"
+                  className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2d2924] dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
                 >
                   Add Site
                 </Link>
               ) : (
-                <div className="rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-medium text-[#8b857c]">
+                <div className="rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-medium text-[#8b857c] dark:border-white/10 dark:bg-white/5 dark:text-slate-500">
                   View only
                 </div>
               )}
@@ -200,13 +200,13 @@ if (tw && tw !== "ALL" && group !== "tower") {
 
           <div className="mt-6">
             <form className="grid gap-3 md:grid-cols-5">
-              <div className="md:col-span-2 flex w-full items-center gap-2 rounded-xl border border-[#e0dbd2] bg-white px-3 py-2">
-                <span className="text-[#b0a79b]">🔎</span>
+              <div className="md:col-span-2 flex w-full items-center gap-2 rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                <span className="text-[#b0a79b] dark:text-slate-600">🔎</span>
                 <input
                   name="q"
                   defaultValue={q}
                   placeholder="Search by site, REG M FREQ, or power..."
-                  className="w-full bg-transparent text-sm outline-none"
+                  className="w-full bg-transparent text-sm outline-none dark:text-slate-100 dark:placeholder:text-slate-500"
                   aria-label="Search sites"
                 />
               </div>
@@ -214,7 +214,7 @@ if (tw && tw !== "ALL" && group !== "tower") {
               <select
                 name="tt"
                 defaultValue={tt}
-                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                 aria-label="Filter by transmitter type"
                 title="Filter by transmitter type"
               >
@@ -226,7 +226,7 @@ if (tw && tw !== "ALL" && group !== "tower") {
               <select
                 name="ss"
                 defaultValue={ss}
-                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                 aria-label="Filter by site status"
                 title="Filter by site status"
               >
@@ -238,7 +238,7 @@ if (tw && tw !== "ALL" && group !== "tower") {
               <select
                 name="tw"
                 defaultValue={tw}
-                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                 aria-label="Filter by tower type"
                 title="Filter by tower type"
               >
@@ -252,7 +252,7 @@ if (tw && tw !== "ALL" && group !== "tower") {
               <div className="flex items-center gap-2 md:col-span-5">
                 <button
                   type="submit"
-                  className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+                  className="rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-black dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
                 >
                   Search
                 </button>
@@ -260,7 +260,7 @@ if (tw && tw !== "ALL" && group !== "tower") {
                 {q || tt !== "ALL" || ss !== "ALL" || tw !== "ALL" || group ? (
                   <Link
                     href="/sites"
-                    className="text-sm font-semibold text-[#5b564d] hover:underline"
+                    className="text-sm font-semibold text-[#5b564d] hover:underline dark:text-slate-400"
                   >
                     Clear
                   </Link>
@@ -342,19 +342,19 @@ function SitesSection({
   startIndex: number;
 }) {
   return (
-    <div className="print-area overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm">
+    <div className="print-area overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-none dark:backdrop-blur-xl">
       <div className="flex items-center justify-between px-5 py-4">
-        <div className="text-sm font-semibold text-[#1a1814]">{title}</div>
-        <div className="text-xs font-medium text-[#8b857c]">
+        <div className="text-sm font-semibold text-[#1a1814] dark:text-slate-100">{title}</div>
+        <div className="text-xs font-medium text-[#8b857c] dark:text-slate-500">
           {sites.length} shown
         </div>
       </div>
 
-      <div className="h-px bg-[#eee7dd]" />
+      <div className="h-px bg-[#eee7dd] dark:bg-white/8" />
 
       <div className="max-h-[72vh] overflow-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-20 bg-[#f8f4ee] text-left text-[#5b564d] shadow-sm">
+          <thead className="sticky top-0 z-20 bg-[#f8f4ee] text-left text-[#5b564d] shadow-sm dark:bg-[#101720] dark:text-slate-400 dark:shadow-none">
             <tr>
               <th className="px-5 py-3 font-semibold">No</th>
               <th className="px-5 py-3 font-semibold">Site</th>
@@ -371,11 +371,11 @@ function SitesSection({
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-[#eee7dd]">
+          <tbody className="divide-y divide-[#eee7dd] dark:divide-white/8">
             {sites.length === 0 ? (
               <tr>
                 <td
-                  className="px-5 py-12 text-center text-[#8b857c]"
+                  className="px-5 py-12 text-center text-[#8b857c] dark:text-slate-500"
                   colSpan={10}
                 >
                   No sites found
@@ -386,20 +386,20 @@ function SitesSection({
                 const tx = (s.transmitterType ?? "AIR") as "AIR" | "LIQUID";
 
                 return (
-                  <tr key={s.id} className="hover:bg-[#fcfaf7]">
-                    <td className="px-5 py-3 font-medium text-[#6b655d]">
+                  <tr key={s.id} className="hover:bg-[#fcfaf7] dark:hover:bg-white/5">
+                    <td className="px-5 py-3 font-medium text-[#6b655d] dark:text-slate-500">
                       {startIndex + index}
                     </td>
 
-                    <td className="px-5 py-3 font-semibold text-[#1a1814]">
+                    <td className="px-5 py-3 font-semibold text-[#1a1814] dark:text-slate-100">
                       {s.name}
                     </td>
 
-                    <td className="px-5 py-3 text-[#5d584f]">
+                    <td className="px-5 py-3 text-[#5d584f] dark:text-slate-400">
                       {s.regMFreq ?? "-"}
                     </td>
 
-                    <td className="px-5 py-3 text-[#5d584f]">
+                    <td className="px-5 py-3 text-[#5d584f] dark:text-slate-400">
                       {typeof s.power === "number" ? s.power : "-"}
                     </td>
 
@@ -417,7 +417,7 @@ function SitesSection({
                       />
                     </td>
 
-                    <td className="px-5 py-3 text-[#5d584f]">
+                    <td className="px-5 py-3 text-[#5d584f] dark:text-slate-400">
                       <SiteHeightInlineEdit
                         siteId={s.id}
                         initialHeight={
@@ -427,7 +427,7 @@ function SitesSection({
                       />
                     </td>
 
-                    <td className="px-5 py-3 text-[#5d584f]">
+                    <td className="px-5 py-3 text-[#5d584f] dark:text-slate-400">
                       <SiteGpsInlineEdit
                         siteId={s.id}
                         initialGps={s.gps ?? null}
@@ -446,7 +446,7 @@ function SitesSection({
                     <td className="px-5 py-3 text-right no-print">
                       <Link
                         href={`/sites/${s.id}`}
-                        className="rounded-md border border-[#e0dbd2] px-3 py-1.5 text-xs font-semibold text-[#1a1814] hover:bg-[#f7f3ed]"
+                        className="rounded-md border border-[#e0dbd2] px-3 py-1.5 text-xs font-semibold text-[#1a1814] hover:bg-[#f7f3ed] dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
                       >
                         Open
                       </Link>
