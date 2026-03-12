@@ -9,7 +9,7 @@ export default async function AppNavbar() {
   const email = profile?.email ?? "Unknown user";
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#e7dfd4] bg-[#fffdf9]/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-[#e7dfd4] bg-[#fffdf9]/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-[#e7dfd4] bg-white shadow-sm">

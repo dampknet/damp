@@ -248,16 +248,16 @@ async function seedSiteAssets(siteRow, ids) {
 
   const harmonicSerial =
     siteName === "Akatsi"
-      ? "311615135"
+      ? "161621007"
       : siteName === "Akosombo"
-      ? "56481818"
+      ? "051650010"
       : siteName === "Axim"
-      ? "56472805"
+      ? "051650004"
       : siteName === "Bawku"
-      ? "311618193"
+      ? ""
       : null;
 
-  const harmonicPart = siteName === "Akatsi" ? "099-0580-251" : null;
+  const harmonicPart = siteName === "Akatsi" ? "" : null;
 
   await ensureAsset({
     siteId,

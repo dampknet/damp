@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
   email: string;
@@ -11,6 +12,7 @@ type Props = {
 export default function SettingsMenu({ email, role }: Props) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const { mode, toggleMode } = useThemeMode();
 
   const isAdmin = role === "ADMIN";
   const initial = (email?.[0] ?? "U").toUpperCase();
@@ -29,7 +31,6 @@ export default function SettingsMenu({ email, role }: Props) {
 
   function handleLogout() {
     closeMenu();
-    // Submit a REAL POST request so the /auth/logout route.ts runs and redirects
     formRef.current?.requestSubmit();
   }
 
@@ -41,7 +42,7 @@ export default function SettingsMenu({ email, role }: Props) {
             {initial}
           </span>
 
-          <div className="hidden sm:block text-left">
+          <div className="hidden text-left sm:block">
             <div className="text-xs font-semibold text-gray-900">{email}</div>
             <div className="text-[11px] text-gray-500">{role}</div>
           </div>
@@ -50,13 +51,24 @@ export default function SettingsMenu({ email, role }: Props) {
         </div>
       </summary>
 
-      <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border bg-white shadow-lg">
+      <div className="absolute right-0 mt-2 w-64 overflow-hidden rounded-2xl border bg-white shadow-lg">
         <div className="px-4 py-3">
           <div className="text-xs font-semibold text-gray-900">{email}</div>
           <div className="mt-0.5 text-[11px] text-gray-500">Role: {role}</div>
         </div>
 
         <div className="h-px bg-gray-100" />
+
+        <button
+          type="button"
+          onClick={toggleMode}
+          className="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
+        >
+          <span>{mode === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          <span className="text-xs font-medium text-gray-500">
+            {mode === "dark" ? "ON" : "OFF"}
+          </span>
+        </button>
 
         {isAdmin ? (
           <Link
@@ -70,7 +82,6 @@ export default function SettingsMenu({ email, role }: Props) {
 
         <div className="h-px bg-gray-100" />
 
-        {/* REAL POST -> hits src/app/(auth)/auth/logout/route.ts */}
         <form ref={formRef} action="/auth/logout" method="post">
           <button
             type="button"
@@ -79,8 +90,6 @@ export default function SettingsMenu({ email, role }: Props) {
           >
             Logout
           </button>
-
-          {/* Hidden submit so requestSubmit() works consistently */}
           <button type="submit" className="hidden" aria-hidden="true" />
         </form>
       </div>
