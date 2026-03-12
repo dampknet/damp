@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getCurrentProfile } from "@/lib/auth";
 import SettingsMenu from "@/components/SettingsMenu";
-import NavbarThemeShell from "@/components/NavBarThemeShell";
+import NavbarThemeShell from "@/components/NavbarThemeShell";
 
 export default async function AppNavbar() {
   const profile = await getCurrentProfile();
@@ -11,8 +11,6 @@ export default async function AppNavbar() {
 
   return (
     <NavbarThemeShell
-      email={email}
-      role={role}
       brand={
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-[#e7dfd4] bg-white shadow-sm">
