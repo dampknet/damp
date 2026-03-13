@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import PrintExportButton from "@/components/PrintExportButton";
+import SiteSubcategoryClient from "./SiteSubcategoryClient";
 
 type SearchParams = { q?: string };
 
@@ -55,7 +54,7 @@ export default async function SiteSubcategoryPage({
   if (q) pageTitleParts.push(`Search: ${q}`);
   const pageTitle = pageTitleParts.join(" — ");
 
-  const csvRows = assets.map((a: (typeof assets)[number]) => ({
+  const csvRows = assets.map((a) => ({
     Site: site.name,
     Category: category?.name ?? "",
     Subcategory: sub.name,
@@ -79,97 +78,27 @@ export default async function SiteSubcategoryPage({
     { key: "UpdatedAt", label: "Updated At" },
   ];
 
+  const rows = assets.map((a) => ({
+    id: a.id,
+    assetName: a.assetName,
+    serialNumber: a.serialNumber ?? "-",
+    manufacturer: a.manufacturer ?? "-",
+    model: a.model ?? "-",
+    status: a.status,
+  }));
+
   return (
-    <div className="min-h-screen bg-gray-50 print:bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-10 print:py-0">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Link
-              href={`/sites/${site.id}`}
-              className="text-sm text-gray-600 hover:underline print:hidden"
-            >
-              ← Back to Site
-            </Link>
-
-            <h1 className="mt-2 text-2xl font-semibold text-gray-900">
-              {site.name} — {sub.name}
-            </h1>
-
-            <p className="mt-1 text-sm text-gray-600">
-              Category:{" "}
-              <span className="font-medium">{category?.name ?? "-"}</span>
-            </p>
-          </div>
-
-          <div className="print:hidden">
-            <PrintExportButton
-              title={pageTitle}
-              filename={`${site.name}-${sub.name}.csv`}
-              rows={csvRows}
-              columns={exportCols}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-xl border bg-white p-4 print:hidden">
-          <form className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Search name, serial, model, manufacturer…"
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
-            />
-            <button
-              type="submit"
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
-            >
-              Search
-            </button>
-            <Link
-              href={`/sites/${site.id}/subcategory/${sub.id}`}
-              className="text-sm font-medium text-gray-700 hover:underline"
-            >
-              Clear
-            </Link>
-          </form>
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-xl border bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 text-left text-gray-700">
-              <tr>
-                <th className="px-4 py-3">Device</th>
-                <th className="px-4 py-3">Serial</th>
-                <th className="px-4 py-3">Manufacturer</th>
-                <th className="px-4 py-3">Model</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {assets.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-10 text-center text-gray-600" colSpan={5}>
-                    No devices yet under this subcategory.
-                  </td>
-                </tr>
-              ) : (
-                assets.map((a: (typeof assets)[number]) => (
-                  <tr key={a.id} className="border-t">
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {a.assetName}
-                    </td>
-                    <td className="px-4 py-3">{a.serialNumber ?? "-"}</td>
-                    <td className="px-4 py-3">{a.manufacturer ?? "-"}</td>
-                    <td className="px-4 py-3">{a.model ?? "-"}</td>
-                    <td className="px-4 py-3">{a.status}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <SiteSubcategoryClient
+      siteId={site.id}
+      siteName={site.name}
+      subId={sub.id}
+      subName={sub.name}
+      categoryName={category?.name ?? "-"}
+      q={q}
+      pageTitle={pageTitle}
+      csvRows={csvRows}
+      exportCols={exportCols}
+      rows={rows}
+    />
   );
 }

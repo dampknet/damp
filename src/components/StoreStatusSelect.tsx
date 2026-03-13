@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { StoreStatus } from "@prisma/client";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
   itemId: string;
@@ -9,13 +10,19 @@ type Props = {
   canEdit?: boolean;
 };
 
-function badgeClass(status: StoreStatus) {
+function badgeClass(status: StoreStatus, dark: boolean) {
   const base =
     "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
 
-  return status === "RECEIVED"
-    ? `${base} border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300`
-    : `${base} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300`;
+  if (status === "RECEIVED") {
+    return dark
+      ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`
+      : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+  }
+
+  return dark
+    ? `${base} border-amber-500/30 bg-amber-500/10 text-amber-300`
+    : `${base} border-amber-200 bg-amber-50 text-amber-800`;
 }
 
 export default function StoreStatusSelect({
@@ -23,6 +30,9 @@ export default function StoreStatusSelect({
   initialStatus,
   canEdit = true,
 }: Props) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const [status, setStatus] = React.useState<StoreStatus>(initialStatus);
   const [saving, setSaving] = React.useState(false);
 
@@ -58,18 +68,22 @@ export default function StoreStatusSelect({
   }
 
   if (!canEdit) {
-    return <span className={badgeClass(status)}>{status}</span>;
+    return <span className={badgeClass(status, dark)}>{status}</span>;
   }
 
   return (
     <div className="inline-flex items-center gap-2">
-      <span className={badgeClass(status)}>{status}</span>
+      <span className={badgeClass(status, dark)}>{status}</span>
 
       <select
         value={status}
         onChange={(e) => update(e.target.value as StoreStatus)}
         disabled={saving}
-        className="rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+        className={
+          dark
+            ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
+            : "rounded-md border bg-white px-2 py-1 text-xs"
+        }
         aria-label="Update store item status"
       >
         <option value="RECEIVED">RECEIVED</option>

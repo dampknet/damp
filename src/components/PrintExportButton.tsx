@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
-  title: string; // used for printing + file name
-  filename?: string; // optional override
+  title: string;
+  filename?: string;
   rows: Array<Record<string, string | number | null | undefined>>;
   columns: Array<{ key: string; label: string }>;
 };
@@ -46,6 +47,9 @@ export default function PrintExportButton({
   rows,
   columns,
 }: Props) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const safeName =
     (filename ?? title)
       .trim()
@@ -71,12 +75,16 @@ export default function PrintExportButton({
     downloadTextFile(`${safeName}.csv`, csv);
   }
 
+  const secondaryBtn = dark
+    ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+    : "rounded-xl border bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50";
+
   return (
     <div className="flex items-center gap-2">
       <button
         type="button"
         onClick={handlePrint}
-        className="rounded-xl border bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        className={secondaryBtn}
         aria-label="Print table"
         title="Print"
       >
@@ -86,7 +94,7 @@ export default function PrintExportButton({
       <button
         type="button"
         onClick={handleExport}
-        className="rounded-xl border bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        className={secondaryBtn}
         aria-label="Export table as CSV"
         title="Export CSV"
       >

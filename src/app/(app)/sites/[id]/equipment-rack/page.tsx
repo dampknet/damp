@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import EquipmentRackClient from "./EquipmentRackClient";
 
 function showVal(v: unknown) {
   if (typeof v === "string" && v.trim()) return v;
@@ -19,7 +19,6 @@ function getSpecString(specs: Prisma.JsonValue | null | undefined, key: string) 
 }
 
 function rackLabel(name: string) {
-  // Your requested naming
   if (name.toLowerCase() === "harmonic") return "Harmonic (PVR)";
   return name;
 }
@@ -64,7 +63,6 @@ export default async function SiteRackPage({
     orderBy: { assetName: "asc" },
   });
 
-  // System asset: the standalone rack record (subcategoryId null)
   const rackSystem = assets.find(
     (a) => a.subcategoryId === null && a.assetName === "Equipment Rack"
   );
@@ -84,81 +82,27 @@ export default async function SiteRackPage({
     bySub.set(a.subcategoryId, [...(bySub.get(a.subcategoryId) ?? []), a]);
   }
 
+  const cards = subcategories.map((sc) => ({
+    id: sc.id,
+    name: rackLabel(sc.name),
+    items: (bySub.get(sc.id) ?? []).map((a) => ({
+      id: a.id,
+      assetName: a.assetName,
+      serialNumber: a.serialNumber ?? "-",
+      status: a.status,
+    })),
+  }));
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <Link
-          href={`/sites/${site.id}`}
-          className="text-sm text-gray-600 hover:underline"
-        >
-          ← Back to {site.name}
-        </Link>
-
-        <h1 className="mt-3 text-2xl font-semibold text-gray-900">
-          {site.name} — Equipment Rack
-        </h1>
-
-        {/* Rack System header */}
-        <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="text-base font-semibold text-gray-900">
-            Equipment Rack
-          </div>
-
-          <div className="mt-2 text-sm text-gray-700">
-            Serial:{" "}
-            <span className="font-semibold">{showVal(systemSerial)}</span>
-            <span className="mx-2 text-gray-300">•</span>
-            Part No: <span className="font-semibold">{showVal(systemPart)}</span>
-            <span className="mx-2 text-gray-300">•</span>
-            Status: <span className="font-semibold">{systemStatus}</span>
-          </div>
-        </div>
-
-        {/* Components */}
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {subcategories.map((sc) => {
-            const list = bySub.get(sc.id) ?? [];
-
-            return (
-              <div
-                key={sc.id}
-                className="overflow-hidden rounded-2xl border bg-white shadow-sm"
-              >
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div className="text-sm font-semibold text-gray-900">
-                    {rackLabel(sc.name)}
-                  </div>
-                  <div className="text-xs text-gray-500">{list.length}</div>
-                </div>
-
-                <div className="h-px bg-gray-100" />
-
-                <div className="divide-y">
-                  {list.length === 0 ? (
-                    <div className="px-5 py-4 text-sm text-gray-600">None</div>
-                  ) : (
-                    list.map((a) => (
-                      <div
-                        key={a.id}
-                        className="flex items-center justify-between px-5 py-3"
-                      >
-                        <div className="text-sm text-gray-800">
-                          {a.assetName}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {a.serialNumber ?? "-"}
-                          <span className="mx-2 text-gray-300">•</span>
-                          {a.status}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <EquipmentRackClient
+      siteId={site.id}
+      siteName={site.name}
+      system={{
+        serial: showVal(systemSerial),
+        part: showVal(systemPart),
+        status: systemStatus,
+      }}
+      cards={cards}
+    />
   );
 }

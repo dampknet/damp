@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
   siteId: string;
@@ -8,19 +9,23 @@ type Props = {
   canEdit?: boolean;
 };
 
-function GpsDisplay({ gps }: { gps: string | null }) {
+function GpsDisplay({ gps, dark }: { gps: string | null; dark: boolean }) {
   return gps ? (
     <a
       href={`https://www.google.com/maps?q=${encodeURIComponent(gps)}`}
       target="_blank"
       rel="noreferrer"
-      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+      className={
+        dark
+          ? "text-sm font-medium text-sky-300 hover:underline"
+          : "text-sm font-medium text-blue-600 hover:underline"
+      }
       title="Open in Google Maps"
     >
       {gps}
     </a>
   ) : (
-    <span className="text-gray-700 dark:text-slate-300">-</span>
+    <span className={dark ? "text-slate-300" : ""}>-</span>
   );
 }
 
@@ -29,6 +34,9 @@ export default function SiteGpsInlineEdit({
   initialGps,
   canEdit = true,
 }: Props) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const [gps, setGps] = React.useState<string | null>(initialGps);
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState<string>(initialGps ?? "");
@@ -60,16 +68,20 @@ export default function SiteGpsInlineEdit({
   }
 
   if (!canEdit) {
-    return <GpsDisplay gps={gps} />;
+    return <GpsDisplay gps={gps} dark={dark} />;
   }
 
   if (!editing) {
     return (
       <div className="inline-flex items-center gap-2">
-        <GpsDisplay gps={gps} />
+        <GpsDisplay gps={gps} dark={dark} />
         <button
           type="button"
-          className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
+          className={
+            dark
+              ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-100 hover:bg-white/10"
+              : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+          }
           onClick={() => {
             setDraft(gps ?? "");
             setEditing(true);
@@ -87,14 +99,22 @@ export default function SiteGpsInlineEdit({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder='e.g. "5.6037,-0.1870" or any text'
-        className="w-64 rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
+        className={
+          dark
+            ? "w-64 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 outline-none placeholder:text-slate-500"
+            : "w-64 rounded-md border bg-white px-2 py-1 text-xs outline-none"
+        }
         aria-label="GPS coordinates"
         title="GPS coordinates"
         disabled={saving}
       />
       <button
         type="button"
-        className="rounded-md bg-black px-2 py-1 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-60 dark:bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] dark:hover:opacity-95"
+        className={
+          dark
+            ? "rounded-md bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-2 py-1 text-xs font-medium text-white hover:opacity-95 disabled:opacity-60"
+            : "rounded-md bg-black px-2 py-1 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+        }
         onClick={save}
         disabled={saving}
       >
@@ -102,7 +122,11 @@ export default function SiteGpsInlineEdit({
       </button>
       <button
         type="button"
-        className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
+        className={
+          dark
+            ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-300 hover:bg-white/10"
+            : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+        }
         onClick={() => {
           setDraft(gps ?? "");
           setEditing(false);

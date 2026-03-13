@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, AssetStatus } from "@prisma/client";
 import { getCurrentProfile } from "@/lib/auth";
+import TransmitterClient from "./TransmitterClient";
 
 type Mux = "TX_MUX_1_2" | "TX_MUX_3";
 
@@ -63,7 +63,6 @@ function sortAssetsNaturally(list: TxAssetRow[]) {
     if (aBase !== bBase) return aBase.localeCompare(bBase);
 
     if (aNum !== null && bNum !== null) return aNum - bNum;
-
     if (aNum === null && bNum !== null) return -1;
     if (aNum !== null && bNum === null) return 1;
 
@@ -197,136 +196,67 @@ export default async function SiteTransmitterPage({
 
   const systemStatus = systemAsset?.status ?? "ACTIVE";
 
-  const muxPairs: Array<readonly [Mux, Blocks]> = [
-    ["TX_MUX_1_2", mux12],
-    ["TX_MUX_3", mux3],
+  const muxPairs = [
+    {
+      key: "TX_MUX_1_2" as const,
+      title: muxTitle("TX_MUX_1_2"),
+      blocks: mux12.map(([compName, list]) => ({
+        compName,
+        list: list.map((a) => ({
+          id: a.id,
+          assetName: a.assetName,
+          serialNumber: a.serialNumber ?? "-",
+          status: a.status,
+        })),
+      })),
+      totalItems: mux12.reduce((acc, [, arr]) => acc + arr.length, 0),
+      serialRows: [
+        {
+          label: "MUX 1 Serial",
+          serial: showVal(mux1Asset?.serialNumber),
+          status: mux1Asset?.status ?? "ACTIVE",
+        },
+        {
+          label: "MUX 2 Serial",
+          serial: showVal(mux2Asset?.serialNumber),
+          status: mux2Asset?.status ?? "ACTIVE",
+        },
+      ],
+    },
+    {
+      key: "TX_MUX_3" as const,
+      title: muxTitle("TX_MUX_3"),
+      blocks: mux3.map(([compName, list]) => ({
+        compName,
+        list: list.map((a) => ({
+          id: a.id,
+          assetName: a.assetName,
+          serialNumber: a.serialNumber ?? "-",
+          status: a.status,
+        })),
+      })),
+      totalItems: mux3.reduce((acc, [, arr]) => acc + arr.length, 0),
+      serialRows: [
+        {
+          label: "MUX 3 Serial",
+          serial: showVal(mux3Asset?.serialNumber),
+          status: mux3Asset?.status ?? "ACTIVE",
+        },
+      ],
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <Link
-          href={`/sites/${site.id}`}
-          className="text-sm text-gray-600 hover:underline"
-        >
-          ← Back to {site.name}
-        </Link>
-
-        <h1 className="mt-3 text-2xl font-semibold text-gray-900">
-          {site.name} — Transmitter
-        </h1>
-
-        <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="text-base font-semibold text-gray-900">
-            Transmitter System
-          </div>
-
-          <div className="mt-2 text-sm text-gray-700">
-            Serial: <span className="font-semibold">{showVal(systemSerial)}</span>
-            <span className="mx-2 text-gray-300">•</span>
-            Part No: <span className="font-semibold">{showVal(systemPart)}</span>
-            <span className="mx-2 text-gray-300">•</span>
-            Status: <span className="font-semibold">{systemStatus}</span>
-          </div>
-
-          <div className="mt-2 text-xs text-gray-500">
-            Role: <span className="font-semibold">{role}</span>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {muxPairs.map(([mux, blocks]) => {
-            const totalItems = blocks.reduce(
-              (acc: number, [, arr]: Block) => acc + arr.length,
-              0
-            );
-
-            const muxSerialUI =
-              mux === "TX_MUX_1_2" ? (
-                <div className="space-y-2 text-xs text-gray-700">
-                  <div>
-                    <span className="text-gray-500">MUX 1 Serial:</span>{" "}
-                    <span className="font-medium">{showVal(mux1Asset?.serialNumber)}</span>
-                    <span className="mx-2 text-gray-300">•</span>
-                    <span className="font-medium">{mux1Asset?.status ?? "ACTIVE"}</span>
-                  </div>
-
-                  <div>
-                    <span className="text-gray-500">MUX 2 Serial:</span>{" "}
-                    <span className="font-medium">{showVal(mux2Asset?.serialNumber)}</span>
-                    <span className="mx-2 text-gray-300">•</span>
-                    <span className="font-medium">{mux2Asset?.status ?? "ACTIVE"}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-700">
-                  <span className="text-gray-500">MUX 3 Serial:</span>{" "}
-                  <span className="font-medium">{showVal(mux3Asset?.serialNumber)}</span>
-                  <span className="mx-2 text-gray-300">•</span>
-                  <span className="font-medium">{mux3Asset?.status ?? "ACTIVE"}</span>
-                </div>
-              );
-
-            return (
-              <div
-                key={mux}
-                className="overflow-hidden rounded-2xl border bg-white shadow-sm"
-              >
-                <div className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900">
-                      {muxTitle(mux)}
-                    </div>
-                    <div className="text-xs text-gray-500">{totalItems} items</div>
-                  </div>
-
-                  <div className="mt-2">{muxSerialUI}</div>
-                </div>
-
-                <div className="h-px bg-gray-100" />
-
-                <div className="space-y-4 p-5">
-                  {blocks.length === 0 ? (
-                    <div className="text-sm text-gray-600">No components yet.</div>
-                  ) : (
-                    blocks.map(([compName, list]: Block) => (
-                      <div
-                        key={compName}
-                        className="overflow-hidden rounded-xl border"
-                      >
-                        <div className="flex items-center justify-between px-4 py-3">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {compName}
-                          </div>
-                          <div className="text-xs text-gray-500">{list.length}</div>
-                        </div>
-
-                        <div className="h-px bg-gray-100" />
-
-                        <div className="divide-y">
-                          {list.map((a: TxAssetRow) => (
-                            <div
-                              key={a.id}
-                              className="flex items-center justify-between px-4 py-2"
-                            >
-                              <div className="text-sm text-gray-800">{a.assetName}</div>
-                              <div className="text-xs text-gray-600">
-                                {a.serialNumber ?? "-"}
-                                <span className="mx-2 text-gray-300">•</span>
-                                {a.status}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <TransmitterClient
+      siteId={site.id}
+      siteName={site.name}
+      role={role}
+      system={{
+        serial: showVal(systemSerial),
+        part: showVal(systemPart),
+        status: systemStatus,
+      }}
+      muxPairs={muxPairs}
+    />
   );
 }

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type ItemMini = {
   id: string;
@@ -15,6 +16,9 @@ type Props = {
 
 export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) {
   const router = useRouter();
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const dialogRef = React.useRef<HTMLDialogElement | null>(null);
 
   const [open, setOpen] = React.useState(false);
@@ -30,7 +34,6 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
     if (!canEdit) return;
     setError(null);
 
-    // always keep a valid selection
     const first = items[0]?.id ?? "";
     setItemId((prev) => prev || first);
 
@@ -47,6 +50,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
 
   async function onDelete() {
     if (!canEdit || deleting) return;
+
     if (!itemId) {
       setError("Please select an item.");
       return;
@@ -90,7 +94,11 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
         type="button"
         onClick={show}
         disabled={disabled}
-        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+        className={
+          dark
+            ? "rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+            : "rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+        }
         title={disabled ? "No items to delete" : "Delete a store item"}
         aria-label="Delete store item"
       >
@@ -100,22 +108,52 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
       <dialog
         ref={dialogRef}
         onClose={() => setOpen(false)}
-        className="w-full max-w-md rounded-2xl border bg-white p-0 shadow-xl backdrop:bg-black/40"
+        className={
+          dark
+            ? "w-full max-w-md rounded-2xl border border-white/10 bg-[#101720] p-0 text-slate-200 shadow-xl backdrop:bg-black/60"
+            : "w-full max-w-md rounded-2xl border bg-white p-0 shadow-xl backdrop:bg-black/40"
+        }
       >
         <div className="p-5">
-          <div className="text-base font-semibold text-gray-900">Delete store item</div>
-          <p className="mt-1 text-sm text-gray-600">
+          <div
+            className={
+              dark
+                ? "text-base font-semibold text-slate-100"
+                : "text-base font-semibold text-gray-900"
+            }
+          >
+            Delete store item
+          </div>
+
+          <p
+            className={
+              dark
+                ? "mt-1 text-sm text-slate-500"
+                : "mt-1 text-sm text-gray-600"
+            }
+          >
             Select an item and confirm deletion. This will remove it from the database.
           </p>
 
           <div className="mt-4">
-            <label className="block text-xs font-medium text-gray-600">
+            <label
+              className={
+                dark
+                  ? "block text-xs font-medium text-slate-400"
+                  : "block text-xs font-medium text-gray-600"
+              }
+            >
               Item to delete
             </label>
+
             <select
               value={itemId}
               onChange={(e) => setItemId(e.target.value)}
-              className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:border-gray-400"
+              className={
+                dark
+                  ? "mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-white/20"
+                  : "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:border-gray-400"
+              }
               aria-label="Select store item to delete"
               title="Select store item to delete"
             >
@@ -127,12 +165,24 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
             </select>
           </div>
 
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div
+            className={
+              dark
+                ? "mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
+                : "mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            }
+          >
             Warning: This action cannot be undone.
           </div>
 
           {error ? (
-            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div
+              className={
+                dark
+                  ? "mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+                  : "mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              }
+            >
               {error}
             </div>
           ) : null}
@@ -141,7 +191,11 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
             <button
               type="button"
               onClick={close}
-              className="rounded-xl border bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              className={
+                dark
+                  ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
+                  : "rounded-xl border bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              }
             >
               Cancel
             </button>
@@ -157,7 +211,6 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
           </div>
         </div>
 
-        {/* allows Esc / clicking backdrop to close nicely */}
         {open ? (
           <form method="dialog" className="hidden">
             <button />

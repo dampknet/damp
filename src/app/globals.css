@@ -1,63 +1,139 @@
 @import "tailwindcss";
 
-/* Default: print-only is hidden on screen */
+/* Screen defaults */
 .print-only {
   display: none;
 }
 
 @media print {
-  /* Hide everything by default */
-  body * {
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide things that must never print */
+  .no-print,
+  .no-print * {
+    display: none !important;
     visibility: hidden !important;
   }
 
-  /* Show only the print area */
+  /* Show print-only content */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Make normal page wrappers harmless in print */
+  header,
+  nav,
+  aside,
+  footer {
+    display: none !important;
+  }
+
+  /* Ensure the actual print section stays visible */
   .print-area,
   .print-area * {
     visibility: visible !important;
   }
 
-  /* Move print area to top-left */
   .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-
-  /* Hide UI controls */
-  .no-print {
-    display: none !important;
-  }
-
-  /* Show print-only header */
-  .print-only {
-    display: block !important;
-  }
-
-  /* Cleaner print look */
-  body {
+    position: static !important;
+    width: 100% !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: white !important;
   }
 
+  /* If a print header sits just before print-area, keep it visible too */
+  .print-only + .print-area,
+  .print-only + .print-area * {
+    visibility: visible !important;
+  }
+
+  /* Remove decorative UI styling */
   .shadow-sm,
-  .shadow-lg {
+  .shadow,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
     box-shadow: none !important;
   }
 
+  .rounded-xl,
   .rounded-2xl,
-  .rounded-xl {
+  .rounded-3xl,
+  .rounded-lg,
+  .rounded-md {
     border-radius: 0 !important;
   }
 
+  /* Prevent sticky table headers from behaving oddly on print */
+  .sticky,
+  thead.sticky,
+  thead[class*="sticky"] {
+    position: static !important;
+    top: auto !important;
+    box-shadow: none !important;
+  }
+
+  /* Better table printing */
   table {
-    border-collapse: collapse !important;
     width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr,
+  img {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   th,
   td {
-    border: 1px solid #ddd !important;
+    border: 1px solid #d1d5db !important;
     padding: 8px !important;
+    color: #000 !important;
+    background: #fff !important;
+    vertical-align: top !important;
+  }
+
+  th {
+    font-weight: 700 !important;
+  }
+
+  /* Show links as plain text color */
+  a,
+  a:visited {
+    color: #000 !important;
+    text-decoration: none !important;
+  }
+
+  /* Inputs/selects should print cleanly */
+  input,
+  select,
+  textarea,
+  button {
+    box-shadow: none !important;
   }
 }

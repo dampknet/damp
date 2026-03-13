@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type AssetStatus = "ACTIVE" | "FAULTY" | "DECOMMISSIONED";
 
@@ -10,19 +11,25 @@ type Props = {
   canEdit?: boolean;
 };
 
-function badgeClass(status: AssetStatus) {
+function badgeClass(status: AssetStatus, dark: boolean) {
   const base =
     "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
 
   if (status === "ACTIVE") {
-    return `${base} border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300`;
+    return dark
+      ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`
+      : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
   }
 
   if (status === "FAULTY") {
-    return `${base} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300`;
+    return dark
+      ? `${base} border-amber-500/30 bg-amber-500/10 text-amber-300`
+      : `${base} border-amber-200 bg-amber-50 text-amber-800`;
   }
 
-  return `${base} border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300`;
+  return dark
+    ? `${base} border-red-500/30 bg-red-500/10 text-red-300`
+    : `${base} border-red-200 bg-red-50 text-red-700`;
 }
 
 export default function AssetStatusInlineEdit({
@@ -30,6 +37,9 @@ export default function AssetStatusInlineEdit({
   initialStatus,
   canEdit = true,
 }: Props) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const [status, setStatus] = React.useState<AssetStatus>(initialStatus);
   const [saving, setSaving] = React.useState(false);
 
@@ -63,18 +73,22 @@ export default function AssetStatusInlineEdit({
   }
 
   if (!canEdit) {
-    return <span className={badgeClass(status)}>{status}</span>;
+    return <span className={badgeClass(status, dark)}>{status}</span>;
   }
 
   return (
     <div className="inline-flex items-center gap-2">
-      <span className={badgeClass(status)}>{status}</span>
+      <span className={badgeClass(status, dark)}>{status}</span>
 
       <select
         value={status}
         onChange={(e) => update(e.target.value as AssetStatus)}
         disabled={saving}
-        className="rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+        className={
+          dark
+            ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
+            : "rounded-md border bg-white px-2 py-1 text-xs"
+        }
         aria-label="Update asset status"
         title="Update asset status"
       >

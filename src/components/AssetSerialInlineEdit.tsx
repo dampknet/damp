@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
   assetId: string;
@@ -13,6 +14,9 @@ export default function AssetSerialInlineEdit({
   initialSerial,
   canEdit = true,
 }: Props) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const [value, setValue] = React.useState(initialSerial ?? "");
   const [saving, setSaving] = React.useState(false);
   const [editing, setEditing] = React.useState(false);
@@ -47,7 +51,7 @@ export default function AssetSerialInlineEdit({
   }
 
   if (!canEdit) {
-    return <span className="text-sm text-gray-900 dark:text-slate-100">{value || "-"}</span>;
+    return <span className={dark ? "text-slate-300" : ""}>{value || "-"}</span>;
   }
 
   return (
@@ -57,7 +61,11 @@ export default function AssetSerialInlineEdit({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="w-48 rounded-md border bg-white px-2 py-1 text-xs text-gray-900 outline-none focus:border-gray-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-white/20"
+            className={
+              dark
+                ? "w-48 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
+                : "w-48 rounded-md border bg-white px-2 py-1 text-xs outline-none focus:border-gray-400"
+            }
             placeholder="Enter serial..."
             autoFocus
           />
@@ -65,7 +73,11 @@ export default function AssetSerialInlineEdit({
             type="button"
             disabled={saving}
             onClick={() => save(value)}
-            className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
+            className={
+              dark
+                ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-100 hover:bg-white/10 disabled:opacity-60"
+                : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-60"
+            }
           >
             {saving ? "Saving..." : "Save"}
           </button>
@@ -76,18 +88,28 @@ export default function AssetSerialInlineEdit({
               setValue(initialSerial ?? "");
               setEditing(false);
             }}
-            className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
+            className={
+              dark
+                ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-300 hover:bg-white/10 disabled:opacity-60"
+                : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-60"
+            }
           >
             Cancel
           </button>
         </>
       ) : (
         <>
-          <span className="text-sm text-gray-900 dark:text-slate-100">{value || "-"}</span>
+          <span className={dark ? "text-sm text-slate-300" : "text-sm"}>
+            {value || "-"}
+          </span>
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-md border px-2 py-1 text-xs font-medium text-gray-900 hover:bg-gray-50 dark:border-white/10 dark:text-slate-100 dark:hover:bg-white/10"
+            className={
+              dark
+                ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-100 hover:bg-white/10"
+                : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-gray-50"
+            }
           >
             Edit
           </button>
