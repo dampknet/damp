@@ -8,7 +8,7 @@
 @media print {
   @page {
     size: auto;
-    margin: 12mm;
+    margin: 10mm;
   }
 
   html,
@@ -17,11 +17,21 @@
     padding: 0 !important;
     background: #fff !important;
     color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Hide navbar / top controls / buttons marked no-print */
+  /* Hide anything marked no-print */
   .no-print,
   .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  header,
+  nav,
+  aside,
+  footer {
     display: none !important;
     visibility: hidden !important;
   }
@@ -32,14 +42,7 @@
     visibility: visible !important;
   }
 
-  header,
-  nav,
-  aside,
-  footer {
-    display: none !important;
-  }
-
-  /* Make printable region fully visible */
+  /* Printable region */
   .print-area,
   .print-area * {
     visibility: visible !important;
@@ -47,7 +50,9 @@
 
   .print-area {
     position: static !important;
+    inset: auto !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
@@ -55,9 +60,11 @@
     padding: 0 !important;
     background: #fff !important;
     color: #000 !important;
+    box-shadow: none !important;
+    transform: none !important;
   }
 
-  /* kill scroll wrappers so whole table prints */
+  /* Kill all scroll wrappers so full content prints */
   .overflow-auto,
   .overflow-x-auto,
   .overflow-y-auto,
@@ -65,29 +72,34 @@
   [class*="overflow-auto"],
   [class*="overflow-x-auto"],
   [class*="overflow-y-auto"],
-  [class*="max-h-"] {
+  [class*="overflow-scroll"],
+  [class*="max-h-"],
+  [class*="h-["] {
     overflow: visible !important;
     max-height: none !important;
     height: auto !important;
   }
 
-  /* remove sticky behavior in print */
+  /* Remove sticky in print */
   .sticky,
   thead.sticky,
   thead[class*="sticky"] {
     position: static !important;
     top: auto !important;
+    z-index: auto !important;
     box-shadow: none !important;
   }
 
-  /* force dark-mode text back to black on paper */
+  /* Force all text dark on paper */
   .print-area,
   .print-area * {
     color: #000 !important;
     text-shadow: none !important;
+    background-image: none !important;
+    filter: none !important;
   }
 
-  /* hide edit controls, keep plain values/badges */
+  /* Hide interactive controls in table print */
   .print-area button,
   .print-area select,
   .print-area input,
@@ -95,14 +107,14 @@
     display: none !important;
   }
 
-  /* links should print like normal text */
+  /* Links should print as normal readable text */
   .print-area a,
   .print-area a:visited {
     color: #000 !important;
     text-decoration: none !important;
   }
 
-  /* remove decorative UI styling */
+  /* Remove decorative UI effects */
   .shadow-sm,
   .shadow,
   .shadow-md,
@@ -121,12 +133,13 @@
     border-radius: 0 !important;
   }
 
-  /* table formatting */
+  /* Table formatting */
   table {
     width: 100% !important;
     border-collapse: collapse !important;
     table-layout: auto !important;
     page-break-inside: auto !important;
+    font-size: 11px !important;
   }
 
   thead {
@@ -137,6 +150,10 @@
     display: table-footer-group !important;
   }
 
+  tbody {
+    display: table-row-group !important;
+  }
+
   tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -145,23 +162,27 @@
   th,
   td {
     border: 1px solid #d1d5db !important;
-    padding: 8px !important;
+    padding: 6px 8px !important;
     vertical-align: top !important;
     background: #fff !important;
     color: #000 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
   }
 
   th {
     font-weight: 700 !important;
+    font-size: 10.5px !important;
   }
 
-  /* keep status badges visible enough on paper */
+  /* Keep printed badges readable */
   .print-area .border,
   .print-area [class*="border-"] {
     border-color: #d1d5db !important;
   }
 
-  /* hide scrollbars if browser still reserves them */
+  /* Remove reserved scrollbar space */
   ::-webkit-scrollbar {
     display: none !important;
   }
