@@ -61,8 +61,11 @@ export default function PrintExportButton({
     e.preventDefault();
     e.stopPropagation();
 
-    const el = document.getElementById("print-title");
-    if (el) el.textContent = title;
+    const titleEl = document.getElementById("print-title");
+    if (titleEl) titleEl.textContent = title;
+
+    const countEl = document.getElementById("print-count");
+    if (countEl) countEl.textContent = `${rows.length} shown`;
 
     window.print();
   }

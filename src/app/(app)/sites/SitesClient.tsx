@@ -89,6 +89,28 @@ function uniqueNumbers(values: Array<number | null>) {
   );
 }
 
+function GpsLink({ gps, dark }: { gps: string | null; dark: boolean }) {
+  if (!gps) {
+    return <span>-</span>;
+  }
+
+  return (
+    <a
+      href={`https://www.google.com/maps?q=${encodeURIComponent(gps)}`}
+      target="_blank"
+      rel="noreferrer"
+      className={
+        dark
+          ? "font-medium text-sky-300 hover:underline"
+          : "font-medium text-blue-600 hover:underline"
+      }
+      title="Open in Google Maps"
+    >
+      {gps}
+    </a>
+  );
+}
+
 export default function SitesClient({
   role,
   email,
@@ -320,14 +342,14 @@ export default function SitesClient({
           <div className="mt-6 space-y-6">
             <SitesSection
               dark={dark}
-              title={`Active Sites (${activeSites.length})`}
+              title="Active Sites"
               sites={activeSites}
               canEdit={canEdit}
               startIndex={1}
             />
             <SitesSection
               dark={dark}
-              title={`Down Sites (${downSites.length})`}
+              title="Down Sites"
               sites={downSites}
               canEdit={canEdit}
               startIndex={activeSites.length + 1}
@@ -337,14 +359,14 @@ export default function SitesClient({
           <div className="mt-6 space-y-6">
             <SitesSection
               dark={dark}
-              title={`Air-cooled Sites (${airSites.length})`}
+              title="Air-cooled Sites"
               sites={airSites}
               canEdit={canEdit}
               startIndex={1}
             />
             <SitesSection
               dark={dark}
-              title={`Liquid-cooled Sites (${liquidSites.length})`}
+              title="Liquid-cooled Sites"
               sites={liquidSites}
               canEdit={canEdit}
               startIndex={airSites.length + 1}
@@ -354,14 +376,14 @@ export default function SitesClient({
           <div className="mt-6 space-y-6">
             <SitesSection
               dark={dark}
-              title={`KNET Tower Sites (${knetSites.length})`}
+              title="KNET Tower Sites"
               sites={knetSites}
               canEdit={canEdit}
               startIndex={1}
             />
             <SitesSection
               dark={dark}
-              title={`GBC Tower Sites (${gbcSites.length})`}
+              title="GBC Tower Sites"
               sites={gbcSites}
               canEdit={canEdit}
               startIndex={knetSites.length + 1}
@@ -371,7 +393,7 @@ export default function SitesClient({
           <div className="mt-6">
             <SitesSection
               dark={dark}
-              title={`Sites (${sites.length})`}
+              title="Sites"
               sites={sites}
               canEdit={canEdit}
               startIndex={1}
@@ -431,6 +453,30 @@ function SitesSection({
     });
   }, [sites, filters]);
 
+  const filteredExportRows = filteredSites.map((s, index) => ({
+    No: startIndex + index,
+    Site: s.name,
+    "REG M FREQ": s.regMFreq ?? "",
+    Power: s.power ?? "",
+    Tx: s.transmitterType === "AIR" ? "A" : "L",
+    Tower: s.towerType ?? "",
+    "Height(m)": s.towerHeight ?? "",
+    GPS: s.gps ?? "",
+    Status: s.status,
+  }));
+
+  const filteredExportCols = [
+    { key: "No", label: "No" },
+    { key: "Site", label: "Site" },
+    { key: "REG M FREQ", label: "REG M FREQ" },
+    { key: "Power", label: "Power" },
+    { key: "Tx", label: "Tx" },
+    { key: "Tower", label: "Tower" },
+    { key: "Height(m)", label: "Height(m)" },
+    { key: "GPS", label: "GPS" },
+    { key: "Status", label: "Status" },
+  ];
+
   function clearColumnFilter<K extends keyof SectionFilterState>(key: K) {
     setFilters((prev) => ({ ...prev, [key]: "" }));
   }
@@ -446,6 +492,10 @@ function SitesSection({
     });
   }
 
+  const printTitle = filteringActive
+    ? `${title} (${filteredSites.length}) — Filtered`
+    : `${title} (${sites.length})`;
+
   return (
     <div
       className={
@@ -454,12 +504,28 @@ function SitesSection({
           : "print-area overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm"
       }
     >
+      <div className="print-only px-5 py-4">
+        <div id="print-title" className="text-lg font-semibold text-gray-900">
+          {printTitle}
+        </div>
+        <div id="print-count" className="mt-1 text-xs text-gray-500">
+          {filteredSites.length} shown
+        </div>
+      </div>
+      <div className="print-only h-px bg-gray-200" />
+
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>
-          {title}
+          {title} ({filteredSites.length})
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <PrintExportButton
+            title={printTitle}
+            rows={filteredExportRows}
+            columns={filteredExportCols}
+          />
+
           {filteringActive ? (
             <>
               {filters.regMFreq ? (
@@ -661,7 +727,7 @@ function SitesSection({
                   aria-label="Filter by tower height"
                   title="Filter by tower height"
                 >
-                  <option value="">Height ▼</option>
+                  <option value="">Height(m) ▼</option>
                   {heightOptions.map((value) => (
                     <option key={value} value={String(value)}>
                       {value}
@@ -757,7 +823,7 @@ function SitesSection({
 
                   <td className={`${plainCellClass(dark)} px-5 py-3`}>
                     {filteringActive ? (
-                      s.gps ?? "-"
+                      <GpsLink gps={s.gps ?? null} dark={dark} />
                     ) : (
                       <SiteGpsInlineEdit
                         siteId={s.id}
