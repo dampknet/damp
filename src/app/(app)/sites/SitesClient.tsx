@@ -756,10 +756,10 @@ function SitesSection({
             }
           >
             <tr>
-              <th className="w-[48px] px-2 py-3 font-semibold">No</th>
-              <th className="min-w-[120px] px-2 py-3 font-semibold">Site</th>
+              <th className="w-12 px-2 py-3 font-semibold">No</th>
+              <th className="min-w-30 px-2 py-3 font-semibold">Site</th>
 
-              <th className="min-w-[112px] px-1.5 py-3 font-semibold">
+              <th className="min-w-28 px-1.5 py-3 font-semibold">
                 <select
                   value={filters.regMFreq}
                   onChange={(e) =>
@@ -778,7 +778,7 @@ function SitesSection({
                 </select>
               </th>
 
-              <th className="min-w-[84px] px-1.5 py-3 font-semibold">
+              <th className="min-w-21 px-1.5 py-3 font-semibold">
                 <select
                   value={filters.power}
                   onChange={(e) =>
@@ -797,7 +797,7 @@ function SitesSection({
                 </select>
               </th>
 
-              <th className="min-w-[72px] px-1.5 py-3 font-semibold">
+              <th className="min-w-18 px-1.5 py-3 font-semibold">
                 <select
                   value={filters.tx}
                   onChange={(e) =>
@@ -813,7 +813,7 @@ function SitesSection({
                 </select>
               </th>
 
-              <th className="min-w-[82px] px-1.5 py-3 font-semibold">
+              <th className="min-w-20.5 px-1.5 py-3 font-semibold">
                 <select
                   value={filters.tower}
                   onChange={(e) =>
@@ -829,7 +829,7 @@ function SitesSection({
                 </select>
               </th>
 
-              <th className="min-w-[88px] px-1.5 py-3 font-semibold">
+              <th className="min-w-22 px-1.5 py-3 font-semibold">
                 <select
                   value={filters.height}
                   onChange={(e) =>
@@ -848,9 +848,9 @@ function SitesSection({
                 </select>
               </th>
 
-              <th className="min-w-[130px] px-2 py-3 font-semibold">GPS</th>
+              <th className="min-w-32.5 px-2 py-3 font-semibold">GPS</th>
 
-              <th className="min-w-[92px] px-1.5 py-3 text-right font-semibold">
+              <th className="min-w-23 px-1.5 py-3 text-right font-semibold">
                 <select
                   value={filters.status}
                   onChange={(e) =>
@@ -866,7 +866,7 @@ function SitesSection({
                 </select>
               </th>
 
-              <th className="w-[70px] px-2 py-3 text-right font-semibold no-print">
+              <th className="w-17.5 px-2 py-3 text-right font-semibold no-print">
                 Open
               </th>
             </tr>
@@ -937,7 +937,7 @@ function SitesSection({
                     )}
                   </td>
 
-                  <td className={`${plainCellClass(dark)} px-2 py-3 break-words`}>
+                  <td className={`${plainCellClass(dark)} px-2 py-3 wrap-break-word`}>
                     {filteringActive ? (
                       <GpsLink gps={s.gps ?? null} dark={dark} />
                     ) : (
