@@ -49,14 +49,32 @@ export default function LoginForm() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#f7f4ee_0%,#efe6d8_45%,#f6f1e8_100%)]">
-      {/* animated background */}
+      <style jsx>{`
+        @keyframes floaty {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes signal {
+          0%, 100% { transform: scaleY(0.55); opacity: 0.4; }
+          50% { transform: scaleY(1); opacity: 1; }
+        }
+      `}</style>
+
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-20 top-10 h-72 w-72 animate-pulse rounded-full bg-[#1d5fa8]/12 blur-3xl" />
-        <div className="absolute right-0 top-0 h-80 w-80 animate-pulse rounded-full bg-[#c8611a]/12 blur-3xl [animation-delay:700ms]" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 animate-pulse rounded-full bg-emerald-500/10 blur-3xl [animation-delay:1200ms]" />
+        <div
+          className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-[#1d5fa8]/12 blur-3xl"
+          style={{ animation: "floaty 7s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute right-0 top-0 h-80 w-80 rounded-full bg-[#c8611a]/12 blur-3xl"
+          style={{ animation: "floaty 8s ease-in-out infinite 0.7s" }}
+        />
+        <div
+          className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl"
+          style={{ animation: "floaty 9s ease-in-out infinite 1.2s" }}
+        />
       </div>
 
-      {/* grid pattern */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.05]"
         style={{
@@ -68,26 +86,40 @@ export default function LoginForm() {
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10">
         <div className="grid w-full items-center gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-          {/* left content */}
           <div
             className={`hidden lg:block transition-all duration-700 ${
-              mounted
-                ? "translate-y-0 opacity-100"
-                : "translate-y-6 opacity-0"
+              mounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
             }`}
           >
             <div className="max-w-xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e4d9cb] bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c8611a] backdrop-blur">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#1d5fa8] animate-pulse" />
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#1d5fa8]" />
                 Secure Access
               </div>
 
-              <h1 className="text-5xl font-semibold tracking-tight text-[#1a1814]">
-                DTT Asset
-                <span className="block bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
-                  Management Platform
-                </span>
-              </h1>
+              <div className="relative">
+                <div className="pointer-events-none absolute -left-2 top-3 flex items-end gap-1 opacity-30">
+                  {[20, 30, 42, 56, 42, 30, 20].map((h, i) => (
+                    <span
+                      key={i}
+                      className="w-1.5 rounded-full bg-[linear-gradient(180deg,#1d5fa8,#3b82f6,#c8611a)]"
+                      style={{
+                        height: `${h}px`,
+                        transformOrigin: "bottom",
+                        animation: `signal 1.6s ease-in-out infinite`,
+                        animationDelay: `${i * 0.12}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <h1 className="text-5xl font-semibold tracking-tight leading-[1.15] text-[#1a1814]">
+                  DTT Asset
+                  <span className="block pb-1 bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
+                    Management Platform
+                  </span>
+                </h1>
+              </div>
 
               <p className="mt-5 max-w-lg text-base leading-7 text-[#6f6a62]">
                 Manage sites, monitor assets, track store records, and keep your
@@ -120,12 +152,9 @@ export default function LoginForm() {
             </div>
           </div>
 
-          {/* form side */}
           <div
             className={`mx-auto w-full max-w-md transition-all duration-700 ${
-              mounted
-                ? "translate-y-0 opacity-100"
-                : "translate-y-8 opacity-0"
+              mounted ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
             }`}
           >
             <div className="overflow-hidden rounded-[30px] border border-[#e4dccf] bg-white/88 shadow-[0_24px_70px_rgba(0,0,0,0.10)] backdrop-blur">
@@ -186,7 +215,7 @@ export default function LoginForm() {
                   </div>
 
                   {msg ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 animate-in fade-in duration-200">
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                       {msg}
                     </div>
                   ) : null}
