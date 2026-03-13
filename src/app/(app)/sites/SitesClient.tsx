@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
 import SiteStatusSelect from "@/components/SiteStatusSelect";
@@ -46,6 +47,15 @@ type Props = {
   siteMini: Array<{ id: string; name: string }>;
 };
 
+type SectionFilterState = {
+  regMFreq: string;
+  power: string;
+  tx: string;
+  tower: string;
+  height: string;
+  status: string;
+};
+
 function ttBadge(tt: "AIR" | "LIQUID", dark: boolean) {
   const base =
     "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
@@ -57,6 +67,26 @@ function ttBadge(tt: "AIR" | "LIQUID", dark: boolean) {
     : dark
     ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`
     : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+}
+
+function headerSelectClass(dark: boolean) {
+  return dark
+    ? "rounded-md border border-white/10 bg-[#101720] px-2 py-1 text-xs font-semibold text-slate-300 outline-none transition hover:bg-white/5 focus:border-sky-400"
+    : "rounded-md border border-[#ddd5c9] bg-white px-2 py-1 text-xs font-semibold text-[#5b564d] outline-none transition hover:bg-[#f7f3ed] focus:border-[#1a1814]";
+}
+
+function plainCellClass(dark: boolean) {
+  return dark ? "text-slate-300" : "text-[#5d584f]";
+}
+
+function uniqueStrings(values: Array<string | null>) {
+  return [...new Set(values.filter((v): v is string => typeof v === "string" && v.trim() !== ""))];
+}
+
+function uniqueNumbers(values: Array<number | null>) {
+  return [...new Set(values.filter((v): v is number => typeof v === "number"))].sort(
+    (a, b) => b - a
+  );
 }
 
 export default function SitesClient({
@@ -288,22 +318,64 @@ export default function SitesClient({
 
         {group === "status" ? (
           <div className="mt-6 space-y-6">
-            <SitesSection dark={dark} title={`Active Sites (${activeSites.length})`} sites={activeSites} canEdit={canEdit} startIndex={1} />
-            <SitesSection dark={dark} title={`Down Sites (${downSites.length})`} sites={downSites} canEdit={canEdit} startIndex={activeSites.length + 1} />
+            <SitesSection
+              dark={dark}
+              title={`Active Sites (${activeSites.length})`}
+              sites={activeSites}
+              canEdit={canEdit}
+              startIndex={1}
+            />
+            <SitesSection
+              dark={dark}
+              title={`Down Sites (${downSites.length})`}
+              sites={downSites}
+              canEdit={canEdit}
+              startIndex={activeSites.length + 1}
+            />
           </div>
         ) : group === "tt" ? (
           <div className="mt-6 space-y-6">
-            <SitesSection dark={dark} title={`Air-cooled Sites (${airSites.length})`} sites={airSites} canEdit={canEdit} startIndex={1} />
-            <SitesSection dark={dark} title={`Liquid-cooled Sites (${liquidSites.length})`} sites={liquidSites} canEdit={canEdit} startIndex={airSites.length + 1} />
+            <SitesSection
+              dark={dark}
+              title={`Air-cooled Sites (${airSites.length})`}
+              sites={airSites}
+              canEdit={canEdit}
+              startIndex={1}
+            />
+            <SitesSection
+              dark={dark}
+              title={`Liquid-cooled Sites (${liquidSites.length})`}
+              sites={liquidSites}
+              canEdit={canEdit}
+              startIndex={airSites.length + 1}
+            />
           </div>
         ) : group === "tower" ? (
           <div className="mt-6 space-y-6">
-            <SitesSection dark={dark} title={`KNET Tower Sites (${knetSites.length})`} sites={knetSites} canEdit={canEdit} startIndex={1} />
-            <SitesSection dark={dark} title={`GBC Tower Sites (${gbcSites.length})`} sites={gbcSites} canEdit={canEdit} startIndex={knetSites.length + 1} />
+            <SitesSection
+              dark={dark}
+              title={`KNET Tower Sites (${knetSites.length})`}
+              sites={knetSites}
+              canEdit={canEdit}
+              startIndex={1}
+            />
+            <SitesSection
+              dark={dark}
+              title={`GBC Tower Sites (${gbcSites.length})`}
+              sites={gbcSites}
+              canEdit={canEdit}
+              startIndex={knetSites.length + 1}
+            />
           </div>
         ) : (
           <div className="mt-6">
-            <SitesSection dark={dark} title={`Sites (${sites.length})`} sites={sites} canEdit={canEdit} startIndex={1} />
+            <SitesSection
+              dark={dark}
+              title={`Sites (${sites.length})`}
+              sites={sites}
+              canEdit={canEdit}
+              startIndex={1}
+            />
           </div>
         )}
       </div>
@@ -324,6 +396,56 @@ function SitesSection({
   canEdit: boolean;
   startIndex: number;
 }) {
+  const [filters, setFilters] = useState<SectionFilterState>({
+    regMFreq: "",
+    power: "",
+    tx: "",
+    tower: "",
+    height: "",
+    status: "",
+  });
+
+  const filteringActive = Object.values(filters).some(Boolean);
+
+  const regMFreqOptions = useMemo(
+    () => uniqueStrings(sites.map((s) => s.regMFreq)).sort((a, b) => a.localeCompare(b)),
+    [sites]
+  );
+
+  const powerOptions = useMemo(() => uniqueNumbers(sites.map((s) => s.power)), [sites]);
+
+  const heightOptions = useMemo(
+    () => uniqueNumbers(sites.map((s) => s.towerHeight)),
+    [sites]
+  );
+
+  const filteredSites = useMemo(() => {
+    return sites.filter((s) => {
+      if (filters.regMFreq && (s.regMFreq ?? "") !== filters.regMFreq) return false;
+      if (filters.power && String(s.power ?? "") !== filters.power) return false;
+      if (filters.tx && s.transmitterType !== filters.tx) return false;
+      if (filters.tower && s.towerType !== filters.tower) return false;
+      if (filters.height && String(s.towerHeight ?? "") !== filters.height) return false;
+      if (filters.status && s.status !== filters.status) return false;
+      return true;
+    });
+  }, [sites, filters]);
+
+  function clearColumnFilter<K extends keyof SectionFilterState>(key: K) {
+    setFilters((prev) => ({ ...prev, [key]: "" }));
+  }
+
+  function clearAllFilters() {
+    setFilters({
+      regMFreq: "",
+      power: "",
+      tx: "",
+      tower: "",
+      height: "",
+      status: "",
+    });
+  }
+
   return (
     <div
       className={
@@ -332,12 +454,115 @@ function SitesSection({
           : "print-area overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm"
       }
     >
-      <div className="flex items-center justify-between px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>
           {title}
         </div>
-        <div className={dark ? "text-xs font-medium text-slate-500" : "text-xs font-medium text-[#8b857c]"}>
-          {sites.length} shown
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {filteringActive ? (
+            <>
+              {filters.regMFreq ? (
+                <button
+                  type="button"
+                  onClick={() => clearColumnFilter("regMFreq")}
+                  className={
+                    dark
+                      ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10"
+                      : "rounded-full border border-[#e0dbd2] bg-[#faf7f2] px-3 py-1 text-[11px] font-medium text-[#5b564d] hover:bg-[#f3ede4]"
+                  }
+                >
+                  REG M FREQ: {filters.regMFreq} ✕
+                </button>
+              ) : null}
+
+              {filters.power ? (
+                <button
+                  type="button"
+                  onClick={() => clearColumnFilter("power")}
+                  className={
+                    dark
+                      ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10"
+                      : "rounded-full border border-[#e0dbd2] bg-[#faf7f2] px-3 py-1 text-[11px] font-medium text-[#5b564d] hover:bg-[#f3ede4]"
+                  }
+                >
+                  Power: {filters.power} ✕
+                </button>
+              ) : null}
+
+              {filters.tx ? (
+                <button
+                  type="button"
+                  onClick={() => clearColumnFilter("tx")}
+                  className={
+                    dark
+                      ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10"
+                      : "rounded-full border border-[#e0dbd2] bg-[#faf7f2] px-3 py-1 text-[11px] font-medium text-[#5b564d] hover:bg-[#f3ede4]"
+                  }
+                >
+                  Tx: {filters.tx} ✕
+                </button>
+              ) : null}
+
+              {filters.tower ? (
+                <button
+                  type="button"
+                  onClick={() => clearColumnFilter("tower")}
+                  className={
+                    dark
+                      ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10"
+                      : "rounded-full border border-[#e0dbd2] bg-[#faf7f2] px-3 py-1 text-[11px] font-medium text-[#5b564d] hover:bg-[#f3ede4]"
+                  }
+                >
+                  Tower: {filters.tower} ✕
+                </button>
+              ) : null}
+
+              {filters.height ? (
+                <button
+                  type="button"
+                  onClick={() => clearColumnFilter("height")}
+                  className={
+                    dark
+                      ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10"
+                      : "rounded-full border border-[#e0dbd2] bg-[#faf7f2] px-3 py-1 text-[11px] font-medium text-[#5b564d] hover:bg-[#f3ede4]"
+                  }
+                >
+                  Height: {filters.height} ✕
+                </button>
+              ) : null}
+
+              {filters.status ? (
+                <button
+                  type="button"
+                  onClick={() => clearColumnFilter("status")}
+                  className={
+                    dark
+                      ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10"
+                      : "rounded-full border border-[#e0dbd2] bg-[#faf7f2] px-3 py-1 text-[11px] font-medium text-[#5b564d] hover:bg-[#f3ede4]"
+                  }
+                >
+                  Status: {filters.status} ✕
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className={
+                  dark
+                    ? "rounded-lg border border-white/10 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-white/10"
+                    : "rounded-lg border border-[#e0dbd2] px-3 py-1 text-xs font-medium text-[#5b564d] hover:bg-[#f5f2ed]"
+                }
+              >
+                Clear Filters
+              </button>
+            </>
+          ) : null}
+
+          <div className={dark ? "text-xs font-medium text-slate-500" : "text-xs font-medium text-[#8b857c]"}>
+            {filteredSites.length} shown
+          </div>
         </div>
       </div>
 
@@ -355,29 +580,134 @@ function SitesSection({
             <tr>
               <th className="px-5 py-3 font-semibold">No</th>
               <th className="px-5 py-3 font-semibold">Site</th>
-              <th className="px-5 py-3 font-semibold">REG M FREQ</th>
-              <th className="px-5 py-3 font-semibold">Power</th>
-              <th className="px-5 py-3 font-semibold">Tx</th>
-              <th className="px-5 py-3 font-semibold">Tower</th>
-              <th className="px-5 py-3 font-semibold">Height(m)</th>
+
+              <th className="px-5 py-3 font-semibold">
+                <select
+                  value={filters.regMFreq}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, regMFreq: e.target.value }))
+                  }
+                  className={headerSelectClass(dark)}
+                  aria-label="Filter by REG M FREQ"
+                  title="Filter by REG M FREQ"
+                >
+                  <option value="">REG M FREQ ▼</option>
+                  {regMFreqOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </th>
+
+              <th className="px-5 py-3 font-semibold">
+                <select
+                  value={filters.power}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, power: e.target.value }))
+                  }
+                  className={headerSelectClass(dark)}
+                  aria-label="Filter by power"
+                  title="Filter by power"
+                >
+                  <option value="">Power ▼</option>
+                  {powerOptions.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </th>
+
+              <th className="px-5 py-3 font-semibold">
+                <select
+                  value={filters.tx}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, tx: e.target.value }))
+                  }
+                  className={headerSelectClass(dark)}
+                  aria-label="Filter by transmitter type"
+                  title="Filter by transmitter type"
+                >
+                  <option value="">Tx ▼</option>
+                  <option value="AIR">AIR</option>
+                  <option value="LIQUID">LIQUID</option>
+                </select>
+              </th>
+
+              <th className="px-5 py-3 font-semibold">
+                <select
+                  value={filters.tower}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, tower: e.target.value }))
+                  }
+                  className={headerSelectClass(dark)}
+                  aria-label="Filter by tower"
+                  title="Filter by tower"
+                >
+                  <option value="">Tower ▼</option>
+                  <option value="GBC">GBC</option>
+                  <option value="KNET">KNET</option>
+                </select>
+              </th>
+
+              <th className="px-5 py-3 font-semibold">
+                <select
+                  value={filters.height}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, height: e.target.value }))
+                  }
+                  className={headerSelectClass(dark)}
+                  aria-label="Filter by tower height"
+                  title="Filter by tower height"
+                >
+                  <option value="">Height ▼</option>
+                  {heightOptions.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </th>
+
               <th className="px-5 py-3 font-semibold">GPS</th>
-              <th className="px-5 py-3 font-semibold text-right">Status</th>
+
+              <th className="px-5 py-3 font-semibold text-right">
+                <select
+                  value={filters.status}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, status: e.target.value }))
+                  }
+                  className={`${headerSelectClass(dark)} text-right`}
+                  aria-label="Filter by status"
+                  title="Filter by status"
+                >
+                  <option value="">Status ▼</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="DOWN">DOWN</option>
+                </select>
+              </th>
+
               <th className="px-5 py-3 font-semibold text-right no-print">Open</th>
             </tr>
           </thead>
 
           <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
-            {sites.length === 0 ? (
+            {filteredSites.length === 0 ? (
               <tr>
                 <td
-                  className={dark ? "px-5 py-12 text-center text-slate-500" : "px-5 py-12 text-center text-[#8b857c]"}
+                  className={
+                    dark
+                      ? "px-5 py-12 text-center text-slate-500"
+                      : "px-5 py-12 text-center text-[#8b857c]"
+                  }
                   colSpan={10}
                 >
                   No sites found
                 </td>
               </tr>
             ) : (
-              sites.map((s, index) => (
+              filteredSites.map((s, index) => (
                 <tr key={s.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}>
                   <td className={dark ? "px-5 py-3 font-medium text-slate-500" : "px-5 py-3 font-medium text-[#6b655d]"}>
                     {startIndex + index}
@@ -387,11 +717,11 @@ function SitesSection({
                     {s.name}
                   </td>
 
-                  <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                  <td className={`${plainCellClass(dark)} px-5 py-3`}>
                     {s.regMFreq ?? "-"}
                   </td>
 
-                  <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                  <td className={`${plainCellClass(dark)} px-5 py-3`}>
                     {typeof s.power === "number" ? s.power : "-"}
                   </td>
 
@@ -402,35 +732,51 @@ function SitesSection({
                   </td>
 
                   <td className="px-5 py-3">
-                    <SiteTowerTypeSelect
-                      siteId={s.id}
-                      initialTowerType={s.towerType ?? "GBC"}
-                      canEdit={canEdit}
-                    />
+                    {filteringActive ? (
+                      <span className={plainCellClass(dark)}>{s.towerType ?? "-"}</span>
+                    ) : (
+                      <SiteTowerTypeSelect
+                        siteId={s.id}
+                        initialTowerType={s.towerType ?? "GBC"}
+                        canEdit={canEdit}
+                      />
+                    )}
                   </td>
 
-                  <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
-                    <SiteHeightInlineEdit
-                      siteId={s.id}
-                      initialHeight={typeof s.towerHeight === "number" ? s.towerHeight : null}
-                      canEdit={canEdit}
-                    />
+                  <td className={`${plainCellClass(dark)} px-5 py-3`}>
+                    {filteringActive ? (
+                      typeof s.towerHeight === "number" ? s.towerHeight : "-"
+                    ) : (
+                      <SiteHeightInlineEdit
+                        siteId={s.id}
+                        initialHeight={typeof s.towerHeight === "number" ? s.towerHeight : null}
+                        canEdit={canEdit}
+                      />
+                    )}
                   </td>
 
-                  <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
-                    <SiteGpsInlineEdit
-                      siteId={s.id}
-                      initialGps={s.gps ?? null}
-                      canEdit={canEdit}
-                    />
+                  <td className={`${plainCellClass(dark)} px-5 py-3`}>
+                    {filteringActive ? (
+                      s.gps ?? "-"
+                    ) : (
+                      <SiteGpsInlineEdit
+                        siteId={s.id}
+                        initialGps={s.gps ?? null}
+                        canEdit={canEdit}
+                      />
+                    )}
                   </td>
 
                   <td className="px-5 py-3 text-right">
-                    <SiteStatusSelect
-                      siteId={s.id}
-                      initialStatus={s.status}
-                      canEdit={canEdit}
-                    />
+                    {filteringActive ? (
+                      <span className={plainCellClass(dark)}>{s.status}</span>
+                    ) : (
+                      <SiteStatusSelect
+                        siteId={s.id}
+                        initialStatus={s.status}
+                        canEdit={canEdit}
+                      />
+                    )}
                   </td>
 
                   <td className="px-5 py-3 text-right no-print">
