@@ -97,29 +97,32 @@ export default function LoginForm() {
                 Secure Access
               </div>
 
-              <div className="relative">
-                <div className="pointer-events-none absolute -left-2 top-3 flex items-end gap-1 opacity-30">
-                  {[20, 30, 42, 56, 42, 30, 20].map((h, i) => (
-                    <span
-                      key={i}
-                      className="w-1.5 rounded-full bg-[linear-gradient(180deg,#1d5fa8,#3b82f6,#c8611a)]"
-                      style={{
-                        height: `${h}px`,
-                        transformOrigin: "bottom",
-                        animation: `signal 1.6s ease-in-out infinite`,
-                        animationDelay: `${i * 0.12}s`,
-                      }}
-                    />
-                  ))}
-                </div>
+             <div className="flex items-start gap-3">
 
-                <h1 className="text-5xl font-semibold tracking-tight leading-[1.15] text-[#1a1814]">
-                  DTT Asset
-                  <span className="block pb-1 bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
-                    Management Platform
-                  </span>
-                </h1>
+              {/* signal bars */}
+              <div className="mt-3 flex items-end gap-1 opacity-50">
+                {[16, 24, 34, 48, 34, 24, 16].map((h, i) => (
+                  <span
+                    key={i}
+                    className="w-0.75 rounded-full bg-[linear-gradient(180deg,#1d5fa8,#3b82f6,#c8611a)]"
+                    style={{
+                      height: `${h}px`,
+                      transformOrigin: "bottom",
+                      animation: `signal 1.6s ease-in-out infinite`,
+                      animationDelay: `${i * 0.12}s`,
+                    }}
+                  />
+                ))}
               </div>
+
+              <h1 className="text-5xl font-semibold tracking-tight leading-[1.15] text-[#1a1814]">
+                DTT Asset
+                <span className="block pb-1 bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
+                  Management Platform
+                </span>
+              </h1>
+
+            </div>
 
               <p className="mt-5 max-w-lg text-base leading-7 text-[#6f6a62]">
                 Manage sites, monitor assets, track store records, and keep your
