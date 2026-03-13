@@ -51,12 +51,34 @@ export default function LoginForm() {
     <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#f7f4ee_0%,#efe6d8_45%,#f6f1e8_100%)]">
       <style jsx>{`
         @keyframes floaty {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-8px);
+          }
         }
+
         @keyframes signal {
-          0%, 100% { transform: scaleY(0.55); opacity: 0.4; }
-          50% { transform: scaleY(1); opacity: 1; }
+          0%,
+          100% {
+            transform: scaleY(0.55);
+            opacity: 0.4;
+          }
+          50% {
+            transform: scaleY(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes shine {
+          0% {
+            transform: translateX(-120%);
+          }
+          100% {
+            transform: translateX(220%);
+          }
         }
       `}</style>
 
@@ -97,32 +119,29 @@ export default function LoginForm() {
                 Secure Access
               </div>
 
-             <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-4.5 flex items-end gap-1 opacity-50">
+                  {[16, 24, 34, 48, 34, 24, 16].map((h, i) => (
+                    <span
+                      key={i}
+                      className="w-0.75 rounded-full bg-[linear-gradient(180deg,#1d5fa8,#3b82f6,#c8611a)]"
+                      style={{
+                        height: `${h}px`,
+                        transformOrigin: "bottom",
+                        animation: "signal 1.6s ease-in-out infinite",
+                        animationDelay: `${i * 0.12}s`,
+                      }}
+                    />
+                  ))}
+                </div>
 
-              {/* signal bars */}
-              <div className="mt-3 flex items-end gap-1 opacity-50">
-                {[16, 24, 34, 48, 34, 24, 16].map((h, i) => (
-                  <span
-                    key={i}
-                    className="w-0.75 rounded-full bg-[linear-gradient(180deg,#1d5fa8,#3b82f6,#c8611a)]"
-                    style={{
-                      height: `${h}px`,
-                      transformOrigin: "bottom",
-                      animation: `signal 1.6s ease-in-out infinite`,
-                      animationDelay: `${i * 0.12}s`,
-                    }}
-                  />
-                ))}
+                <h1 className="text-5xl font-semibold leading-[1.15] tracking-tight text-[#1a1814]">
+                  DTT Asset
+                  <span className="block pb-1 bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
+                    Management Platform
+                  </span>
+                </h1>
               </div>
-
-              <h1 className="text-5xl font-semibold tracking-tight leading-[1.15] text-[#1a1814]">
-                DTT Asset
-                <span className="block pb-1 bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
-                  Management Platform
-                </span>
-              </h1>
-
-            </div>
 
               <p className="mt-5 max-w-lg text-base leading-7 text-[#6f6a62]">
                 Manage sites, monitor assets, track store records, and keep your
@@ -132,6 +151,7 @@ export default function LoginForm() {
               <div className="mt-8 max-w-md">
                 <div className="group relative overflow-hidden rounded-3xl border border-[#e2d7c9] bg-white/80 p-5 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-lg">
                   <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]" />
+
                   <div className="flex items-start gap-4">
                     <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] text-lg text-white shadow-md">
                       ✓
@@ -161,7 +181,12 @@ export default function LoginForm() {
             }`}
           >
             <div className="overflow-hidden rounded-[30px] border border-[#e4dccf] bg-white/88 shadow-[0_24px_70px_rgba(0,0,0,0.10)] backdrop-blur">
-              <div className="relative border-b border-[#efe8de] bg-[linear-gradient(135deg,#fcfaf7_0%,#f6efe6_100%)] px-6 py-6">
+              <div className="relative overflow-hidden border-b border-[#efe8de] bg-[linear-gradient(135deg,#fcfaf7_0%,#f6efe6_100%)] px-6 py-6">
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.65),transparent)]"
+                  style={{ animation: "shine 3.8s ease-in-out infinite" }}
+                />
+
                 <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-[#1d5fa8]/10 blur-2xl" />
                 <div className="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[#c8611a]/10 blur-2xl" />
 
@@ -242,7 +267,7 @@ export default function LoginForm() {
             </div>
 
             <p className="mt-4 text-center text-xs font-medium text-[#9c9890]">
-              DTT Asset Management Platform
+              © 2026 DTT Asset Management Platform. All rights reserved.
             </p>
           </div>
         </div>
