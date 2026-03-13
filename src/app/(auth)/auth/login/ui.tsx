@@ -37,9 +37,8 @@ export default function LoginForm() {
       password,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setMsg(error.message);
       return;
     }
@@ -80,7 +79,42 @@ export default function LoginForm() {
             transform: translateX(220%);
           }
         }
+
+        @keyframes progress {
+          0% {
+            transform: translateX(-120%);
+          }
+          100% {
+            transform: translateX(300%);
+          }
+        }
       `}</style>
+
+      {loading ? (
+        <div className="fixed inset-0 z-200 bg-black/25 backdrop-blur-sm">
+          <div className="absolute inset-x-0 top-0 h-1 overflow-hidden bg-white/30">
+            <div
+              className="h-full w-1/3 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"
+              style={{ animation: "progress 1.1s ease-in-out infinite" }}
+            />
+          </div>
+
+          <div className="flex min-h-screen items-center justify-center px-4">
+            <div className="w-full max-w-sm rounded-3xl border border-white/40 bg-white/90 p-6 text-center shadow-2xl">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] text-white shadow-md">
+                <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              </div>
+
+              <h2 className="mt-4 text-lg font-semibold text-[#1a1814]">
+                Signing you in...
+              </h2>
+              <p className="mt-1 text-sm text-[#746f67]">
+                Please wait while we prepare your dashboard.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="pointer-events-none absolute inset-0">
         <div
