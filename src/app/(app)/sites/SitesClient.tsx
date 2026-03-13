@@ -746,7 +746,7 @@ function SitesSection({
 
       <div className={dark ? "h-px bg-white/8" : "h-px bg-[#eee7dd]"} />
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[72vh] overflow-auto">
         <table className="w-full table-auto text-[13px]">
           <thead
             className={

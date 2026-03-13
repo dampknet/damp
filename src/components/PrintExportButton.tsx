@@ -58,17 +58,28 @@ export default function PrintExportButton({
       .slice(0, 80) || "export";
 
   function handlePrint(e: React.MouseEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 
-    const titleEl = document.getElementById("print-title");
-    if (titleEl) titleEl.textContent = title;
-
-    const countEl = document.getElementById("print-count");
-    if (countEl) countEl.textContent = `${rows.length} shown`;
-
+  const printArea = e.currentTarget.closest(".print-area");
+  if (!printArea) {
     window.print();
+    return;
   }
+
+  const original = document.body.innerHTML;
+
+  const titleEl = printArea.querySelector("#print-title");
+  if (titleEl) titleEl.textContent = title;
+
+  document.body.innerHTML = printArea.outerHTML;
+
+  window.print();
+
+  document.body.innerHTML = original;
+
+  window.location.reload();
+}
 
   function handleExport(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
