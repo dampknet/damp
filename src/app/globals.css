@@ -13,25 +13,25 @@
 
   html,
   body {
-    background: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
   }
 
-  /* Hide things that must never print */
+  /* Hide navbar / top controls / buttons marked no-print */
   .no-print,
   .no-print * {
     display: none !important;
     visibility: hidden !important;
   }
 
-  /* Show print-only content */
+  /* Show print header blocks */
   .print-only {
     display: block !important;
     visibility: visible !important;
   }
 
-  /* Make normal page wrappers harmless in print */
   header,
   nav,
   aside,
@@ -39,7 +39,7 @@
     display: none !important;
   }
 
-  /* Ensure the actual print section stays visible */
+  /* Make printable region fully visible */
   .print-area,
   .print-area * {
     visibility: visible !important;
@@ -48,19 +48,61 @@
   .print-area {
     position: static !important;
     width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: white !important;
+    background: #fff !important;
+    color: #000 !important;
   }
 
-  /* If a print header sits just before print-area, keep it visible too */
-  .print-only + .print-area,
-  .print-only + .print-area * {
-    visibility: visible !important;
+  /* kill scroll wrappers so whole table prints */
+  .overflow-auto,
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-scroll,
+  [class*="overflow-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-y-auto"],
+  [class*="max-h-"] {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
   }
 
-  /* Remove decorative UI styling */
+  /* remove sticky behavior in print */
+  .sticky,
+  thead.sticky,
+  thead[class*="sticky"] {
+    position: static !important;
+    top: auto !important;
+    box-shadow: none !important;
+  }
+
+  /* force dark-mode text back to black on paper */
+  .print-area,
+  .print-area * {
+    color: #000 !important;
+    text-shadow: none !important;
+  }
+
+  /* hide edit controls, keep plain values/badges */
+  .print-area button,
+  .print-area select,
+  .print-area input,
+  .print-area textarea {
+    display: none !important;
+  }
+
+  /* links should print like normal text */
+  .print-area a,
+  .print-area a:visited {
+    color: #000 !important;
+    text-decoration: none !important;
+  }
+
+  /* remove decorative UI styling */
   .shadow-sm,
   .shadow,
   .shadow-md,
@@ -70,29 +112,21 @@
     box-shadow: none !important;
   }
 
+  .rounded-md,
+  .rounded-lg,
   .rounded-xl,
   .rounded-2xl,
   .rounded-3xl,
-  .rounded-lg,
-  .rounded-md {
+  .rounded-full {
     border-radius: 0 !important;
   }
 
-  /* Prevent sticky table headers from behaving oddly on print */
-  .sticky,
-  thead.sticky,
-  thead[class*="sticky"] {
-    position: static !important;
-    top: auto !important;
-    box-shadow: none !important;
-  }
-
-  /* Better table printing */
+  /* table formatting */
   table {
     width: 100% !important;
     border-collapse: collapse !important;
     table-layout: auto !important;
-    page-break-inside: auto;
+    page-break-inside: auto !important;
   }
 
   thead {
@@ -103,8 +137,7 @@
     display: table-footer-group !important;
   }
 
-  tr,
-  img {
+  tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
@@ -113,27 +146,23 @@
   td {
     border: 1px solid #d1d5db !important;
     padding: 8px !important;
-    color: #000 !important;
-    background: #fff !important;
     vertical-align: top !important;
+    background: #fff !important;
+    color: #000 !important;
   }
 
   th {
     font-weight: 700 !important;
   }
 
-  /* Show links as plain text color */
-  a,
-  a:visited {
-    color: #000 !important;
-    text-decoration: none !important;
+  /* keep status badges visible enough on paper */
+  .print-area .border,
+  .print-area [class*="border-"] {
+    border-color: #d1d5db !important;
   }
 
-  /* Inputs/selects should print cleanly */
-  input,
-  select,
-  textarea,
-  button {
-    box-shadow: none !important;
+  /* hide scrollbars if browser still reserves them */
+  ::-webkit-scrollbar {
+    display: none !important;
   }
 }
