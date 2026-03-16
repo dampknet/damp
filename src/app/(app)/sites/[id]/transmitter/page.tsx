@@ -61,7 +61,6 @@ function sortAssetsNaturally(list: TxAssetRow[]) {
     const bBase = b.assetName.replace(/\s*\d+\s*$/, "").trim();
 
     if (aBase !== bBase) return aBase.localeCompare(bBase);
-
     if (aNum !== null && bNum !== null) return aNum - bNum;
     if (aNum === null && bNum !== null) return -1;
     if (aNum !== null && bNum === null) return 1;

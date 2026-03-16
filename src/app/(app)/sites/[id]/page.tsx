@@ -57,7 +57,6 @@ export default async function SiteDetailsPage({
   });
 
   const txCategoryId = catByName.get("Transmitter")?.id ?? null;
-
   const categoryCount = new Map<string, number>();
 
   for (const a of assets) {

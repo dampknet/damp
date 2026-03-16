@@ -1,104 +1,374 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import SiteSubcategoryClient from "./SiteSubcategoryClient";
+"use client";
 
-type SearchParams = { q?: string };
+import Link from "next/link";
+import { useThemeMode } from "@/context/ThemeContext";
+import PrintExportButton from "@/components/PrintExportButton";
 
-export default async function SiteSubcategoryPage({
-  params,
-  searchParams,
+type Row = {
+  id: string;
+  assetName: string;
+  serialNumber: string;
+  manufacturer: string;
+  model: string;
+  status: string;
+};
+
+function SummaryCard({
+  dark,
+  label,
+  value,
+  accent,
 }: {
-  params: Promise<{ id: string; subCategoryId: string }>;
-  searchParams?: Promise<SearchParams>;
+  dark: boolean;
+  label: string;
+  value: string;
+  accent: string;
 }) {
-  const { id, subCategoryId } = await params;
-  const sp = (await searchParams) ?? {};
-  const q = (sp.q ?? "").trim();
-
-  const site = await prisma.site.findUnique({
-    where: { id },
-    select: { id: true, name: true },
-  });
-  if (!site) return notFound();
-
-  const sub = await prisma.subcategory.findUnique({
-    where: { id: subCategoryId },
-    select: { id: true, name: true, categoryId: true },
-  });
-  if (!sub) return notFound();
-
-  const category = await prisma.category.findUnique({
-    where: { id: sub.categoryId },
-    select: { id: true, name: true },
-  });
-
-  const assets = await prisma.asset.findMany({
-    where: {
-      siteId: site.id,
-      subcategoryId: sub.id,
-      ...(q
-        ? {
-            OR: [
-              { assetName: { contains: q, mode: "insensitive" } },
-              { serialNumber: { contains: q, mode: "insensitive" } },
-              { manufacturer: { contains: q, mode: "insensitive" } },
-              { model: { contains: q, mode: "insensitive" } },
-            ],
+  return (
+    <div
+      className={
+        dark
+          ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl"
+          : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-[0_10px_25px_rgba(26,24,20,0.045)]"
+      }
+    >
+      <div className={`h-1 ${accent}`} />
+      <div className="p-4">
+        <div
+          className={
+            dark
+              ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
+              : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"
           }
-        : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+        >
+          {label}
+        </div>
+        <div
+          className={
+            dark
+              ? "mt-2 text-2xl font-semibold tracking-tight text-slate-100"
+              : "mt-2 text-2xl font-semibold tracking-tight text-[#1a1814]"
+          }
+        >
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const pageTitleParts = [`${site.name} — ${sub.name}`];
-  if (q) pageTitleParts.push(`Search: ${q}`);
-  const pageTitle = pageTitleParts.join(" — ");
+function Chip({
+  dark,
+  label,
+  value,
+}: {
+  dark: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <span
+      className={
+        dark
+          ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
+          : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"
+      }
+    >
+      {label}:{" "}
+      <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
+        {value}
+      </span>
+    </span>
+  );
+}
 
-  const csvRows = assets.map((a) => ({
-    Site: site.name,
-    Category: category?.name ?? "",
-    Subcategory: sub.name,
-    Name: a.assetName,
-    Serial: a.serialNumber ?? "",
-    Manufacturer: a.manufacturer ?? "",
-    Model: a.model ?? "",
-    Status: a.status,
-    UpdatedAt: a.updatedAt.toISOString(),
-  }));
-
-  const exportCols = [
-    { key: "Site", label: "Site" },
-    { key: "Category", label: "Category" },
-    { key: "Subcategory", label: "Subcategory" },
-    { key: "Name", label: "Device" },
-    { key: "Serial", label: "Serial" },
-    { key: "Manufacturer", label: "Manufacturer" },
-    { key: "Model", label: "Model" },
-    { key: "Status", label: "Status" },
-    { key: "UpdatedAt", label: "Updated At" },
-  ];
-
-  const rows = assets.map((a) => ({
-    id: a.id,
-    assetName: a.assetName,
-    serialNumber: a.serialNumber ?? "-",
-    manufacturer: a.manufacturer ?? "-",
-    model: a.model ?? "-",
-    status: a.status,
-  }));
+export default function SiteSubcategoryClient({
+  siteId,
+  siteName,
+  subId,
+  subName,
+  categoryName,
+  q,
+  pageTitle,
+  csvRows,
+  exportCols,
+  rows,
+}: {
+  siteId: string;
+  siteName: string;
+  subId: string;
+  subName: string;
+  categoryName: string;
+  q: string;
+  pageTitle: string;
+  csvRows: Array<Record<string, string>>;
+  exportCols: Array<{ key: string; label: string }>;
+  rows: Row[];
+}) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
 
   return (
-    <SiteSubcategoryClient
-      siteId={site.id}
-      siteName={site.name}
-      subId={sub.id}
-      subName={sub.name}
-      categoryName={category?.name ?? "-"}
-      q={q}
-      pageTitle={pageTitle}
-      csvRows={csvRows}
-      exportCols={exportCols}
-      rows={rows}
-    />
+    <div
+      className={
+        dark
+          ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] print:bg-white text-slate-200"
+          : "min-h-screen bg-[linear-gradient(180deg,#fbf8f3_0%,#f5f2ed_48%,#f2ede5_100%)] print:bg-white"
+      }
+    >
+      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 print:py-0">
+        <section
+          className={
+            dark
+              ? "no-print relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl print:hidden"
+              : "no-print relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)] print:hidden"
+          }
+        >
+          <div
+            className={
+              dark
+                ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]"
+                : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"
+            }
+          />
+
+          {!dark ? (
+            <>
+              <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#1d5fa8]/8 blur-3xl" />
+              <div className="pointer-events-none absolute bottom-0 left-0 h-32 w-32 rounded-full bg-[#c8611a]/8 blur-3xl" />
+            </>
+          ) : null}
+
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <Link
+                href={`/sites/${siteId}`}
+                className={
+                  dark
+                    ? "inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
+                    : "inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
+                }
+              >
+                ← Back to Site
+              </Link>
+
+              <div
+                className={
+                  dark
+                    ? "mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
+                    : "mt-3 inline-flex items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
+                }
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Subcategory View
+              </div>
+
+              <h1
+                className={
+                  dark
+                    ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
+                    : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
+                }
+              >
+                {siteName} — {subName}
+              </h1>
+
+              <p
+                className={
+                  dark
+                    ? "mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-400"
+                    : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
+                }
+              >
+                View all devices under this subcategory, search quickly, and export or
+                print a cleaner record when needed.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Chip dark={dark} label="Site" value={siteName} />
+                <Chip dark={dark} label="Category" value={categoryName} />
+                <Chip dark={dark} label="Subcategory" value={subName} />
+                <Chip dark={dark} label="Devices" value={String(rows.length)} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <PrintExportButton
+                title={pageTitle}
+                filename={`${siteName}-${subName}.csv`}
+                rows={csvRows}
+                columns={exportCols}
+              />
+            </div>
+          </div>
+
+          <div
+            className={
+              dark
+                ? "mt-6 rounded-2xl border border-white/10 bg-white/5 p-4"
+                : "mt-6 rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-4"
+            }
+          >
+            <form className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Search name, serial, model, manufacturer…"
+                className={
+                  dark
+                    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
+                    : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-400"
+                }
+              />
+              <button
+                type="submit"
+                className={
+                  dark
+                    ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-95"
+                    : "rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-900"
+                }
+              >
+                Search
+              </button>
+              <Link
+                href={`/sites/${siteId}/subcategory/${subId}`}
+                className={
+                  dark
+                    ? "text-sm font-medium text-slate-400 hover:underline"
+                    : "text-sm font-medium text-gray-700 hover:underline"
+                }
+              >
+                Clear
+              </Link>
+            </form>
+          </div>
+        </section>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4 print:hidden">
+          <SummaryCard
+            dark={dark}
+            label="Devices"
+            value={String(rows.length)}
+            accent={dark ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]" : "bg-[#1d5fa8]"}
+          />
+          <SummaryCard
+            dark={dark}
+            label="With Serial"
+            value={String(rows.filter((r) => r.serialNumber !== "-").length)}
+            accent={dark ? "bg-[linear-gradient(90deg,#10b981,#34d399)]" : "bg-[#2a7d52]"}
+          />
+          <SummaryCard
+            dark={dark}
+            label="Manufacturers"
+            value={String(new Set(rows.map((r) => r.manufacturer).filter((x) => x !== "-")).size)}
+            accent={dark ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]" : "bg-[#c8611a]"}
+          />
+          <SummaryCard
+            dark={dark}
+            label="Models"
+            value={String(new Set(rows.map((r) => r.model).filter((x) => x !== "-")).size)}
+            accent={dark ? "bg-[linear-gradient(90deg,#f59e0b,#fbbf24)]" : "bg-[#b08b2c]"}
+          />
+        </div>
+
+        <div className="print-only mt-6">
+          <div id="print-title" className="text-lg font-semibold text-gray-900">
+            {pageTitle}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            Printed on {new Date().toLocaleString()}
+          </div>
+        </div>
+        <div className="print-only h-px bg-gray-200" />
+
+        <div
+          className={
+            dark
+              ? "print-area mt-4 overflow-hidden rounded-3xl border border-white/10 bg-white/5"
+              : "print-area mt-4 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-[0_12px_34px_rgba(26,24,20,0.055)]"
+          }
+        >
+          <div
+            className={
+              dark
+                ? "h-1 w-full bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)] opacity-80"
+                : "h-1 w-full bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"
+            }
+          />
+
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>
+              Devices
+            </div>
+            <div className={dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"}>
+              {rows.length} shown
+            </div>
+          </div>
+
+          <div className={dark ? "h-px bg-white/8" : "h-px bg-[#eee7dd]"} />
+
+          <table className="w-full text-sm">
+            <thead
+              className={
+                dark
+                  ? "bg-[#101720] text-left text-slate-400"
+                  : "bg-[#f8f4ee] text-left text-[#5b564d]"
+              }
+            >
+              <tr>
+                <th className="px-4 py-3">Device</th>
+                <th className="px-4 py-3">Serial</th>
+                <th className="px-4 py-3">Manufacturer</th>
+                <th className="px-4 py-3">Model</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+
+            <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    className={
+                      dark
+                        ? "px-4 py-10 text-center text-slate-500"
+                        : "px-4 py-10 text-center text-gray-600"
+                    }
+                    colSpan={5}
+                  >
+                    No devices yet under this subcategory.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((a) => (
+                  <tr key={a.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}>
+                    <td
+                      className={
+                        dark
+                          ? "px-4 py-3 font-medium text-slate-100"
+                          : "px-4 py-3 font-medium text-gray-900"
+                      }
+                    >
+                      {a.assetName}
+                    </td>
+                    <td className={dark ? "px-4 py-3 text-slate-400" : "px-4 py-3 text-[#5d584f]"}>
+                      {a.serialNumber}
+                    </td>
+                    <td className={dark ? "px-4 py-3 text-slate-400" : "px-4 py-3 text-[#5d584f]"}>
+                      {a.manufacturer}
+                    </td>
+                    <td className={dark ? "px-4 py-3 text-slate-400" : "px-4 py-3 text-[#5d584f]"}>
+                      {a.model}
+                    </td>
+                    <td className={dark ? "px-4 py-3 text-slate-400" : "px-4 py-3 text-[#5d584f]"}>
+                      {a.status}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
