@@ -16,49 +16,6 @@ type RackCard = {
   items: RackItem[];
 };
 
-function SummaryCard({
-  dark,
-  label,
-  value,
-  accent,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  accent: string;
-}) {
-  return (
-    <div
-      className={
-        dark
-          ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl"
-          : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-[0_10px_25px_rgba(26,24,20,0.045)]"
-      }
-    >
-      <div className={`h-1 ${accent}`} />
-      <div className="p-4">
-        <div
-          className={
-            dark
-              ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
-              : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"
-          }
-        >
-          {label}
-        </div>
-        <div
-          className={
-            dark
-              ? "mt-2 text-2xl font-semibold tracking-tight text-slate-100"
-              : "mt-2 text-2xl font-semibold tracking-tight text-[#1a1814]"
-          }
-        >
-          {value}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function EquipmentRackClient({
   siteId,
@@ -78,7 +35,7 @@ export default function EquipmentRackClient({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
 
-  const totalItems = cards.reduce((sum, card) => sum + card.items.length, 0);
+
 
   return (
     <div
@@ -265,31 +222,6 @@ function Chip({
       }
     >
       {label}:{" "}
-      <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
-        {value}
-      </span>
-    </span>
-  );
-}
-
-function Pill({
-  dark,
-  label,
-  value,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-}) {
-  return (
-    <span
-      className={
-        dark
-          ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
-          : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5"
-      }
-    >
-      <span className={dark ? "text-slate-500" : "text-[#8b857c]"}>{label}:</span>{" "}
       <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
         {value}
       </span>
