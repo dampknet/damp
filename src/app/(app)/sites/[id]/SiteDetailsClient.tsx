@@ -29,55 +29,6 @@ function accentForCard(name: string) {
   return "bg-[linear-gradient(90deg,#1a1814,#4a4740)]";
 }
 
-function StatCard({
-  dark,
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  sub: string;
-  accent: string;
-}) {
-  return (
-    <div
-      className={
-        dark
-          ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl"
-          : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-[0_10px_25px_rgba(26,24,20,0.045)]"
-      }
-    >
-      <div className={`h-1 ${accent}`} />
-      <div className="p-4">
-        <div
-          className={
-            dark
-              ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
-              : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"
-          }
-        >
-          {label}
-        </div>
-        <div
-          className={
-            dark
-              ? "mt-2 text-2xl font-semibold tracking-tight text-slate-100"
-              : "mt-2 text-2xl font-semibold tracking-tight text-[#1a1814]"
-          }
-        >
-          {value}
-        </div>
-        <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
-          {sub}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function SiteDetailsClient({
   site,
   categoryCards,
@@ -87,10 +38,6 @@ export default function SiteDetailsClient({
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-
-  const transmitterCount =
-    categoryCards.find((c) => c.isTransmitter)?.count ?? 0;
-  const rackCount = categoryCards.find((c) => c.isRack)?.count ?? 0;
 
   return (
     <div
@@ -125,33 +72,35 @@ export default function SiteDetailsClient({
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <Link
-                href="/sites"
-                className={
-                  dark
-                    ? "inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                    : "inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-                }
-              >
-                ← Back to Sites
-              </Link>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href="/sites"
+                  className={
+                    dark
+                      ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
+                      : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
+                  }
+                >
+                  ← Back to Sites
+                </Link>
 
-              <div
-                className={
-                  dark
-                    ? "mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
-                    : "mt-3 inline-flex items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
-                }
-              >
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Site Overview
+                <div
+                  className={
+                    dark
+                      ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
+                      : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
+                  }
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Site Overview
+                </div>
               </div>
 
               <h1
                 className={
                   dark
-                    ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
-                    : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
+                    ? "mt-4 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
+                    : "mt-4 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
                 }
               >
                 {site.name}
@@ -191,7 +140,6 @@ export default function SiteDetailsClient({
             </div>
           </div>
         </section>
-
 
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           {categoryCards.map((c) => (
