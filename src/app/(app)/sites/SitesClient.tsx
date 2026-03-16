@@ -760,6 +760,8 @@ function SitesSection({
               <th className="min-w-30 px-2 py-3 font-semibold">Site</th>
 
               <th className="min-w-28 px-1.5 py-3 font-semibold">
+                <span className="print-only">REG M FREQ</span>
+                <div className="no-print">
                 <select
                   value={filters.regMFreq}
                   onChange={(e) =>
@@ -776,9 +778,12 @@ function SitesSection({
                     </option>
                   ))}
                 </select>
+                </div>
               </th>
 
               <th className="min-w-21 px-1.5 py-3 font-semibold">
+                <span className="print-only">Power</span>
+                <div className="no-print">
                 <select
                   value={filters.power}
                   onChange={(e) =>
@@ -795,9 +800,12 @@ function SitesSection({
                     </option>
                   ))}
                 </select>
+                </div>
               </th>
 
               <th className="min-w-18 px-1.5 py-3 font-semibold">
+                <span className="print-only">Tx</span>
+                <div className="no-print">
                 <select
                   value={filters.tx}
                   onChange={(e) =>
@@ -811,9 +819,12 @@ function SitesSection({
                   <option value="AIR">AIR</option>
                   <option value="LIQUID">LIQUID</option>
                 </select>
+                </div>
               </th>
 
               <th className="min-w-20.5 px-1.5 py-3 font-semibold">
+                 <span className="print-only">Tower</span>
+                <div className="no-print">
                 <select
                   value={filters.tower}
                   onChange={(e) =>
@@ -827,9 +838,12 @@ function SitesSection({
                   <option value="GBC">GBC</option>
                   <option value="KNET">KNET</option>
                 </select>
+                </div>
               </th>
 
               <th className="min-w-22 px-1.5 py-3 font-semibold">
+                <span className="print-only">Height</span>
+                <div className="no-print">
                 <select
                   value={filters.height}
                   onChange={(e) =>
@@ -846,11 +860,14 @@ function SitesSection({
                     </option>
                   ))}
                 </select>
+                </div>
               </th>
 
               <th className="min-w-32.5 px-2 py-3 font-semibold">GPS</th>
 
               <th className="min-w-23 px-1.5 py-3 text-right font-semibold">
+                <span className="print-only">Status</span>
+                <div className="no-print">
                 <select
                   value={filters.status}
                   onChange={(e) =>
@@ -864,6 +881,7 @@ function SitesSection({
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="DOWN">DOWN</option>
                 </select>
+                </div>
               </th>
 
               <th className="w-17.5 px-2 py-3 text-right font-semibold no-print">
