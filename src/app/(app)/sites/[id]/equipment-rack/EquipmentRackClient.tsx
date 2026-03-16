@@ -165,22 +165,6 @@ export default function EquipmentRackClient({
           </div>
         </section>
 
-
-        <div className="mt-6 rounded-[26px] overflow-hidden border border-[#e0dbd2] bg-white shadow-[0_12px_34px_rgba(26,24,20,0.055)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
-          <div className={dark ? "h-1 w-full bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)] opacity-80" : "h-1 w-full bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
-          <div className="p-6">
-            <div className={dark ? "text-lg font-semibold text-slate-100" : "text-lg font-semibold text-[#1a1814]"}>
-              Equipment Rack
-            </div>
-
-            <div className={dark ? "mt-3 flex flex-wrap gap-2 text-sm text-slate-300" : "mt-3 flex flex-wrap gap-2 text-sm text-[#5d584f]"}>
-              <Pill dark={dark} label="Serial" value={system.serial} />
-              <Pill dark={dark} label="Part No" value={system.part} />
-              <Pill dark={dark} label="Status" value={system.status} />
-            </div>
-          </div>
-        </div>
-
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           {cards.map((card) => (
             <div
