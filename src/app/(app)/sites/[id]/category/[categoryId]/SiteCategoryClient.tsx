@@ -139,13 +139,14 @@ export default function SiteCategoryClient({
           ) : null}
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
+           <div className="max-w-3xl">
+            <div className="flex flex-col gap-3">
               <Link
                 href={`/sites/${siteId}`}
                 className={
                   dark
-                    ? "inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                    : "inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
+                    ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
+                    : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
                 }
               >
                 ← Back to Site
@@ -154,23 +155,24 @@ export default function SiteCategoryClient({
               <div
                 className={
                   dark
-                    ? "mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
-                    : "mt-3 inline-flex items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
+                    ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
+                    : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
                 }
               >
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Category View
               </div>
+            </div>
 
-              <h1
-                className={
-                  dark
-                    ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
-                    : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
-                }
-              >
-                {pageTitle}
-              </h1>
+            <h1
+              className={
+                dark
+                  ? "mt-4 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
+                  : "mt-4 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
+              }
+            >
+              {pageTitle}
+            </h1>
 
               <p
                 className={
