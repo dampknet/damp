@@ -244,34 +244,6 @@ export default function SiteCategoryClient({
             </form>
           </div>
         </section>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4 print:hidden">
-          <SummaryCard
-            dark={dark}
-            label="Devices"
-            value={String(rows.length)}
-            accent={dark ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]" : "bg-[#1d5fa8]"}
-          />
-          <SummaryCard
-            dark={dark}
-            label="Subcategories"
-            value={String(uniqueSubs.size)}
-            accent={dark ? "bg-[linear-gradient(90deg,#10b981,#34d399)]" : "bg-[#2a7d52]"}
-          />
-          <SummaryCard
-            dark={dark}
-            label="With Serial"
-            value={String(rows.filter((r) => r.serialNumber !== "-").length)}
-            accent={dark ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]" : "bg-[#c8611a]"}
-          />
-          <SummaryCard
-            dark={dark}
-            label="Search Results"
-            value={String(rows.length)}
-            accent={dark ? "bg-[linear-gradient(90deg,#f59e0b,#fbbf24)]" : "bg-[#b08b2c]"}
-          />
-        </div>
-
         <div className="print-only mt-6">
           <div id="print-title" className="text-lg font-semibold text-gray-900">
             {pageTitle}

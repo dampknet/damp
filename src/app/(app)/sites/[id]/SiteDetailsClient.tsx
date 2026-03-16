@@ -192,36 +192,6 @@ export default function SiteDetailsClient({
           </div>
         </section>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            dark={dark}
-            label="Categories"
-            value={String(categoryCards.length)}
-            sub="device groups available"
-            accent={dark ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]" : "bg-[#1d5fa8]"}
-          />
-          <StatCard
-            dark={dark}
-            label="Devices"
-            value={String(site.totalAssets)}
-            sub="registered at this site"
-            accent={dark ? "bg-[linear-gradient(90deg,#10b981,#34d399)]" : "bg-[#2a7d52]"}
-          />
-          <StatCard
-            dark={dark}
-            label="Transmitter"
-            value={String(transmitterCount)}
-            sub="mux components counted"
-            accent={dark ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]" : "bg-[#c8611a]"}
-          />
-          <StatCard
-            dark={dark}
-            label="Equipment Rack"
-            value={String(rackCount)}
-            sub="rack devices available"
-            accent={dark ? "bg-[linear-gradient(90deg,#f59e0b,#fbbf24)]" : "bg-[#b08b2c]"}
-          />
-        </div>
 
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           {categoryCards.map((c) => (

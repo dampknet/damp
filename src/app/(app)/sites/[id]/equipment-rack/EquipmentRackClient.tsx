@@ -165,36 +165,6 @@ export default function EquipmentRackClient({
           </div>
         </section>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard
-            dark={dark}
-            label="Rack Groups"
-            value={String(cards.length)}
-            accent={dark ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]" : "bg-[#1d5fa8]"}
-          />
-          <SummaryCard
-            dark={dark}
-            label="Rack Items"
-            value={String(totalItems)}
-            accent={dark ? "bg-[linear-gradient(90deg,#10b981,#34d399)]" : "bg-[#2a7d52]"}
-          />
-          <SummaryCard
-            dark={dark}
-            label="Largest Group"
-            value={
-              cards.length > 0
-                ? String(Math.max(...cards.map((c) => c.items.length)))
-                : "0"
-            }
-            accent={dark ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]" : "bg-[#c8611a]"}
-          />
-          <SummaryCard
-            dark={dark}
-            label="System Status"
-            value={system.status}
-            accent={dark ? "bg-[linear-gradient(90deg,#f59e0b,#fbbf24)]" : "bg-[#b08b2c]"}
-          />
-        </div>
 
         <div className="mt-6 rounded-[26px] overflow-hidden border border-[#e0dbd2] bg-white shadow-[0_12px_34px_rgba(26,24,20,0.055)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
           <div className={dark ? "h-1 w-full bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)] opacity-80" : "h-1 w-full bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
