@@ -15,7 +15,7 @@ const prisma = new PrismaClient({
 async function main() {
   const sites = [
     { name: "Kanda", location: "Kanda" },
-    { name: "Bastoona", location: "Bastoona" },
+    { name: "Baatsona", location: "Baatsona" },
     { name: "Tse Addo", location: "Tse Addo" },
   ];
 
