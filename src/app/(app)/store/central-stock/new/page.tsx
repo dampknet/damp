@@ -9,7 +9,7 @@ export default async function NewStoreItemPage() {
   const role = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
 
-  if (!canEdit) redirect("/store");
+  if (!canEdit) redirect("/store/central-stock");
 
   async function createItem(formData: FormData) {
     "use server";
@@ -23,15 +23,15 @@ export default async function NewStoreItemPage() {
     const quantity = Number(qtyRaw);
 
     if (!Number.isFinite(itemNo)) {
-      redirect(`/store/new?error=${encodeURIComponent("Item number must be a number")}`);
+      redirect(`/store/central-stock/new?error=${encodeURIComponent("Item number must be a number")}`);
     }
 
     if (!description) {
-      redirect(`/store/new?error=${encodeURIComponent("Description is required")}`);
+      redirect(`/store/central-stock/new?error=${encodeURIComponent("Description is required")}`);
     }
 
     if (!Number.isFinite(quantity)) {
-      redirect(`/store/new?error=${encodeURIComponent("Quantity must be a number")}`);
+      redirect(`/store/central-stock/new?error=${encodeURIComponent("Quantity must be a number")}`);
     }
 
     const status = (statusRaw === "NOT_RECEIVED" ? "NOT_RECEIVED" : "RECEIVED") as StoreStatus;
@@ -46,10 +46,10 @@ export default async function NewStoreItemPage() {
         },
       });
 
-      redirect("/store");
+      redirect("/store/central-stock");
     } catch {
       redirect(
-        `/store/new?error=${encodeURIComponent(
+        `/store/central-stock/new?error=${encodeURIComponent(
           "Could not create item (maybe itemNo already exists)"
         )}`
       );

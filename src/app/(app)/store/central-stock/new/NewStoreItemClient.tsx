@@ -24,14 +24,14 @@ export default function NewStoreItemClient({
     >
       <div className="mx-auto max-w-xl px-4 py-10">
         <Link
-          href="/store"
+          href="/store/central-stock"
           className={
             dark
               ? "text-sm text-slate-400 hover:underline"
               : "text-sm text-gray-600 hover:underline"
           }
         >
-          ← Back to Store
+          ← Back to Central Stock
         </Link>
 
         <h1
@@ -41,7 +41,7 @@ export default function NewStoreItemClient({
               : "mt-3 text-2xl font-semibold text-gray-900"
           }
         >
-          Add Store Item
+          Add Central Stock Item
         </h1>
 
         <p
@@ -51,7 +51,7 @@ export default function NewStoreItemClient({
               : "mt-1 text-sm text-gray-600"
           }
         >
-          Create a new store/inventory item.
+          Create a new central stock item.
         </p>
 
         {error ? (
@@ -148,7 +148,7 @@ export default function NewStoreItemClient({
             </button>
 
             <Link
-              href="/store"
+              href="/store/central-stock"
               className={
                 dark
                   ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
