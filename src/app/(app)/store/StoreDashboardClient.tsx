@@ -254,7 +254,7 @@ export default function StoreDashboardClient({
             value={String(summary.materialIssueCount)}
             sub="issued material records"
             accent={dark ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]" : "bg-[#c8611a]"}
-            href="/store/issues"
+            href="/store/sites/[siteId]/issues"
           />
         </div>
 
