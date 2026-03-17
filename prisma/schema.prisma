@@ -71,6 +71,11 @@ enum EquipmentCondition {
   UNDER_REPAIR
 }
 
+enum InventoryIssueStatus {
+  ISSUED
+  RETURNED
+}
+
 model UserProfile {
   id        String   @id
   email     String   @unique
@@ -206,6 +211,7 @@ model InventorySite {
   restocks           InventoryRestock[]
   materialIssues     MaterialIssue[]
   equipmentCheckouts EquipmentCheckout[]
+  issues             InventoryIssue[]
 }
 
 model InventoryItem {
@@ -237,6 +243,7 @@ model InventoryItem {
   restocks           InventoryRestock[]
   materialIssues     MaterialIssue[]
   equipmentCheckouts EquipmentCheckout[]
+  issues             InventoryIssue[]
 
   @@index([inventorySiteId])
   @@index([itemType])
@@ -318,5 +325,47 @@ model EquipmentCheckout {
   @@index([inventoryItemId])
   @@index([inventorySiteId])
   @@index([takenAt])
+  @@index([returnedAt])
+}
+
+model InventoryIssue {
+  id              String               @id @default(cuid())
+  inventoryItemId String
+  inventorySiteId String
+
+  itemType InventoryItemType
+  quantity Int                  @default(1)
+
+  requesterName    String
+  requesterContact String?
+  department       String?
+
+  purpose String
+
+  authorizedBy String
+
+  issuedAt           DateTime @default(now())
+  expectedReturnDate DateTime?
+
+  conditionAtIssue EquipmentCondition?
+
+  returnedBy      String?
+  returnContact   String?
+  returnedAt      DateTime?
+  returnCondition EquipmentCondition?
+  returnNote      String?
+
+  status InventoryIssueStatus @default(ISSUED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id])
+
+  @@index([inventoryItemId])
+  @@index([inventorySiteId])
+  @@index([status])
+  @@index([issuedAt])
   @@index([returnedAt])
 }
