@@ -413,6 +413,28 @@ export default function InventorySiteClient({
                     </button>
                     
                     <Link
+                        href={`/store/sites/${site.id}/restock`}
+                        className={
+                            dark
+                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                        }
+                        >
+                        Restock Item
+                        </Link>
+
+                        <Link
+                        href={`/store/sites/${site.id}/restocks`}
+                        className={
+                            dark
+                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                        }
+                        >
+                        View Restock Log
+                        </Link>
+
+                    <Link
                         href={`/store/sites/${site.id}/issues`}
                         className={
                             dark
