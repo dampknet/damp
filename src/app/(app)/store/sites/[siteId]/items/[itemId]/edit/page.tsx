@@ -7,14 +7,14 @@ import type {
   InventoryItemStatus,
   InventoryItemType,
 } from "@prisma/client";
-import NewInventoryItemClient from "./NewInventoryItemClient";
+import EditInventoryItemClient from "./EditInventoryItemClient";
 
-export default async function NewInventoryItemPage({
+export default async function EditInventoryItemPage({
   params,
 }: {
-  params: Promise<{ siteId: string }>;
+  params: Promise<{ siteId: string; itemId: string }>;
 }) {
-  const { siteId } = await params;
+  const { siteId, itemId } = await params;
 
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
@@ -29,7 +29,32 @@ export default async function NewInventoryItemPage({
 
   if (!site) return notFound();
 
-  async function createInventoryItem(formData: FormData) {
+  const item = await prisma.inventoryItem.findFirst({
+    where: {
+      id: itemId,
+      inventorySiteId: siteId,
+    },
+    select: {
+      id: true,
+      itemType: true,
+      name: true,
+      description: true,
+      stockNumber: true,
+      manufacturer: true,
+      model: true,
+      serialNumber: true,
+      quantity: true,
+      unit: true,
+      reorderLevel: true,
+      targetStockLevel: true,
+      status: true,
+      condition: true,
+    },
+  });
+
+  if (!item) return notFound();
+
+  async function updateInventoryItem(formData: FormData) {
     "use server";
 
     const itemTypeRaw = String(formData.get("itemType") ?? "MATERIAL").trim();
@@ -51,21 +76,21 @@ export default async function NewInventoryItemPage({
 
     if (!name) {
       redirect(
-        `/store/sites/${siteId}/new?error=${encodeURIComponent("Item name is required")}`
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`
       );
     }
 
     const quantity = quantityRaw === "" ? 0 : Number(quantityRaw);
     if (!Number.isFinite(quantity) || quantity < 0) {
       redirect(
-        `/store/sites/${siteId}/new?error=${encodeURIComponent("Quantity must be a valid number")}`
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Quantity must be a valid number")}`
       );
     }
 
     const reorderLevel = reorderLevelRaw === "" ? 0 : Number(reorderLevelRaw);
     if (!Number.isFinite(reorderLevel) || reorderLevel < 0) {
       redirect(
-        `/store/sites/${siteId}/new?error=${encodeURIComponent("Reorder level must be a valid number")}`
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Reorder level must be a valid number")}`
       );
     }
 
@@ -77,7 +102,7 @@ export default async function NewInventoryItemPage({
       (!Number.isFinite(targetStockLevel) || Number(targetStockLevel) < 0)
     ) {
       redirect(
-        `/store/sites/${siteId}/new?error=${encodeURIComponent("Target stock level must be a valid number")}`
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Target stock level must be a valid number")}`
       );
     }
 
@@ -113,9 +138,9 @@ export default async function NewInventoryItemPage({
     }
 
     try {
-      await prisma.inventoryItem.create({
+      await prisma.inventoryItem.update({
+        where: { id: itemId },
         data: {
-          inventorySiteId: siteId,
           itemType: itemType as InventoryItemType,
           name,
           description: description || null,
@@ -134,8 +159,8 @@ export default async function NewInventoryItemPage({
       });
     } catch {
       redirect(
-        `/store/sites/${siteId}/new?error=${encodeURIComponent(
-          "Could not create inventory item"
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(
+          "Could not update inventory item"
         )}`
       );
     }
@@ -143,5 +168,11 @@ export default async function NewInventoryItemPage({
     redirect(`/store/sites/${siteId}`);
   }
 
-  return <NewInventoryItemClient site={site} action={createInventoryItem} />;
+  return (
+    <EditInventoryItemClient
+      site={site}
+      item={item}
+      action={updateInventoryItem}
+    />
+  );
 }

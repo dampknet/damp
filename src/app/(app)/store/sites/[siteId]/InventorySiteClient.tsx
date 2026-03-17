@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
+import { useRouter } from "next/navigation";
 
 type InventoryItemRow = {
   id: string;
@@ -160,6 +161,31 @@ export default function InventorySiteClient({
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
+
+  const router = useRouter();
+
+async function handleDelete(itemId: string, itemName: string) {
+  const ok = window.confirm(`Delete "${itemName}"? This cannot be undone.`);
+  if (!ok) return;
+
+  try {
+    const res = await fetch("/store/api/inventory-item-delete", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId }),
+    });
+
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      alert(data?.error ?? "Failed to delete inventory item");
+      return;
+    }
+
+    router.refresh();
+  } catch {
+    alert("Failed to delete inventory item");
+  }
+}
 
   const [typeFilter, setTypeFilter] = useState<"ALL" | "MATERIAL" | "EQUIPMENT">("ALL");
   const [statusFilter, setStatusFilter] = useState<
