@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 
 export default function EditInventoryItemClient({
@@ -35,11 +35,9 @@ export default function EditInventoryItemClient({
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-  const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const [itemType, setItemType] = useState<"MATERIAL" | "EQUIPMENT">(item.itemType);
-  const [deleting, setDeleting] = useState(false);
 
   const statusOptions = useMemo(
     () => [
@@ -53,34 +51,6 @@ export default function EditInventoryItemClient({
     ],
     [itemType]
   );
-
-  async function handleDelete() {
-    const ok = window.confirm(`Delete "${item.name}"? This cannot be undone.`);
-    if (!ok) return;
-
-    setDeleting(true);
-
-    try {
-      const res = await fetch("/store/api/inventory-item-delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id }),
-      });
-
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        alert(data?.error ?? "Failed to delete inventory item");
-        setDeleting(false);
-        return;
-      }
-
-      router.push(`/store/sites/${site.id}`);
-      router.refresh();
-    } catch {
-      alert("Failed to delete inventory item");
-      setDeleting(false);
-    }
-  }
 
   return (
     <div
@@ -130,31 +100,16 @@ export default function EditInventoryItemClient({
             </div>
           </div>
 
-          <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h1
-                className={
-                  dark
-                    ? "text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
-                    : "text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
-                }
-              >
-                Edit {item.name}
-              </h1>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
+          <div className="mt-5">
+            <h1
               className={
                 dark
-                  ? "rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/15 disabled:opacity-60"
-                  : "rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                  ? "text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
+                  : "text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"
               }
             >
-              {deleting ? "Deleting..." : "Delete Item"}
-            </button>
+              Edit {item.name}
+            </h1>
           </div>
 
           {error ? (

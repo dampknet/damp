@@ -106,10 +106,7 @@ function Chip({
   );
 }
 
-function statusBadge(
-  status: InventoryItemRow["status"],
-  dark: boolean
-) {
+function statusBadge(status: InventoryItemRow["status"], dark: boolean) {
   const base = "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold";
 
   if (status === "AVAILABLE") {
@@ -161,32 +158,9 @@ export default function InventorySiteClient({
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-
   const router = useRouter();
 
-async function handleDelete(itemId: string, itemName: string) {
-  const ok = window.confirm(`Delete "${itemName}"? This cannot be undone.`);
-  if (!ok) return;
-
-  try {
-    const res = await fetch("/store/api/inventory-item-delete", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId }),
-    });
-
-    if (!res.ok) {
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      alert(data?.error ?? "Failed to delete inventory item");
-      return;
-    }
-
-    router.refresh();
-  } catch {
-    alert("Failed to delete inventory item");
-  }
-}
-
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"ALL" | "MATERIAL" | "EQUIPMENT">("ALL");
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE"
@@ -216,6 +190,37 @@ async function handleDelete(itemId: string, itemName: string) {
       return haystack.includes(search);
     });
   }, [items, q, typeFilter, statusFilter]);
+
+  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? null;
+
+  async function handleDelete() {
+    if (!selectedItem) {
+      alert("Please select an item first.");
+      return;
+    }
+
+    const ok = window.confirm(`Delete "${selectedItem.name}"? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/store/api/inventory-item-delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: selectedItem.id }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        alert(data?.error ?? "Failed to delete inventory item");
+        return;
+      }
+
+      setSelectedItemId(null);
+      router.refresh();
+    } catch {
+      alert("Failed to delete inventory item");
+    }
+  }
 
   return (
     <div
@@ -305,16 +310,31 @@ async function handleDelete(itemId: string, itemName: string) {
 
             <div className="flex flex-wrap items-center gap-2">
               {canEdit ? (
-               <Link
-                href={`/store/sites/${site.id}/new`}
-                className={
-                    dark
-                    ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-                    : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2d2924]"
-                }
-                >
-                + Add Inventory Item
-                </Link>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={!selectedItem}
+                    className={
+                      dark
+                        ? "rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        : "rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    }
+                  >
+                    {selectedItem ? `Delete ${selectedItem.name}` : "Delete Item"}
+                  </button>
+
+                  <Link
+                    href={`/store/sites/${site.id}/new`}
+                    className={
+                      dark
+                        ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+                        : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2d2924]"
+                    }
+                  >
+                    + Add Inventory Item
+                  </Link>
+                </>
               ) : (
                 <div
                   className={
@@ -417,27 +437,27 @@ async function handleDelete(itemId: string, itemName: string) {
                 aria-label="Filter inventory items by type"
                 title="Filter inventory items by type"
                 className={
-                    dark
+                  dark
                     ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
                     : "rounded-xl border border-[#ddd5c9] bg-white px-3 py-2 text-sm"
                 }
-                >
+              >
                 <option value="ALL">All Types</option>
                 <option value="MATERIAL">Material</option>
                 <option value="EQUIPMENT">Equipment</option>
               </select>
 
-             <select
+              <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
                 aria-label="Filter inventory items by status"
                 title="Filter inventory items by status"
                 className={
-                    dark
+                  dark
                     ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
                     : "rounded-xl border border-[#ddd5c9] bg-white px-3 py-2 text-sm"
                 }
-                >
+              >
                 <option value="ALL">All Statuses</option>
                 <option value="AVAILABLE">Available</option>
                 <option value="LOW_STOCK">Low Stock</option>
@@ -488,15 +508,30 @@ async function handleDelete(itemId: string, itemName: string) {
                   filteredItems.map((item) => (
                     <tr
                       key={item.id}
-                      className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}
+                      onClick={() => setSelectedItemId(item.id)}
+                      className={
+                        selectedItemId === item.id
+                          ? dark
+                            ? "cursor-pointer bg-white/10"
+                            : "cursor-pointer bg-[#f3ede4]"
+                          : dark
+                          ? "cursor-pointer hover:bg-white/5"
+                          : "cursor-pointer hover:bg-[#fcfaf7]"
+                      }
                     >
                       <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
-                        <div className="font-medium">{item.name}</div>
-                        {item.description ? (
-                          <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
-                            {item.description}
-                          </div>
-                        ) : null}
+                        <Link
+                          href={`/store/sites/${site.id}/items/${item.id}/edit`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="block hover:underline"
+                        >
+                          <div className="font-medium">{item.name}</div>
+                          {item.description ? (
+                            <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
+                              {item.description}
+                            </div>
+                          ) : null}
+                        </Link>
                       </td>
 
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
