@@ -1,97 +1,72 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
-import StoreClient from "./StoreClient";
+import StoreDashboardClient from "./StoreDashboardClient";
 
-type SearchParams = {
-  q?: string;
-  status?: "ALL" | "RECEIVED" | "NOT_RECEIVED";
-};
-
-export default async function StorePage({
-  searchParams,
-}: {
-  searchParams?: Promise<SearchParams>;
-}) {
+export default async function StoreDashboardPage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
 
-  const sp = (await searchParams) ?? {};
-  const q = (sp.q ?? "").trim();
-  const status: "ALL" | "RECEIVED" | "NOT_RECEIVED" = sp.status ?? "ALL";
-
-  const qAsNumber = Number(q);
-  const isNumberSearch = q.length > 0 && Number.isFinite(qAsNumber);
-
-  const items = await prisma.storeItem.findMany({
-    where: {
-      AND: [
-        q
-          ? {
-              OR: [
-                { description: { contains: q, mode: "insensitive" } },
-                ...(isNumberSearch ? [{ itemNo: qAsNumber }] : []),
-              ],
-            }
-          : {},
-        status && status !== "ALL" ? { status } : {},
-      ],
-    },
-    orderBy: { itemNo: "asc" },
-    select: {
-      id: true,
-      itemNo: true,
-      description: true,
-      quantity: true,
-      status: true,
-    },
-  });
-
-  const [receivedCount, notReceivedCount] = await Promise.all([
-    prisma.storeItem.count({ where: { status: "RECEIVED" } }),
-    prisma.storeItem.count({ where: { status: "NOT_RECEIVED" } }),
+  const [
+    inventorySites,
+    totalInventoryItems,
+    totalMaterials,
+    totalEquipment,
+    lowStockItems,
+    checkedOutEquipment,
+    centralStockCount,
+    restockCount,
+    materialIssueCount,
+  ] = await Promise.all([
+    prisma.inventorySite.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        _count: { select: { items: true } },
+      },
+    }),
+    prisma.inventoryItem.count(),
+    prisma.inventoryItem.count({ where: { itemType: "MATERIAL" } }),
+    prisma.inventoryItem.count({ where: { itemType: "EQUIPMENT" } }),
+    prisma.inventoryItem.count({
+      where: {
+        OR: [
+          { status: "LOW_STOCK" },
+          { status: "OUT_OF_STOCK" },
+        ],
+      },
+    }),
+    prisma.inventoryItem.count({
+      where: { status: "CHECKED_OUT" },
+    }),
+    prisma.storeItem.count(),
+    prisma.inventoryRestock.count(),
+    prisma.materialIssue.count(),
   ]);
 
-  const statusLabel =
-    status === "ALL" ? "All" : status === "RECEIVED" ? "Received" : "Not received";
-
-  const printTitleParts = ["Store"];
-  if (q) printTitleParts.push(`Search: ${q}`);
-  if (status && status !== "ALL") printTitleParts.push(`Status: ${statusLabel}`);
-  const printTitle = printTitleParts.join(" — ");
-
-  const exportRows = items.map((it) => ({
-    Item: it.itemNo,
-    Description: it.description,
-    Quantity: it.quantity,
-    Status: it.status === "RECEIVED" ? "RECEIVED" : "NOT RECEIVED",
-  }));
-
-  const exportCols = [
-    { key: "Item", label: "Item" },
-    { key: "Description", label: "Description" },
-    { key: "Quantity", label: "Quantity" },
-    { key: "Status", label: "Status" },
-  ];
-
-  const itemMini = items.map((it) => ({
-    id: it.id,
-    itemNo: it.itemNo,
+  const siteCards = inventorySites.map((site) => ({
+    id: site.id,
+    name: site.name,
+    location: site.location ?? "-",
+    itemCount: site._count.items,
   }));
 
   return (
-    <StoreClient
+    <StoreDashboardClient
       role={role}
-      canEdit={canEdit}
-      q={q}
-      status={status}
-      printTitle={printTitle}
-      items={items}
-      receivedCount={receivedCount}
-      notReceivedCount={notReceivedCount}
-      exportRows={exportRows}
-      exportCols={exportCols}
-      itemMini={itemMini}
+      email={profile?.email ?? null}
+      summary={{
+        totalInventoryItems,
+        totalMaterials,
+        totalEquipment,
+        lowStockItems,
+        checkedOutEquipment,
+        centralStockCount,
+        restockCount,
+        materialIssueCount,
+      }}
+      siteCards={siteCards}
     />
   );
 }

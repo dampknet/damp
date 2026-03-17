@@ -21,13 +21,17 @@ enum AssetStatus {
   DECOMMISSIONED
 }
 
-/** Site transmitter cooling type */
+/**
+ * Site transmitter cooling type
+ */
 enum TransmitterType {
   AIR
   LIQUID
 }
 
-/** Site operational status */
+/**
+ * Site operational status
+ */
 enum SiteStatus {
   ACTIVE
   DOWN
@@ -40,6 +44,31 @@ enum TowerType {
 
 enum ActivityType {
   SITE_STATUS_CHANGED
+}
+
+enum StoreStatus {
+  RECEIVED
+  NOT_RECEIVED
+}
+
+enum InventoryItemType {
+  MATERIAL
+  EQUIPMENT
+}
+
+enum InventoryItemStatus {
+  AVAILABLE
+  LOW_STOCK
+  OUT_OF_STOCK
+  CHECKED_OUT
+  INACTIVE
+}
+
+enum EquipmentCondition {
+  GOOD
+  FAULTY
+  DAMAGED
+  UNDER_REPAIR
 }
 
 model UserProfile {
@@ -111,28 +140,30 @@ model Subcategory {
 }
 
 model Asset {
-  id            String       @id @default(cuid())
+  id            String  @id @default(cuid())
   siteId        String
   categoryId    String
   subcategoryId String?
 
-  /** human readable label in UI e.g. "Amplifier 1", "Exciter 2", "Humidifier" */
-  assetName     String
+  /**
+   * human readable label in UI e.g. "Amplifier 1", "Exciter 2", "Humidifier"
+   */
+  assetName String
 
-  serialNumber  String?
-  manufacturer  String?
-  model         String?
-  partNumber    String?
-  status        AssetStatus  @default(ACTIVE)
+  serialNumber String?
+  manufacturer String?
+  model        String?
+  partNumber   String?
+  status       AssetStatus @default(ACTIVE)
 
   /**
    * extra metadata (deviceType, mux group, rack component etc.)
    * { "mux": "TX_MUX_1_2" }
    */
-  specs         Json         @default("{}")
+  specs Json @default("{}")
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   site        Site         @relation(fields: [siteId], references: [id])
   category    Category     @relation(fields: [categoryId], references: [id])
@@ -143,11 +174,6 @@ model Asset {
   @@index([serialNumber])
 }
 
-enum StoreStatus {
-  RECEIVED
-  NOT_RECEIVED
-}
-
 model StoreItem {
   id          String      @id @default(cuid())
   itemNo      Int         @unique
@@ -155,9 +181,142 @@ model StoreItem {
   quantity    Int
   status      StoreStatus
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([itemNo])
+}
+
+/**
+ * NEW INVENTORY MODULE
+ * Keep StoreItem as Central Stock.
+ */
+
+model InventorySite {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  location    String?
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items              InventoryItem[]
+  restocks           InventoryRestock[]
+  materialIssues     MaterialIssue[]
+  equipmentCheckouts EquipmentCheckout[]
+}
+
+model InventoryItem {
+  id              String @id @default(cuid())
+  inventorySiteId String
+
+  itemType    InventoryItemType
+  name        String
+  description String?
+
+  stockNumber  String?
+  manufacturer String?
+  model        String?
+  serialNumber String?
+
+  quantity Int     @default(0)
+  unit     String?
+
+  reorderLevel     Int  @default(0)
+  targetStockLevel Int?
+
+  status    InventoryItemStatus @default(AVAILABLE)
+  condition EquipmentCondition?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventorySite      InventorySite       @relation(fields: [inventorySiteId], references: [id])
+  restocks           InventoryRestock[]
+  materialIssues     MaterialIssue[]
+  equipmentCheckouts EquipmentCheckout[]
+
+  @@index([inventorySiteId])
+  @@index([itemType])
+  @@index([status])
+  @@index([name])
+  @@index([stockNumber])
+  @@index([serialNumber])
+}
+
+model InventoryRestock {
+  id              String @id @default(cuid())
+  inventoryItemId String
+  inventorySiteId String
+
+  quantityAdded Int
+  dateBought    DateTime?
+  dateReceived  DateTime
+  supplier      String?
+  receivedBy    String?
+  note          String?
+
+  createdAt DateTime @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id])
+
+  @@index([inventoryItemId])
+  @@index([inventorySiteId])
+  @@index([dateReceived])
+}
+
+model MaterialIssue {
+  id              String @id @default(cuid())
+  inventoryItemId String
+  inventorySiteId String
+
+  requesterName  String
+  requestDate    DateTime
+  authorizedBy   String
+  projectPurpose String
+  quantityIssued Int
+  issuedBy       String?
+  remarks        String?
+
+  createdAt DateTime @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id])
+
+  @@index([inventoryItemId])
+  @@index([inventorySiteId])
+  @@index([requestDate])
+}
+
+model EquipmentCheckout {
+  id              String @id @default(cuid())
+  inventoryItemId String
+  inventorySiteId String
+
+  requesterName String
+  takenAt       DateTime
+  returnedAt    DateTime?
+
+  takenBy      String
+  authorizedBy String
+  purpose      String
+
+  statusBefore EquipmentCondition
+  statusAfter  EquipmentCondition?
+
+  receivedBy String?
+  remarks    String?
+
+  createdAt DateTime @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id])
+
+  @@index([inventoryItemId])
+  @@index([inventorySiteId])
+  @@index([takenAt])
+  @@index([returnedAt])
 }
