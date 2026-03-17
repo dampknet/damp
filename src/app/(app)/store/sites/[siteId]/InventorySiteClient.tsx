@@ -160,12 +160,13 @@ export default function InventorySiteClient({
   const dark = mode === "dark";
   const router = useRouter();
 
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"ALL" | "MATERIAL" | "EQUIPMENT">("ALL");
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE"
   >("ALL");
   const [q, setQ] = useState("");
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   const filteredItems = useMemo(() => {
     const search = q.trim().toLowerCase();
@@ -191,34 +192,78 @@ export default function InventorySiteClient({
     });
   }, [items, q, typeFilter, statusFilter]);
 
-  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? null;
+  const selectedItems = filteredItems.filter((item) =>
+    selectedItemIds.includes(item.id)
+  );
 
-  async function handleDelete() {
-    if (!selectedItem) {
-      alert("Please select an item first.");
+  const allVisibleSelected =
+    filteredItems.length > 0 &&
+    filteredItems.every((item) => selectedItemIds.includes(item.id));
+
+  function toggleItemSelection(itemId: string) {
+    setSelectedItemIds((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedItemIds((prev) =>
+        prev.filter((id) => !filteredItems.some((item) => item.id === id))
+      );
       return;
     }
 
-    const ok = window.confirm(`Delete "${selectedItem.name}"? This cannot be undone.`);
+    setSelectedItemIds((prev) => {
+      const merged = new Set([...prev, ...filteredItems.map((item) => item.id)]);
+      return Array.from(merged);
+    });
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedItems.length === 0) {
+      alert("Please select at least one item.");
+      return;
+    }
+
+    const preview = selectedItems
+      .map((item, index) => `${index + 1}. ${item.name}${item.stockNumber ? ` (${item.stockNumber})` : ""}`)
+      .join("\n");
+
+    const ok = window.confirm(
+      `Delete these ${selectedItems.length} item(s)? This cannot be undone.\n\n${preview}`
+    );
     if (!ok) return;
 
-    try {
-      const res = await fetch("/store/api/inventory-item-delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: selectedItem.id }),
-      });
+    setDeleting(true);
 
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        alert(data?.error ?? "Failed to delete inventory item");
+    try {
+      const results = await Promise.all(
+        selectedItems.map((item) =>
+          fetch("/store/api/inventory-item-delete", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: item.id }),
+          })
+        )
+      );
+
+      const failed = results.filter((res) => !res.ok);
+
+      if (failed.length > 0) {
+        alert(`Failed to delete ${failed.length} item(s).`);
+        setDeleting(false);
         return;
       }
 
-      setSelectedItemId(null);
+      setSelectedItemIds([]);
       router.refresh();
     } catch {
-      alert("Failed to delete inventory item");
+      alert("Failed to delete selected items");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -313,15 +358,19 @@ export default function InventorySiteClient({
                 <>
                   <button
                     type="button"
-                    onClick={handleDelete}
-                    disabled={!selectedItem}
+                    onClick={handleDeleteSelected}
+                    disabled={selectedItems.length === 0 || deleting}
                     className={
                       dark
                         ? "rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
                         : "rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                     }
                   >
-                    {selectedItem ? `Delete ${selectedItem.name}` : "Delete Item"}
+                    {deleting
+                      ? "Deleting..."
+                      : selectedItems.length > 0
+                      ? `Delete Selected (${selectedItems.length})`
+                      : "Delete Selected"}
                   </button>
 
                   <Link
@@ -480,6 +529,17 @@ export default function InventorySiteClient({
                 }
               >
                 <tr>
+                  <th className="w-16 px-5 py-3 font-medium">No</th>
+                  <th className="w-14 px-5 py-3 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      aria-label="Select all visible inventory items"
+                      title="Select all visible inventory items"
+                      className="h-4 w-4"
+                    />
+                  </th>
                   <th className="px-5 py-3 font-medium">Item</th>
                   <th className="px-5 py-3 font-medium">Type</th>
                   <th className="px-5 py-3 font-medium">Stock No</th>
@@ -494,7 +554,7 @@ export default function InventorySiteClient({
                 {filteredItems.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={9}
                       className={
                         dark
                           ? "px-5 py-10 text-center text-slate-500"
@@ -505,61 +565,78 @@ export default function InventorySiteClient({
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => setSelectedItemId(item.id)}
-                      className={
-                        selectedItemId === item.id
-                          ? dark
-                            ? "cursor-pointer bg-white/10"
-                            : "cursor-pointer bg-[#f3ede4]"
-                          : dark
-                          ? "cursor-pointer hover:bg-white/5"
-                          : "cursor-pointer hover:bg-[#fcfaf7]"
-                      }
-                    >
-                      <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
-                        <Link
-                          href={`/store/sites/${site.id}/items/${item.id}/edit`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="block hover:underline"
-                        >
-                          <div className="font-medium">{item.name}</div>
-                          {item.description ? (
-                            <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
-                              {item.description}
-                            </div>
-                          ) : null}
-                        </Link>
-                      </td>
+                  filteredItems.map((item, index) => {
+                    const checked = selectedItemIds.includes(item.id);
 
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {item.itemType}
-                      </td>
+                    return (
+                      <tr
+                        key={item.id}
+                        className={
+                          checked
+                            ? dark
+                              ? "bg-white/10"
+                              : "bg-[#f3ede4]"
+                            : dark
+                            ? "hover:bg-white/5"
+                            : "hover:bg-[#fcfaf7]"
+                        }
+                      >
+                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                          {index + 1}
+                        </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {item.stockNumber ?? "-"}
-                      </td>
+                        <td className="px-5 py-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleItemSelection(item.id)}
+                            aria-label={`Select ${item.name}`}
+                            title={`Select ${item.name}`}
+                            className="h-4 w-4"
+                          />
+                        </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {item.serialNumber ?? "-"}
-                      </td>
+                        <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
+                          <Link
+                            href={`/store/sites/${site.id}/items/${item.id}/edit`}
+                            className="block hover:underline"
+                          >
+                            <div className="font-medium">{item.name}</div>
+                            {item.description ? (
+                              <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
+                                {item.description}
+                              </div>
+                            ) : null}
+                          </Link>
+                        </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {item.quantity}
-                        {item.unit ? ` ${item.unit}` : ""}
-                      </td>
+                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                          {item.itemType}
+                        </td>
 
-                      <td className="px-5 py-3">
-                        <span className={statusBadge(item.status, dark)}>{item.status}</span>
-                      </td>
+                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                          {item.stockNumber ?? "-"}
+                        </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {item.condition ?? "-"}
-                      </td>
-                    </tr>
-                  ))
+                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                          {item.serialNumber ?? "-"}
+                        </td>
+
+                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                          {item.quantity}
+                          {item.unit ? ` ${item.unit}` : ""}
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <span className={statusBadge(item.status, dark)}>{item.status}</span>
+                        </td>
+
+                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                          {item.condition ?? "-"}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
