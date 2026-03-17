@@ -279,16 +279,16 @@ export default function InventorySiteClient({
 
             <div className="flex flex-wrap items-center gap-2">
               {canEdit ? (
-                <button
-                  type="button"
-                  className={
+               <Link
+                href={`/store/sites/${site.id}/new`}
+                className={
                     dark
-                      ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-                      : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2d2924]"
-                  }
+                    ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+                    : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2d2924]"
+                }
                 >
-                  + Add Inventory Item
-                </button>
+                + Add Inventory Item
+                </Link>
               ) : (
                 <div
                   className={
