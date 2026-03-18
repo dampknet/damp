@@ -130,26 +130,28 @@ export default function GlobalRestockLogClient({
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <Link
-                href="/store"
-                className={
-                  dark
-                    ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                    : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-                }
-              >
-                ← Back to Store Dashboard
-              </Link>
+              <div className="flex flex-col items-start gap-3">
+                <Link
+                  href="/store"
+                  className={
+                    dark
+                      ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
+                      : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
+                  }
+                >
+                  ← Back to Store Dashboard
+                </Link>
 
-              <div
-                className={
-                  dark
-                    ? "mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#10b981]"
-                    : "mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-[#dcecdf] bg-[#f7fcf8] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#2a7d52]"
-                }
-              >
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Global Restock Log
+                <div
+                  className={
+                    dark
+                      ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#10b981]"
+                      : "inline-flex w-fit items-center gap-2 rounded-full border border-[#dcecdf] bg-[#f7fcf8] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#2a7d52]"
+                  }
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Global Restock Log
+                </div>
               </div>
 
               <h1

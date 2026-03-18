@@ -15,7 +15,7 @@ export default async function StoreDashboardPage() {
     checkedOutEquipment,
     centralStockCount,
     restockCount,
-    materialIssueCount,
+    issueCount,
   ] = await Promise.all([
     prisma.inventorySite.findMany({
       orderBy: { name: "asc" },
@@ -26,23 +26,35 @@ export default async function StoreDashboardPage() {
         _count: { select: { items: true } },
       },
     }),
+
     prisma.inventoryItem.count(),
-    prisma.inventoryItem.count({ where: { itemType: "MATERIAL" } }),
-    prisma.inventoryItem.count({ where: { itemType: "EQUIPMENT" } }),
+
+    prisma.inventoryItem.count({
+      where: { itemType: "MATERIAL" },
+    }),
+
+    prisma.inventoryItem.count({
+      where: { itemType: "EQUIPMENT" },
+    }),
+
     prisma.inventoryItem.count({
       where: {
-        OR: [
-          { status: "LOW_STOCK" },
-          { status: "OUT_OF_STOCK" },
-        ],
+        OR: [{ status: "LOW_STOCK" }, { status: "OUT_OF_STOCK" }],
       },
     }),
-    prisma.inventoryItem.count({
-      where: { status: "CHECKED_OUT" },
+
+    prisma.inventoryIssue.count({
+      where: {
+        itemType: "EQUIPMENT",
+        status: "ISSUED",
+      },
     }),
+
     prisma.storeItem.count(),
+
     prisma.inventoryRestock.count(),
-    prisma.materialIssue.count(),
+
+    prisma.inventoryIssue.count(),
   ]);
 
   const siteCards = inventorySites.map((site) => ({
@@ -64,7 +76,7 @@ export default async function StoreDashboardPage() {
         checkedOutEquipment,
         centralStockCount,
         restockCount,
-        materialIssueCount,
+        issueCount,
       }}
       siteCards={siteCards}
     />

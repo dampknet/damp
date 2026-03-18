@@ -18,7 +18,7 @@ type Summary = {
   checkedOutEquipment: number;
   centralStockCount: number;
   restockCount: number;
-  materialIssueCount: number;
+  issueCount: number;
 };
 
 function SummaryCard({
@@ -64,7 +64,11 @@ function SummaryCard({
         >
           {value}
         </div>
-        <div className={dark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-[#7b756d]"}>
+        <div
+          className={
+            dark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-[#7b756d]"
+          }
+        >
           {sub}
         </div>
       </div>
@@ -216,7 +220,11 @@ export default function StoreDashboardClient({
                 >
                   {site.name} Inventory
                 </div>
-                <div className={dark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-[#7b756d]"}>
+                <div
+                  className={
+                    dark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-[#7b756d]"
+                  }
+                >
                   Location: {site.location}
                 </div>
                 <div
@@ -251,8 +259,8 @@ export default function StoreDashboardClient({
           <SummaryCard
             dark={dark}
             label="Issue Log"
-            value={String(summary.materialIssueCount)}
-            sub="issued material records"
+            value={String(summary.issueCount)}
+            sub="all issue records"
             accent={dark ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]" : "bg-[#c8611a]"}
             href="/store/issues"
           />
