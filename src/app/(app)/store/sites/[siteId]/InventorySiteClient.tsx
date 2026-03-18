@@ -386,96 +386,119 @@ export default function InventorySiteClient({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <PrintExportButton
-                  title={`${site.name} Inventory`}
-                  rows={exportRows}
-                  columns={exportCols}
-                />
-
+              <div className="w-full lg:w-auto lg:max-w-135">
                 {canEdit ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteDialog(true)}
-                      disabled={selectedItems.length === 0 || deleting}
-                      className={
-                        dark
-                          ? "rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                          : "rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      }
-                    >
-                      {deleting
-                        ? "Deleting..."
-                        : selectedItems.length > 0
-                        ? `Delete Selected (${selectedItems.length})`
-                        : "Delete Selected"}
-                    </button>
-                    
-                    <Link
-                        href={`/store/sites/${site.id}/restock`}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <Link
+                        href={`/store/sites/${site.id}/new`}
                         className={
-                            dark
-                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
-                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                          dark
+                            ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+                            : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2d2924]"
                         }
-                        >
-                        Restock Item
-                        </Link>
+                      >
+                        + Add Inventory Item
+                      </Link>
 
-                        <Link
-                        href={`/store/sites/${site.id}/restocks`}
+                      <Link
+                        href={`/store/sites/${site.id}/upload`}
                         className={
-                            dark
-                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
-                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                          dark
+                            ? "rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/15"
+                            : "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
                         }
-                        >
-                        View Restock Log
-                        </Link>
+                      >
+                        Upload Excel
+                      </Link>
 
-                    <Link
-                        href={`/store/sites/${site.id}/issues`}
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteDialog(true)}
+                        disabled={selectedItems.length === 0 || deleting}
                         className={
-                            dark
-                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
-                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                          dark
+                            ? "rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            : "rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         }
-                        >
-                        View Issue Log
-                        </Link>
+                      >
+                        {deleting
+                          ? "Deleting..."
+                          : selectedItems.length > 0
+                          ? `Delete Selected (${selectedItems.length})`
+                          : "Delete Selected"}
+                      </button>
+                    </div>
 
-                    <Link
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <Link
                         href={`/store/sites/${site.id}/issue`}
                         className={
-                            dark
+                          dark
                             ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
                             : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
                         }
-                        >
+                      >
                         Issue Item
-                        </Link>
+                      </Link>
 
-                    <Link
-                      href={`/store/sites/${site.id}/new`}
+                      <Link
+                        href={`/store/sites/${site.id}/issues`}
+                        className={
+                          dark
+                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                        }
+                      >
+                        View Issue Log
+                      </Link>
+
+                      <Link
+                        href={`/store/sites/${site.id}/restock`}
+                        className={
+                          dark
+                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                        }
+                      >
+                        Restock Item
+                      </Link>
+
+                      <Link
+                        href={`/store/sites/${site.id}/restocks`}
+                        className={
+                          dark
+                            ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                            : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                        }
+                      >
+                        View Restock Log
+                      </Link>
+
+                      <PrintExportButton
+                        title={`${site.name} Inventory`}
+                        rows={exportRows}
+                        columns={exportCols}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <PrintExportButton
+                      title={`${site.name} Inventory`}
+                      rows={exportRows}
+                      columns={exportCols}
+                    />
+
+                    <div
                       className={
                         dark
-                          ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-                          : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2d2924]"
+                          ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-500"
+                          : "rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-medium text-[#8b857c]"
                       }
                     >
-                      + Add Inventory Item
-                    </Link>
-                  </>
-                ) : (
-                  <div
-                    className={
-                      dark
-                        ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-500"
-                        : "rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-medium text-[#8b857c]"
-                    }
-                  >
-                    View only
+                      View only
+                    </div>
                   </div>
                 )}
               </div>
