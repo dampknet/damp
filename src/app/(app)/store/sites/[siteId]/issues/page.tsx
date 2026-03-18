@@ -13,7 +13,7 @@ export default async function SiteIssueLogPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ siteId: string; issueId: string }>;
+  params: Promise<{ siteId: string }>;
   searchParams?: Promise<SearchParams>;
 }) {
   const { siteId } = await params;

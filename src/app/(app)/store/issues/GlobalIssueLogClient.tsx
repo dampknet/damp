@@ -403,7 +403,7 @@ export default function GlobalIssueLogClient({
                   issues.map((row, index) => (
                     <tr
                       key={row.id}
-                      onClick={() => router.push(`/store/sites/${row.inventorySite.id}/issues/${row.id}`)}
+                     onClick={() => router.push(`/store/sites/${row.inventorySite.id}/issues`)}
                       className={
                         dark
                           ? "cursor-pointer hover:bg-white/5"
