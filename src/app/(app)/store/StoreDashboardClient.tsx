@@ -64,11 +64,7 @@ function SummaryCard({
         >
           {value}
         </div>
-        <div
-          className={
-            dark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-[#7b756d]"
-          }
-        >
+        <div className={dark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-[#7b756d]"}>
           {sub}
         </div>
       </div>
@@ -76,7 +72,15 @@ function SummaryCard({
   );
 
   if (!href) return content;
-  return <Link href={href}>{content}</Link>;
+
+  return (
+    <Link
+      href={href}
+      onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
+    >
+      {content}
+    </Link>
+  );
 }
 
 export default function StoreDashboardClient({
@@ -203,6 +207,7 @@ export default function StoreDashboardClient({
             <Link
               key={site.id}
               href={`/store/sites/${site.id}`}
+              onClick={()=> window.scrollTo({ top: 0, behavior: "auto"})}
               className={
                 dark
                   ? "group overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl transition hover:-translate-y-1"

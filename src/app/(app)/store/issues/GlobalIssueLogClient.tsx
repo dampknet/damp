@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
@@ -80,10 +81,14 @@ function SummaryCard({
   );
 }
 
-function badgeStatus(status: "ISSUED" | "RETURNED", dark: boolean) {
+function badgeStatus(
+  status: "ISSUED" | "RETURNED",
+  itemType: "MATERIAL" | "EQUIPMENT",
+  dark: boolean
+) {
   const base = "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold";
 
-  if (status === "RETURNED") {
+  if (itemType === "EQUIPMENT" && status === "RETURNED") {
     return dark
       ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`
       : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
@@ -122,6 +127,7 @@ export default function GlobalIssueLogClient({
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
+  const router = useRouter();
   const printTitle = "Global Issue Log";
 
   return (
@@ -149,7 +155,7 @@ export default function GlobalIssueLogClient({
           />
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-           <div className="max-w-3xl">
+            <div className="max-w-3xl">
               <div className="flex flex-col items-start gap-3">
                 <Link
                   href="/store"
@@ -173,6 +179,7 @@ export default function GlobalIssueLogClient({
                   Global Issue Log
                 </div>
               </div>
+
               <h1
                 className={
                   dark
@@ -336,10 +343,20 @@ export default function GlobalIssueLogClient({
           <div className="print-only h-px bg-gray-200" />
 
           <div className="flex items-center justify-between px-5 py-4">
-            <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>
+            <div
+              className={
+                dark
+                  ? "text-sm font-semibold text-slate-100"
+                  : "text-sm font-semibold text-[#1a1814]"
+              }
+            >
               Issue Records
             </div>
-            <div className={dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"}>
+            <div
+              className={
+                dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"
+              }
+            >
               {issues.length} shown
             </div>
           </div>
@@ -360,6 +377,7 @@ export default function GlobalIssueLogClient({
                   <th className="px-5 py-3 font-medium">Site</th>
                   <th className="px-5 py-3 font-medium">Item</th>
                   <th className="px-5 py-3 font-medium">Requester</th>
+                  <th className="px-5 py-3 font-medium">Authorized By</th>
                   <th className="px-5 py-3 font-medium">Type</th>
                   <th className="px-5 py-3 font-medium">Qty</th>
                   <th className="px-5 py-3 font-medium">Issued At</th>
@@ -371,7 +389,7 @@ export default function GlobalIssueLogClient({
                 {issues.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className={
                         dark
                           ? "px-5 py-10 text-center text-slate-500"
@@ -385,24 +403,27 @@ export default function GlobalIssueLogClient({
                   issues.map((row, index) => (
                     <tr
                       key={row.id}
-                      className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}
+                      onClick={() => router.push(`/store/sites/${row.inventorySite.id}/issues/${row.id}`)}
+                      className={
+                        dark
+                          ? "cursor-pointer hover:bg-white/5"
+                          : "cursor-pointer hover:bg-[#fcfaf7]"
+                      }
                     >
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
                         {index + 1}
                       </td>
-                      <td className="px-5 py-3">
-                        <Link
-                          href={`/store/sites/${row.inventorySite.id}/issues`}
-                          className={dark ? "text-slate-100 hover:underline" : "text-[#1a1814] hover:underline"}
-                        >
-                          {row.inventorySite.name}
-                        </Link>
+                      <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
+                        {row.inventorySite.name}
                       </td>
                       <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
                         {row.inventoryItem.name}
                       </td>
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
                         {row.requesterName}
+                      </td>
+                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                        {row.authorizedBy}
                       </td>
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
                         {row.itemType}
@@ -415,7 +436,9 @@ export default function GlobalIssueLogClient({
                         {new Date(row.issuedAt).toLocaleString()}
                       </td>
                       <td className="px-5 py-3">
-                        <span className={badgeStatus(row.status, dark)}>{row.status}</span>
+                        <span className={badgeStatus(row.status, row.itemType, dark)}>
+                          {row.status}
+                        </span>
                       </td>
                     </tr>
                   ))
