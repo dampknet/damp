@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
+import type { EquipmentCondition } from "@prisma/client";
 import ReturnEquipmentClient from "./ReturnEquipmentClient";
 
 export default async function ReturnEquipmentPage({
@@ -71,96 +72,96 @@ export default async function ReturnEquipmentPage({
   const safeIssue = issue;
 
   async function returnEquipment(formData: FormData) {
-    "use server";
+  "use server";
 
-    const returnedBy = String(formData.get("returnedBy") ?? "").trim();
-    const returnContact = String(formData.get("returnContact") ?? "").trim();
-    const returnedAtRaw = String(formData.get("returnedAt") ?? "").trim();
-    const returnConditionRaw = String(formData.get("returnCondition") ?? "").trim();
-    const returnNote = String(formData.get("returnNote") ?? "").trim();
+  const returnedBy = String(formData.get("returnedBy") ?? "").trim();
+  const returnContact = String(formData.get("returnContact") ?? "").trim();
+  const returnedAtRaw = String(formData.get("returnedAt") ?? "").trim();
+  const returnConditionRaw = String(formData.get("returnCondition") ?? "").trim();
+  const returnNote = String(formData.get("returnNote") ?? "").trim();
 
-    if (!returnedBy) {
-      redirect(
-        `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
-          "Returned by is required"
-        )}`
-      );
-    }
+  if (!returnedBy) {
+    redirect(
+      `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
+        "Returned by is required"
+      )}`
+    );
+  }
 
-    if (!returnContact) {
-      redirect(
-        `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
-          "Return contact is required"
-        )}`
-      );
-    }
+  if (!returnContact) {
+    redirect(
+      `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
+        "Return contact is required"
+      )}`
+    );
+  }
 
-    if (!returnedAtRaw) {
-      redirect(
-        `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
-          "Returned date and time is required"
-        )}`
-      );
-    }
+  if (!returnedAtRaw) {
+    redirect(
+      `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
+        "Returned date and time is required"
+      )}`
+    );
+  }
 
-    const returnedAt = new Date(returnedAtRaw);
-    if (Number.isNaN(returnedAt.getTime())) {
-      redirect(
-        `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
-          "Returned date and time is invalid"
-        )}`
-      );
-    }
+  const returnedAt = new Date(returnedAtRaw);
+  if (Number.isNaN(returnedAt.getTime())) {
+    redirect(
+      `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
+        "Returned date and time is invalid"
+      )}`
+    );
+  }
 
-    if (
-      returnConditionRaw !== "GOOD" &&
-      returnConditionRaw !== "FAULTY" &&
-      returnConditionRaw !== "DAMAGED" &&
-      returnConditionRaw !== "UNDER_REPAIR"
-    ) {
-      redirect(
-        `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
-          "Return condition is invalid"
-        )}`
-      );
-    }
+  if (
+    returnConditionRaw !== "GOOD" &&
+    returnConditionRaw !== "FAULTY" &&
+    returnConditionRaw !== "DAMAGED" &&
+    returnConditionRaw !== "UNDER_REPAIR"
+  ) {
+    redirect(
+      `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
+        "Return condition is invalid"
+      )}`
+    );
+  }
 
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.inventoryIssue.update({
-          where: { id: issueId },
-          data: {
-            returnedBy,
-            returnContact: returnContact || null,
-            returnedAt,
-            returnCondition: returnConditionRaw,
-            returnNote: returnNote || null,
-            status: "RETURNED",
-          },
-        });
-
-        await tx.inventoryItem.update({
-          where: { id: safeIssue.inventoryItem.id },
-          data: {
-            status: "AVAILABLE",
-            condition: returnConditionRaw,
-          },
-        });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryIssue.update({
+        where: { id: issueId },
+        data: {
+          returnedBy,
+          returnContact: returnContact || null,
+          returnedAt,
+          returnCondition: returnConditionRaw as EquipmentCondition,
+          returnNote: returnNote || null,
+          status: "RETURNED",
+        },
       });
 
-      redirect(
-        `/store/sites/${siteId}/issues?success=${encodeURIComponent(
-          "Equipment returned successfully"
-        )}`
-      );
-    } catch {
-      redirect(
-        `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
-          "Could not complete return"
-        )}`
-      );
-    }
+      await tx.inventoryItem.update({
+        where: { id: safeIssue.inventoryItem.id },
+        data: {
+          status: "AVAILABLE",
+          condition: returnConditionRaw as EquipmentCondition,
+        },
+      });
+    });
+  } catch {
+    redirect(
+      `/store/sites/${siteId}/issues/${issueId}/return?error=${encodeURIComponent(
+        "Could not complete return"
+      )}`
+    );
   }
+
+  redirect(
+    `/store/sites/${siteId}/issues?success=${encodeURIComponent(
+      "Equipment returned successfully"
+    )}`
+  );
+}
 
   return (
     <ReturnEquipmentClient
