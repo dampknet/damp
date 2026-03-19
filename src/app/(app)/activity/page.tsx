@@ -21,6 +21,14 @@ function activityIndicator(type: string, reason: string) {
     return { color: "bg-sky-500", label: "LOGIN" as const };
   }
 
+  if (r.includes("down")) {
+    return { color: "bg-red-500", label: "DOWN" as const };
+  }
+
+  if (r.includes("active") || r.includes("up") || r.includes("restored")) {
+    return { color: "bg-emerald-500", label: "UP" as const };
+  }
+
   if (t.includes("equipment_returned") || t.includes("returned")) {
     return { color: "bg-emerald-500", label: "RETURNED" as const };
   }
@@ -41,28 +49,20 @@ function activityIndicator(type: string, reason: string) {
     return { color: "bg-red-500", label: "OUT" as const };
   }
 
-  if (t.includes("deleted")) {
-    return { color: "bg-rose-500", label: "DELETED" as const };
+  if (t.includes("fault") || r.includes("fault")) {
+    return { color: "bg-orange-500", label: "FAULT" as const };
   }
 
-  if (t.includes("updated") || t.includes("changed") || r.includes("update") || r.includes("edit")) {
-    return { color: "bg-blue-500", label: "UPDATED" as const };
+  if (t.includes("deleted")) {
+    return { color: "bg-rose-500", label: "DELETED" as const };
   }
 
   if (t.includes("created") || r.includes("created")) {
     return { color: "bg-emerald-500", label: "CREATED" as const };
   }
 
-  if (r.includes("down")) {
-    return { color: "bg-red-500", label: "DOWN" as const };
-  }
-
-  if (r.includes("active") || r.includes("up")) {
-    return { color: "bg-emerald-500", label: "UP" as const };
-  }
-
-  if (r.includes("fault")) {
-    return { color: "bg-orange-500", label: "FAULT" as const };
+  if (t.includes("updated") || t.includes("changed") || r.includes("update") || r.includes("edit")) {
+    return { color: "bg-blue-500", label: "UPDATED" as const };
   }
 
   return { color: "bg-gray-400", label: "SYSTEM" as const };
