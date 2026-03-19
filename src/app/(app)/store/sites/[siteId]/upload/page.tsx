@@ -32,6 +32,69 @@ function normalizeUpper(v: unknown) {
   return normalizeText(v).toUpperCase();
 }
 
+async function buildInventoryTemplateDataUrl() {
+  const XLSX = await import("xlsx");
+
+  const rows = [
+    [
+      "itemType",
+      "name",
+      "description",
+      "stockNumber",
+      "manufacturer",
+      "model",
+      "serialNumber",
+      "quantity",
+      "unit",
+      "reorderLevel",
+      "targetStockLevel",
+      "status",
+      "condition",
+    ],
+    [
+      "MATERIAL",
+      "Coaxial Cable",
+      "75 ohm cable roll",
+      "MAT-001",
+      "Belden",
+      "RG6",
+      "",
+      10,
+      "rolls",
+      2,
+      15,
+      "AVAILABLE",
+      "",
+    ],
+    [
+      "EQUIPMENT",
+      "Signal Generator",
+      "Portable signal generator",
+      "EQ-001",
+      "Rohde & Schwarz",
+      "SMB100A",
+      "SG-2026-001",
+      1,
+      "pcs",
+      0,
+      "",
+      "AVAILABLE",
+      "GOOD",
+    ],
+  ];
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "InventoryTemplate");
+
+  const base64 = XLSX.write(workbook, {
+    type: "base64",
+    bookType: "xlsx",
+  });
+
+  return `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+}
+
 export default async function UploadInventoryExcelPage({
   params,
 }: {
@@ -293,10 +356,14 @@ export default async function UploadInventoryExcelPage({
     );
   }
 
+  const templateHref = await buildInventoryTemplateDataUrl();
+
   return (
     <UploadInventoryExcelClient
       site={site}
       action={uploadInventoryExcel}
+      templateHref={templateHref}
+      templateFileName="inventory-import-template.xlsx"
     />
   );
 }

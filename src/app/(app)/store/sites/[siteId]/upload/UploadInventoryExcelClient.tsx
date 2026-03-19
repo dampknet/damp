@@ -23,6 +23,8 @@ type PreviewRow = {
 export default function UploadInventoryExcelClient({
   site,
   action,
+  templateHref,
+  templateFileName,
 }: {
   site: {
     id: string;
@@ -30,6 +32,8 @@ export default function UploadInventoryExcelClient({
     location: string | null;
   };
   action: (formData: FormData) => void;
+  templateHref: string;
+  templateFileName: string;
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
@@ -119,7 +123,8 @@ export default function UploadInventoryExcelClient({
                 }
               >
                 Upload an Excel sheet to create inventory items for this site.
-                Required columns are <span className="font-semibold">itemType</span> and <span className="font-semibold">name</span>.
+                Required columns are <span className="font-semibold">itemType</span> and{" "}
+                <span className="font-semibold">name</span>.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
@@ -129,18 +134,34 @@ export default function UploadInventoryExcelClient({
               </div>
             </div>
 
-            <div
-              className={
-                dark
-                  ? "rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300"
-                  : "rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-4 text-sm text-[#5b564d]"
-              }
-            >
-              <div className="font-semibold">Expected columns</div>
-              <div className="mt-2 leading-6">
-                itemType, name, description, stockNumber, manufacturer, model,
-                serialNumber, quantity, unit, reorderLevel, targetStockLevel,
-                status, condition
+            <div className="w-full lg:w-97.5">
+              <div className="flex justify-start lg:justify-end">
+                <a
+                  href={templateHref}
+                  download={templateFileName}
+                  className={
+                    dark
+                      ? "rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/15"
+                      : "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                  }
+                >
+                  Download Template
+                </a>
+              </div>
+
+              <div
+                className={
+                  dark
+                    ? "mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300"
+                    : "mt-4 rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-4 text-sm text-[#5b564d]"
+                }
+              >
+                <div className="font-semibold">Expected columns</div>
+                <div className="mt-2 leading-6">
+                  itemType, name, description, stockNumber, manufacturer, model,
+                  serialNumber, quantity, unit, reorderLevel, targetStockLevel,
+                  status, condition
+                </div>
               </div>
             </div>
           </div>
@@ -179,7 +200,7 @@ export default function UploadInventoryExcelClient({
           >
             <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
-               <label
+                <label
                   htmlFor="inventory-excel-file"
                   className={
                     dark
@@ -317,14 +338,17 @@ export default function UploadInventoryExcelClient({
                         <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
                           {row.status || "-"}
                         </td>
-                        <td className={row.error
-                          ? dark
-                            ? "px-5 py-3 text-red-300"
-                            : "px-5 py-3 text-red-700"
-                          : dark
-                          ? "px-5 py-3 text-emerald-300"
-                          : "px-5 py-3 text-emerald-700"
-                        }>
+                        <td
+                          className={
+                            row.error
+                              ? dark
+                                ? "px-5 py-3 text-red-300"
+                                : "px-5 py-3 text-red-700"
+                              : dark
+                              ? "px-5 py-3 text-emerald-300"
+                              : "px-5 py-3 text-emerald-700"
+                          }
+                        >
                           {row.error ?? "OK"}
                         </td>
                       </tr>
