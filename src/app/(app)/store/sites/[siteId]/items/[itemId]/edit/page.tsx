@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
+import { logActivity } from "@/lib/activity";
 import type {
   EquipmentCondition,
   InventoryItemStatus,
@@ -54,6 +55,9 @@ export default async function EditInventoryItemPage({
 
   if (!item) return notFound();
 
+  const safeSite = site;
+  const safeItem = item;
+
   async function updateInventoryItem(formData: FormData) {
     "use server";
 
@@ -71,8 +75,7 @@ export default async function EditInventoryItemPage({
     const statusRaw = String(formData.get("status") ?? "AVAILABLE").trim();
     const conditionRaw = String(formData.get("condition") ?? "").trim();
 
-    const itemType =
-      itemTypeRaw === "EQUIPMENT" ? "EQUIPMENT" : "MATERIAL";
+    const itemType = itemTypeRaw === "EQUIPMENT" ? "EQUIPMENT" : "MATERIAL";
 
     if (!name) {
       redirect(
@@ -138,7 +141,9 @@ export default async function EditInventoryItemPage({
     }
 
     try {
-      await prisma.inventoryItem.update({
+      const beforeSummary = `Before → Name: ${safeItem.name}, Type: ${safeItem.itemType}, Qty: ${safeItem.quantity}${safeItem.unit ? ` ${safeItem.unit}` : ""}, Status: ${safeItem.status}`;
+
+      const updatedItem = await prisma.inventoryItem.update({
         where: { id: itemId },
         data: {
           itemType: itemType as InventoryItemType,
@@ -157,6 +162,39 @@ export default async function EditInventoryItemPage({
           condition,
         },
       });
+
+      const afterSummary = `After → Name: ${updatedItem.name}, Type: ${updatedItem.itemType}, Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}, Status: ${updatedItem.status}`;
+
+      await logActivity({
+        type: "INVENTORY_ITEM_UPDATED",
+        title: `Inventory item updated: ${updatedItem.name}`,
+        details: `${beforeSummary}. ${afterSummary}. Site: ${safeSite.name}.`,
+        actorEmail: profile?.email ?? null,
+        entityType: "INVENTORY_ITEM",
+        entityId: updatedItem.id,
+      });
+
+      if (updatedItem.status === "LOW_STOCK") {
+        await logActivity({
+          type: "INVENTORY_LOW_STOCK",
+          title: `Low stock detected: ${updatedItem.name}`,
+          details: `${updatedItem.name} at ${safeSite.name} is low in stock. Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}. Reorder level: ${updatedItem.reorderLevel}.`,
+          actorEmail: profile?.email ?? null,
+          entityType: "INVENTORY_ITEM",
+          entityId: updatedItem.id,
+        });
+      }
+
+      if (updatedItem.status === "OUT_OF_STOCK") {
+        await logActivity({
+          type: "INVENTORY_OUT_OF_STOCK",
+          title: `Out of stock: ${updatedItem.name}`,
+          details: `${updatedItem.name} at ${safeSite.name} is out of stock.`,
+          actorEmail: profile?.email ?? null,
+          entityType: "INVENTORY_ITEM",
+          entityId: updatedItem.id,
+        });
+      }
     } catch {
       redirect(
         `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(
@@ -170,8 +208,8 @@ export default async function EditInventoryItemPage({
 
   return (
     <EditInventoryItemClient
-      site={site}
-      item={item}
+      site={safeSite}
+      item={safeItem}
       action={updateInventoryItem}
     />
   );

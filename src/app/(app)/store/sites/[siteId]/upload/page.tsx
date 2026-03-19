@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
+import { logActivity } from "@/lib/activity";
 import type {
   EquipmentCondition,
   InventoryItemStatus,
@@ -114,6 +115,7 @@ export default async function UploadInventoryExcelPage({
   });
 
   if (!site) return notFound();
+  const safeSite = site;
 
   async function uploadInventoryExcel(formData: FormData) {
     "use server";
@@ -341,11 +343,20 @@ export default async function UploadInventoryExcelPage({
       );
     }
 
-    await prisma.inventoryItem.createMany({
+    const created = await prisma.inventoryItem.createMany({
       data: validRows.map((row) => ({
         inventorySiteId: siteId,
         ...row,
       })),
+    });
+
+    await logActivity({
+      type: "INVENTORY_IMPORT",
+      title: `Inventory Excel import completed for ${safeSite.name}`,
+      details: `Imported ${created.count} valid row(s) into ${safeSite.name}. Total rows read: ${preview.length}. Invalid/skipped rows: ${preview.filter((row) => !!row.error).length}.`,
+      actorEmail: profile?.email ?? null,
+      entityType: "INVENTORY_SITE",
+      entityId: safeSite.id,
     });
 
     const payload = encodeURIComponent(JSON.stringify(preview));
@@ -360,7 +371,7 @@ export default async function UploadInventoryExcelPage({
 
   return (
     <UploadInventoryExcelClient
-      site={site}
+      site={safeSite}
       action={uploadInventoryExcel}
       templateHref={templateHref}
       templateFileName="inventory-import-template.xlsx"

@@ -23,12 +23,47 @@ export async function PATCH(req: Request) {
 
     const serial = body.serialNumber?.trim() || null;
 
-    await prisma.asset.update({
+    const current = await prisma.asset.findUnique({
       where: { id: body.assetId },
-      data: { serialNumber: serial },
+      select: {
+        id: true,
+        assetName: true,
+        serialNumber: true,
+      },
     });
 
-    return NextResponse.json({ ok: true });
+    if (!current) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const asset = await tx.asset.update({
+        where: { id: body.assetId! },
+        data: { serialNumber: serial },
+        select: {
+          id: true,
+          assetName: true,
+          serialNumber: true,
+        },
+      });
+
+      if ((current.serialNumber ?? null) !== serial) {
+        await tx.activityLog.create({
+          data: {
+            type: "ASSET_SERIAL_UPDATED",
+            title: `${current.assetName} serial updated`,
+            details: `${current.serialNumber ?? "-"} → ${serial ?? "-"}`,
+            entityType: "ASSET",
+            entityId: asset.id,
+            actorEmail: profile?.email ?? null,
+          },
+        });
+      }
+
+      return asset;
+    });
+
+    return NextResponse.json({ ok: true, asset: updated });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

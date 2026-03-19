@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
+import { logActivity } from "@/lib/activity";
 import RestockInventoryItemClient from "./RestockInventoryItemClient";
 
 export default async function RestockInventoryItemPage({
@@ -27,6 +28,7 @@ export default async function RestockInventoryItemPage({
   });
 
   if (!site) return notFound();
+  const safeSite = site;
 
   const items = await prisma.inventoryItem.findMany({
     where: {
@@ -89,6 +91,8 @@ export default async function RestockInventoryItemPage({
       where: { id: inventoryItemId },
       select: {
         id: true,
+        name: true,
+        unit: true,
         inventorySiteId: true,
         quantity: true,
         reorderLevel: true,
@@ -101,18 +105,20 @@ export default async function RestockInventoryItemPage({
       redirect(`/store/sites/${siteId}/restock?error=${encodeURIComponent("Selected item is invalid")}`);
     }
 
-    const nextQuantity = item.quantity + Math.trunc(quantityAdded);
+    const safeItem = item;
+
+    const nextQuantity = safeItem.quantity + Math.trunc(quantityAdded);
     const nextStatus = getAutoInventoryStatus({
       quantity: nextQuantity,
-      reorderLevel: item.reorderLevel,
-      preferredStatus: item.status === "INACTIVE" ? "INACTIVE" : null,
+      reorderLevel: safeItem.reorderLevel,
+      preferredStatus: safeItem.status === "INACTIVE" ? "INACTIVE" : null,
     });
 
     try {
-      await prisma.$transaction(async (tx) => {
-        await tx.inventoryRestock.create({
+      const result = await prisma.$transaction(async (tx) => {
+        const restock = await tx.inventoryRestock.create({
           data: {
-            inventoryItemId: item.id,
+            inventoryItemId: safeItem.id,
             inventorySiteId: siteId,
             quantityAdded: Math.trunc(quantityAdded),
             dateBought,
@@ -123,13 +129,24 @@ export default async function RestockInventoryItemPage({
           },
         });
 
-        await tx.inventoryItem.update({
-          where: { id: item.id },
+        const updatedItem = await tx.inventoryItem.update({
+          where: { id: safeItem.id },
           data: {
             quantity: nextQuantity,
             status: nextStatus,
           },
         });
+
+        return { restock, updatedItem };
+      });
+
+      await logActivity({
+        type: "INVENTORY_RESTOCK_ADDED",
+        title: `Restock added: ${result.updatedItem.name}`,
+        details: `Added ${Math.trunc(quantityAdded)}${result.updatedItem.unit ? ` ${result.updatedItem.unit}` : ""} at ${safeSite.name}. Received by: ${receivedBy || "-"}. Supplier: ${supplier || "-"}. New qty: ${result.updatedItem.quantity}${result.updatedItem.unit ? ` ${result.updatedItem.unit}` : ""}.`,
+        actorEmail: profile?.email ?? null,
+        entityType: "INVENTORY_ITEM",
+        entityId: result.updatedItem.id,
       });
 
       redirect(
@@ -144,7 +161,7 @@ export default async function RestockInventoryItemPage({
 
   return (
     <RestockInventoryItemClient
-      site={site}
+      site={safeSite}
       items={items}
       action={restockItem}
     />

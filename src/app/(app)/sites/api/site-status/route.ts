@@ -36,7 +36,11 @@ export async function PATCH(req: Request) {
 
     const currentSite = await prisma.site.findUnique({
       where: { id: body.siteId },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+      },
     });
 
     if (!currentSite) {
@@ -63,11 +67,8 @@ export async function PATCH(req: Request) {
       await tx.activityLog.create({
         data: {
           type: "SITE_STATUS_CHANGED",
-          title:
-            body.status === "DOWN"
-              ? `${site.name} down due to ${reason}`
-              : `${site.name} active again due to ${reason}`,
-          details: null,
+          title: `${site.name} status changed from ${currentSite.status} to ${body.status}`,
+          details: `Reason: ${reason}`,
           entityType: "SITE",
           entityId: site.id,
           actorEmail: profile?.email ?? null,

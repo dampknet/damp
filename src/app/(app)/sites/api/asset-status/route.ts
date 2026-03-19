@@ -34,10 +34,44 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const updated = await prisma.asset.update({
+    const current = await prisma.asset.findUnique({
       where: { id: body.assetId },
-      data: { status: body.status },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        assetName: true,
+        status: true,
+      },
+    });
+
+    if (!current) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const asset = await tx.asset.update({
+        where: { id: body.assetId! },
+        data: { status: body.status },
+        select: {
+          id: true,
+          assetName: true,
+          status: true,
+        },
+      });
+
+      if (current.status !== body.status) {
+        await tx.activityLog.create({
+          data: {
+            type: "ASSET_STATUS_CHANGED",
+            title: `${current.assetName} status changed`,
+            details: `${current.status} → ${body.status}`,
+            entityType: "ASSET",
+            entityId: asset.id,
+            actorEmail: profile?.email ?? null,
+          },
+        });
+      }
+
+      return asset;
     });
 
     return NextResponse.json({ ok: true, asset: updated });

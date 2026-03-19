@@ -18,12 +18,37 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
     }
 
-    await prisma.inventoryItem.delete({
+    const item = await prisma.inventoryItem.findUnique({
       where: { id: itemId },
+      select: {
+        id: true,
+        name: true,
+      },
     });
 
+    if (!item) {
+      return NextResponse.json({ error: "Inventory item not found" }, { status: 404 });
+    }
+
+    await prisma.$transaction([
+      prisma.inventoryItem.delete({
+        where: { id: itemId },
+      }),
+      prisma.activityLog.create({
+        data: {
+          type: "INVENTORY_ITEM_DELETED",
+          title: `${item.name} deleted from inventory`,
+          details: null,
+          entityType: "INVENTORY_ITEM",
+          entityId: item.id,
+          actorEmail: profile?.email ?? null,
+        },
+      }),
+    ]);
+
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: "Failed to delete inventory item" },
       { status: 500 }

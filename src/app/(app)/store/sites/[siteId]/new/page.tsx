@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
+import { logActivity } from "@/lib/activity";
 import type {
   EquipmentCondition,
   InventoryItemStatus,
@@ -28,6 +29,7 @@ export default async function NewInventoryItemPage({
   });
 
   if (!site) return notFound();
+  const safeSite = site;
 
   async function createInventoryItem(formData: FormData) {
     "use server";
@@ -46,8 +48,7 @@ export default async function NewInventoryItemPage({
     const statusRaw = String(formData.get("status") ?? "AVAILABLE").trim();
     const conditionRaw = String(formData.get("condition") ?? "").trim();
 
-    const itemType =
-      itemTypeRaw === "EQUIPMENT" ? "EQUIPMENT" : "MATERIAL";
+    const itemType = itemTypeRaw === "EQUIPMENT" ? "EQUIPMENT" : "MATERIAL";
 
     if (!name) {
       redirect(
@@ -113,7 +114,7 @@ export default async function NewInventoryItemPage({
     }
 
     try {
-      await prisma.inventoryItem.create({
+      const createdItem = await prisma.inventoryItem.create({
         data: {
           inventorySiteId: siteId,
           itemType: itemType as InventoryItemType,
@@ -132,6 +133,37 @@ export default async function NewInventoryItemPage({
           condition,
         },
       });
+
+      await logActivity({
+        type: "INVENTORY_ITEM_CREATED",
+        title: `Inventory item created: ${createdItem.name}`,
+        details: `Created ${createdItem.itemType} item at ${safeSite.name}. Qty: ${createdItem.quantity}${createdItem.unit ? ` ${createdItem.unit}` : ""}. Status: ${createdItem.status}.`,
+        actorEmail: profile?.email ?? null,
+        entityType: "INVENTORY_ITEM",
+        entityId: createdItem.id,
+      });
+
+      if (createdItem.status === "LOW_STOCK") {
+        await logActivity({
+          type: "INVENTORY_LOW_STOCK",
+          title: `Low stock detected: ${createdItem.name}`,
+          details: `${createdItem.name} at ${safeSite.name} is low in stock. Qty: ${createdItem.quantity}${createdItem.unit ? ` ${createdItem.unit}` : ""}. Reorder level: ${createdItem.reorderLevel}.`,
+          actorEmail: profile?.email ?? null,
+          entityType: "INVENTORY_ITEM",
+          entityId: createdItem.id,
+        });
+      }
+
+      if (createdItem.status === "OUT_OF_STOCK") {
+        await logActivity({
+          type: "INVENTORY_OUT_OF_STOCK",
+          title: `Out of stock: ${createdItem.name}`,
+          details: `${createdItem.name} at ${safeSite.name} is out of stock.`,
+          actorEmail: profile?.email ?? null,
+          entityType: "INVENTORY_ITEM",
+          entityId: createdItem.id,
+        });
+      }
     } catch {
       redirect(
         `/store/sites/${siteId}/new?error=${encodeURIComponent(
@@ -143,5 +175,5 @@ export default async function NewInventoryItemPage({
     redirect(`/store/sites/${siteId}`);
   }
 
-  return <NewInventoryItemClient site={site} action={createInventoryItem} />;
+  return <NewInventoryItemClient site={safeSite} action={createInventoryItem} />;
 }

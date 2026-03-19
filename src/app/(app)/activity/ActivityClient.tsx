@@ -9,10 +9,25 @@ type ActivityItem = {
   no: number;
   timeLabel: string;
   reason: string;
+  details: string;
   actorEmail: string;
+  type: string;
   indicator: {
     color: string;
-    label: "DOWN" | "UP" | "FAULT" | "UPDATED" | "SYSTEM";
+    label:
+      | "DOWN"
+      | "UP"
+      | "FAULT"
+      | "UPDATED"
+      | "SYSTEM"
+      | "LOGIN"
+      | "ISSUED"
+      | "RETURNED"
+      | "RESTOCK"
+      | "LOW STOCK"
+      | "OUT"
+      | "DELETED"
+      | "CREATED";
   };
   href: string | null;
   entityLabel: string;
@@ -23,12 +38,16 @@ type ActivityItem = {
 
 export default function ActivityClient({
   q,
+  type,
+  typeOptions,
   title,
   activities,
   exportRows,
   exportCols,
 }: {
   q: string;
+  type: string;
+  typeOptions: string[];
   title: string;
   activities: ActivityItem[];
   exportRows: Array<Record<string, string | number>>;
@@ -62,7 +81,7 @@ export default function ActivityClient({
                     : "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
                 }
               >
-                Activity Feed
+                Audit Trail
               </div>
 
               <h1
@@ -82,7 +101,7 @@ export default function ActivityClient({
                     : "mt-2 text-sm font-medium text-[#8b857c]"
                 }
               >
-                Full log of recent actions across the system.
+                Full audit log of recent actions across the system.
               </p>
             </div>
 
@@ -108,7 +127,7 @@ export default function ActivityClient({
           </div>
 
           <div className="mt-6">
-            <form className="flex items-center gap-2">
+            <form className="grid gap-3 md:grid-cols-[1fr_260px_auto_auto]">
               <input
                 name="q"
                 defaultValue={q}
@@ -119,6 +138,25 @@ export default function ActivityClient({
                     : "w-full rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm outline-none focus:border-[#1a1814]"
                 }
               />
+
+              <select
+                name="type"
+                defaultValue={type}
+                aria-label="Filter by activity type"
+                title="Filter by activity type"
+                className={
+                  dark
+                    ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+                    : "rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
+                }
+              >
+                <option value="">All Types</option>
+                {typeOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
 
               <button
                 type="submit"
@@ -135,8 +173,8 @@ export default function ActivityClient({
                 href="/activity"
                 className={
                   dark
-                    ? "text-sm font-semibold text-slate-400 hover:underline"
-                    : "text-sm font-semibold text-[#5b564d] hover:underline"
+                    ? "self-center text-sm font-semibold text-slate-400 hover:underline"
+                    : "self-center text-sm font-semibold text-[#5b564d] hover:underline"
                 }
               >
                 Clear
@@ -188,6 +226,7 @@ export default function ActivityClient({
                 <tr>
                   <th className="px-5 py-3 font-semibold">No</th>
                   <th className="px-5 py-3 font-semibold">Time</th>
+                  <th className="px-5 py-3 font-semibold">Type</th>
                   <th className="px-5 py-3 font-semibold">Reason</th>
                   <th className="px-5 py-3 font-semibold">By</th>
                   <th className="px-5 py-3 font-semibold">Entity</th>
@@ -203,7 +242,7 @@ export default function ActivityClient({
                           ? "px-5 py-12 text-center text-slate-500"
                           : "px-5 py-12 text-center text-[#8b857c]"
                       }
-                      colSpan={5}
+                      colSpan={6}
                     >
                       No activity found
                     </td>
@@ -214,56 +253,45 @@ export default function ActivityClient({
                       key={a.id}
                       className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}
                     >
-                      <td
-                        className={
-                          dark
-                            ? "px-5 py-3 font-medium text-slate-500"
-                            : "px-5 py-3 font-medium text-[#6b655d]"
-                        }
-                      >
+                      <td className={dark ? "px-5 py-3 font-medium text-slate-500" : "px-5 py-3 font-medium text-[#6b655d]"}>
                         {a.no}
                       </td>
 
-                      <td
-                        className={
-                          dark
-                            ? "px-5 py-3 text-slate-400"
-                            : "px-5 py-3 text-[#5d584f]"
-                        }
-                      >
+                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
                         {a.timeLabel}
                       </td>
 
-                      <td
-                        className={
-                          dark
-                            ? "px-5 py-3 font-semibold text-slate-100"
-                            : "px-5 py-3 font-semibold text-[#1a1814]"
-                        }
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2.5 w-2.5 rounded-full ${a.indicator.color}`} />
-                          {a.reason}
+                      <td className="px-5 py-3">
+                        <span
+                          className={
+                            dark
+                              ? "inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300"
+                              : "inline-flex rounded-full border border-[#e0dbd2] bg-[#f8f4ee] px-2.5 py-1 text-[11px] font-semibold text-[#5b564d]"
+                          }
+                        >
+                          {a.type}
+                        </span>
+                      </td>
+
+                      <td className={dark ? "px-5 py-3 font-semibold text-slate-100" : "px-5 py-3 font-semibold text-[#1a1814]"}>
+                        <div className="flex items-start gap-2">
+                          <span className={`mt-1 h-2.5 w-2.5 rounded-full ${a.indicator.color}`} />
+                          <div>
+                            <div>{a.reason}</div>
+                            {a.details ? (
+                              <div className={dark ? "mt-1 text-xs font-normal text-slate-500" : "mt-1 text-xs font-normal text-[#8b857c]"}>
+                                {a.details}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </td>
 
-                      <td
-                        className={
-                          dark
-                            ? "px-5 py-3 text-slate-400"
-                            : "px-5 py-3 text-[#5d584f]"
-                        }
-                      >
+                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
                         {a.actorEmail}
                       </td>
 
-                      <td
-                        className={
-                          dark
-                            ? "px-5 py-3 text-slate-400"
-                            : "px-5 py-3 text-[#5d584f]"
-                        }
-                      >
+                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
                         {a.href ? (
                           <Link
                             href={a.href}
