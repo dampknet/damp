@@ -1,7 +1,7 @@
- "use client";
+"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -14,6 +14,7 @@ type ActivityItem = {
   details: string;
   actorEmail: string;
   type: string;
+  typeLabel: string;
   indicator: {
     color: string;
     label:
@@ -40,31 +41,28 @@ type ActivityItem = {
   isRecent: boolean;
 };
 
-type GroupedActivities = {
-  today: ActivityItem[];
-  yesterday: ActivityItem[];
-  week: ActivityItem[];
-  month: ActivityItem[];
-  older: ActivityItem[];
+type ActionOption = {
+  value: string;
+  label: string;
 };
 
 export default function ActivityClient({
   q,
   type,
-  typeOptions,
+  period,
+  actionOptions,
   title,
   activities,
-  groupedActivities,
   exportRows,
   exportCols,
   refreshIntervalMs,
 }: {
   q: string;
   type: string;
-  typeOptions: string[];
+  period: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
+  actionOptions: ActionOption[];
   title: string;
   activities: ActivityItem[];
-  groupedActivities: GroupedActivities;
   exportRows: Array<Record<string, string | number>>;
   exportCols: Array<{ key: string; label: string }>;
   refreshIntervalMs: number;
@@ -72,7 +70,9 @@ export default function ActivityClient({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
   const router = useRouter();
-  const previousTopIdRef = useRef<string | null>(activities[0]?.id ?? null);
+
+  const previousTopIdRef = useRef<string | null>(null);
+  const [liveNotice, setLiveNotice] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -82,27 +82,49 @@ export default function ActivityClient({
     return () => clearInterval(interval);
   }, [router, refreshIntervalMs]);
 
-  const hasNewItems = useMemo(() => {
+  useEffect(() => {
     const currentTopId = activities[0]?.id ?? null;
-    const previousTopId = previousTopIdRef.current;
 
-    if (!previousTopId) {
+    if (!previousTopIdRef.current) {
       previousTopIdRef.current = currentTopId;
-      return false;
+      return;
     }
 
-    const changed = currentTopId !== previousTopId;
-    previousTopIdRef.current = currentTopId;
-    return changed;
-  }, [activities]);
+    if (currentTopId && previousTopIdRef.current !== currentTopId) {
+      previousTopIdRef.current = currentTopId;
+      setLiveNotice(true);
 
-  const sections = [
-    { key: "today", label: "Today", items: groupedActivities.today },
-    { key: "yesterday", label: "Yesterday", items: groupedActivities.yesterday },
-    { key: "week", label: "This Week", items: groupedActivities.week },
-    { key: "month", label: "This Month", items: groupedActivities.month },
-    { key: "older", label: "Earlier", items: groupedActivities.older },
-  ];
+      try {
+        const AudioCtx =
+          window.AudioContext ||
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const oscillator = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+
+          gainNode.gain.setValueAtTime(0.001, ctx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+          oscillator.connect(gainNode);
+          gainNode.connect(ctx.destination);
+
+          oscillator.start(ctx.currentTime);
+          oscillator.stop(ctx.currentTime + 0.25);
+        }
+      } catch {}
+
+      const timer = setTimeout(() => setLiveNotice(false), 4000);
+      return () => clearTimeout(timer);
+    }
+
+    previousTopIdRef.current = currentTopId;
+  }, [activities]);
 
   return (
     <div
@@ -175,7 +197,7 @@ export default function ActivityClient({
           </div>
 
           <div className="mt-6">
-            <form className="grid gap-3 md:grid-cols-[1fr_260px_auto_auto]">
+            <form className="grid gap-3 md:grid-cols-[1fr_260px_180px_auto_auto]">
               <input
                 name="q"
                 defaultValue={q}
@@ -190,20 +212,38 @@ export default function ActivityClient({
               <select
                 name="type"
                 defaultValue={type}
-                aria-label="Filter by activity type"
-                title="Filter by activity type"
+                aria-label="Filter by action"
+                title="Filter by action"
                 className={
                   dark
                     ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
                     : "rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
                 }
               >
-                <option value="">All Types</option>
-                {typeOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                <option value="">All Actions</option>
+                {actionOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
                   </option>
                 ))}
+              </select>
+
+              <select
+                name="period"
+                defaultValue={period}
+                aria-label="Filter by period"
+                title="Filter by period"
+                className={
+                  dark
+                    ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+                    : "rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
+                }
+              >
+                <option value="ALL">All Time</option>
+                <option value="TODAY">Today</option>
+                <option value="WEEK">This Week</option>
+                <option value="MONTH">This Month</option>
+                <option value="YEAR">This Year</option>
               </select>
 
               <button
@@ -231,7 +271,7 @@ export default function ActivityClient({
           </div>
         </div>
 
-        {hasNewItems ? (
+        {liveNotice ? (
           <div
             className={
               dark
@@ -239,198 +279,148 @@ export default function ActivityClient({
                 : "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"
             }
           >
-            New activity detected. Feed updated automatically.
+            New activity detected.
           </div>
         ) : null}
 
-        <div className="mt-6 space-y-6">
-          {sections.map((section) =>
-            section.items.length > 0 ? (
-              <section
-                key={section.key}
-                className={
-                  dark
-                    ? "overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-none backdrop-blur-xl"
-                    : "overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm"
-                }
-              >
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div
-                    className={
-                      dark
-                        ? "text-sm font-semibold text-slate-100"
-                        : "text-sm font-semibold text-[#1a1814]"
-                    }
-                  >
-                    {section.label}
-                  </div>
-
-                  <div
-                    className={
-                      dark
-                        ? "text-xs font-medium text-slate-500"
-                        : "text-xs font-medium text-[#8b857c]"
-                    }
-                  >
-                    {section.items.length} shown
-                  </div>
-                </div>
-
-                <div className={dark ? "h-px bg-white/8" : "h-px bg-[#eee7dd]"} />
-
-                <div className="max-h-[75vh] overflow-auto">
-                  <table className="w-full text-sm">
-                    <thead
-                      className={
-                        dark
-                          ? "sticky top-0 z-20 bg-[#101720] text-left text-slate-400"
-                          : "sticky top-0 z-20 bg-[#f8f4ee] text-left text-[#5b564d] shadow-sm"
-                      }
-                    >
-                      <tr>
-                        <th className="px-5 py-3 font-semibold">No</th>
-                        <th className="px-5 py-3 font-semibold">Time</th>
-                        <th className="px-5 py-3 font-semibold">Type</th>
-                        <th className="px-5 py-3 font-semibold">Reason</th>
-                        <th className="px-5 py-3 font-semibold">By</th>
-                        <th className="px-5 py-3 font-semibold">Entity</th>
-                      </tr>
-                    </thead>
-
-                    <tbody
-                      className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}
-                    >
-                      {section.items.map((a) => (
-                        <tr
-                          key={a.id}
-                          className={
-                            a.isRecent
-                              ? dark
-                                ? "bg-emerald-500/5 hover:bg-white/5"
-                                : "bg-emerald-50/60 hover:bg-[#fcfaf7]"
-                              : dark
-                              ? "hover:bg-white/5"
-                              : "hover:bg-[#fcfaf7]"
-                          }
-                        >
-                          <td
-                            className={
-                              dark
-                                ? "px-5 py-3 font-medium text-slate-500"
-                                : "px-5 py-3 font-medium text-[#6b655d]"
-                            }
-                          >
-                            {a.no}
-                          </td>
-
-                          <td
-                            className={
-                              dark
-                                ? "px-5 py-3 text-slate-400"
-                                : "px-5 py-3 text-[#5d584f]"
-                            }
-                          >
-                            {a.timeLabel}
-                          </td>
-
-                          <td className="px-5 py-3">
-                            <span
-                              className={
-                                dark
-                                  ? "inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300"
-                                  : "inline-flex rounded-full border border-[#e0dbd2] bg-[#f8f4ee] px-2.5 py-1 text-[11px] font-semibold text-[#5b564d]"
-                              }
-                            >
-                              {a.type}
-                            </span>
-                          </td>
-
-                          <td
-                            className={
-                              dark
-                                ? "px-5 py-3 font-semibold text-slate-100"
-                                : "px-5 py-3 font-semibold text-[#1a1814]"
-                            }
-                          >
-                            <div className="flex items-start gap-2">
-                              <span className={`mt-1 h-2.5 w-2.5 rounded-full ${a.indicator.color}`} />
-                              <div>
-                                <div>{a.reason}</div>
-                                {a.details ? (
-                                  <div
-                                    className={
-                                      dark
-                                        ? "mt-1 text-xs font-normal text-slate-500"
-                                        : "mt-1 text-xs font-normal text-[#8b857c]"
-                                    }
-                                  >
-                                    {a.details}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </td>
-
-                          <td
-                            className={
-                              dark
-                                ? "px-5 py-3 text-slate-400"
-                                : "px-5 py-3 text-[#5d584f]"
-                            }
-                          >
-                            {a.actorEmail}
-                          </td>
-
-                          <td
-                            className={
-                              dark
-                                ? "px-5 py-3 text-slate-400"
-                                : "px-5 py-3 text-[#5d584f]"
-                            }
-                          >
-                            {a.href ? (
-                              <Link
-                                href={a.href}
-                                className={
-                                  dark
-                                    ? "font-medium text-[#60a5fa] hover:underline"
-                                    : "font-medium text-[#c8611a] hover:underline"
-                                }
-                              >
-                                {a.entityLabel}
-                              </Link>
-                            ) : (
-                              a.entityLabel
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ) : null
-          )}
-
-          {activities.length === 0 ? (
+        <div
+          className={
+            dark
+              ? "mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-none backdrop-blur-xl"
+              : "mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm"
+          }
+        >
+          <div className="flex items-center justify-between px-5 py-4">
             <div
               className={
                 dark
-                  ? "overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-none backdrop-blur-xl"
-                  : "overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm"
+                  ? "text-sm font-semibold text-slate-100"
+                  : "text-sm font-semibold text-[#1a1814]"
               }
             >
-              <div className="px-5 py-12 text-center">
-                <div
-                  className={
-                    dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#8b857c]"
-                  }
-                >
-                  No activity found
-                </div>
-              </div>
+              Activity Log
             </div>
-          ) : null}
+
+            <div
+              className={
+                dark
+                  ? "text-xs font-medium text-slate-500"
+                  : "text-xs font-medium text-[#8b857c]"
+              }
+            >
+              {activities.length} shown
+            </div>
+          </div>
+
+          <div className={dark ? "h-px bg-white/8" : "h-px bg-[#eee7dd]"} />
+
+          <div className="max-h-[75vh] overflow-auto">
+            <table className="w-full text-sm">
+              <thead
+                className={
+                  dark
+                    ? "sticky top-0 z-20 bg-[#101720] text-left text-slate-400"
+                    : "sticky top-0 z-20 bg-[#f8f4ee] text-left text-[#5b564d] shadow-sm"
+                }
+              >
+                <tr>
+                  <th className="px-5 py-3 font-semibold">No</th>
+                  <th className="px-5 py-3 font-semibold">Time</th>
+                  <th className="px-5 py-3 font-semibold">Action</th>
+                  <th className="px-5 py-3 font-semibold">Reason</th>
+                  <th className="px-5 py-3 font-semibold">By</th>
+                  <th className="px-5 py-3 font-semibold">Entity</th>
+                </tr>
+              </thead>
+
+              <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
+                {activities.length === 0 ? (
+                  <tr>
+                    <td
+                      className={
+                        dark
+                          ? "px-5 py-12 text-center text-slate-500"
+                          : "px-5 py-12 text-center text-[#8b857c]"
+                      }
+                      colSpan={6}
+                    >
+                      No activity found
+                    </td>
+                  </tr>
+                ) : (
+                  activities.map((a) => (
+                    <tr
+                      key={a.id}
+                      className={
+                        a.isRecent
+                          ? dark
+                            ? "bg-emerald-500/5 hover:bg-white/5"
+                            : "bg-emerald-50/60 hover:bg-[#fcfaf7]"
+                          : dark
+                          ? "hover:bg-white/5"
+                          : "hover:bg-[#fcfaf7]"
+                      }
+                    >
+                      <td className={dark ? "px-5 py-3 font-medium text-slate-500" : "px-5 py-3 font-medium text-[#6b655d]"}>
+                        {a.no}
+                      </td>
+
+                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                        {a.timeLabel}
+                      </td>
+
+                      <td className="px-5 py-3">
+                        <span
+                          className={
+                            dark
+                              ? "inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300"
+                              : "inline-flex rounded-full border border-[#e0dbd2] bg-[#f8f4ee] px-2.5 py-1 text-[11px] font-semibold text-[#5b564d]"
+                          }
+                        >
+                          {a.typeLabel}
+                        </span>
+                      </td>
+
+                      <td className={dark ? "px-5 py-3 font-semibold text-slate-100" : "px-5 py-3 font-semibold text-[#1a1814]"}>
+                        <div className="flex items-start gap-2">
+                          <span className={`mt-1 h-2.5 w-2.5 rounded-full ${a.indicator.color}`} />
+                          <div>
+                            <div>{a.reason}</div>
+                            {a.details ? (
+                              <div className={dark ? "mt-1 text-xs font-normal text-slate-500" : "mt-1 text-xs font-normal text-[#8b857c]"}>
+                                {a.details}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                        {a.actorEmail}
+                      </td>
+
+                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                        {a.href ? (
+                          <Link
+                            href={a.href}
+                            className={
+                              dark
+                                ? "font-medium text-[#60a5fa] hover:underline"
+                                : "font-medium text-[#c8611a] hover:underline"
+                            }
+                          >
+                            {a.entityLabel}
+                          </Link>
+                        ) : (
+                          a.entityLabel
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

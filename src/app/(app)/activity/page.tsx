@@ -4,6 +4,7 @@ import ActivityClient from "./ActivityClient";
 type SearchParams = {
   q?: string;
   type?: string;
+  period?: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
 };
 
 function formatDate(date: Date) {
@@ -95,84 +96,68 @@ function entityLabel(entityType: string | null, entityId: string | null) {
   return `${entityType} (${entityId})`;
 }
 
-type ActivityItem = {
-  id: string;
-  no: number;
-  timeLabel: string;
-  reason: string;
-  details: string;
-  actorEmail: string;
-  type: string;
-  indicator: {
-    color: string;
-    label:
-      | "DOWN"
-      | "UP"
-      | "FAULT"
-      | "UPDATED"
-      | "SYSTEM"
-      | "LOGIN"
-      | "ISSUED"
-      | "RETURNED"
-      | "RESTOCK"
-      | "LOW STOCK"
-      | "OUT"
-      | "DELETED"
-      | "CREATED";
-  };
-  href: string | null;
-  entityLabel: string;
-  exportTime: string;
-  entityType: string;
-  entityId: string;
-  createdAtISO: string;
-  isRecent: boolean;
-};
-
-function startOfToday() {
+function getPeriodStart(period: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR") {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === "TODAY") {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  if (period === "WEEK") {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = today.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    return new Date(today.getTime() - diff * 24 * 60 * 60 * 1000);
+  }
+
+  if (period === "MONTH") {
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  if (period === "YEAR") {
+    return new Date(now.getFullYear(), 0, 1);
+  }
+
+  return null;
 }
 
-function startOfYesterday() {
-  const today = startOfToday();
-  return new Date(today.getTime() - 24 * 60 * 60 * 1000);
-}
+const actionOptions = [
+  { value: "USER_LOGIN", label: "User Login" },
 
-function startOfWeek() {
-  const today = startOfToday();
-  const day = today.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  return new Date(today.getTime() - diff * 24 * 60 * 60 * 1000);
-}
+  { value: "SITE_CREATED", label: "Site Created" },
+  { value: "SITE_UPDATED", label: "Site Updated" },
+  { value: "SITE_STATUS_CHANGED", label: "Site Status Changed" },
+  { value: "SITE_TOWER_UPDATED", label: "Site Tower Updated" },
+  { value: "SITE_HEIGHT_UPDATED", label: "Site Height Updated" },
+  { value: "SITE_GPS_UPDATED", label: "Site GPS Updated" },
+  { value: "SITE_DELETED", label: "Site Deleted" },
 
-function startOfMonth() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
+  { value: "ASSET_CREATED", label: "Asset Created" },
+  { value: "ASSET_UPDATED", label: "Asset Updated" },
+  { value: "ASSET_DELETED", label: "Asset Deleted" },
+  { value: "ASSET_STATUS_CHANGED", label: "Asset Status Changed" },
+  { value: "ASSET_SERIAL_UPDATED", label: "Asset Serial Updated" },
 
-function groupActivities(items: ActivityItem[]) {
-  const today = startOfToday();
-  const yesterday = startOfYesterday();
-  const week = startOfWeek();
-  const month = startOfMonth();
+  { value: "INVENTORY_ITEM_CREATED", label: "Inventory Item Created" },
+  { value: "INVENTORY_ITEM_UPDATED", label: "Inventory Item Updated" },
+  { value: "INVENTORY_ITEM_DELETED", label: "Inventory Item Deleted" },
 
-  return {
-    today: items.filter((a) => new Date(a.createdAtISO) >= today),
-    yesterday: items.filter((a) => {
-      const d = new Date(a.createdAtISO);
-      return d >= yesterday && d < today;
-    }),
-    week: items.filter((a) => {
-      const d = new Date(a.createdAtISO);
-      return d >= week && d < yesterday;
-    }),
-    month: items.filter((a) => {
-      const d = new Date(a.createdAtISO);
-      return d >= month && d < week;
-    }),
-    older: items.filter((a) => new Date(a.createdAtISO) < month),
-  };
+  { value: "INVENTORY_RESTOCK_ADDED", label: "Inventory Restock Added" },
+  { value: "INVENTORY_ITEM_ISSUED", label: "Inventory Item Issued" },
+  { value: "INVENTORY_EQUIPMENT_RETURNED", label: "Equipment Returned" },
+
+  { value: "INVENTORY_LOW_STOCK", label: "Inventory Low Stock" },
+  { value: "INVENTORY_OUT_OF_STOCK", label: "Inventory Out Of Stock" },
+
+  { value: "INVENTORY_IMPORT", label: "Inventory Import" },
+  { value: "SYSTEM_EVENT", label: "System Event" },
+
+  { value: "STORE_ITEM_STATUS_CHANGED", label: "Store Item Status Changed" },
+  { value: "STORE_ITEM_DELETED", label: "Store Item Deleted" },
+];
+
+function getActionLabel(type: string) {
+  return actionOptions.find((item) => item.value === type)?.label ?? type;
 }
 
 export default async function ActivityPage({
@@ -183,6 +168,9 @@ export default async function ActivityPage({
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();
   const type = (sp.type ?? "").trim();
+  const period = sp.period ?? "ALL";
+
+  const periodStart = getPeriodStart(period);
 
   const activitiesRaw = await prisma.activityLog.findMany({
     where: {
@@ -199,6 +187,7 @@ export default async function ActivityPage({
             }
           : {},
         type ? { type: type as any } : {},
+        periodStart ? { createdAt: { gte: periodStart } } : {},
       ],
     },
     orderBy: { createdAt: "desc" },
@@ -207,7 +196,7 @@ export default async function ActivityPage({
 
   const now = Date.now();
 
-  const activities: ActivityItem[] = activitiesRaw.map((a, index) => ({
+  const activities = activitiesRaw.map((a, index) => ({
     id: a.id,
     no: index + 1,
     timeLabel: formatDate(a.createdAt),
@@ -215,6 +204,7 @@ export default async function ActivityPage({
     details: a.details ?? "",
     actorEmail: a.actorEmail ?? "-",
     type: a.type,
+    typeLabel: getActionLabel(a.type),
     indicator: activityIndicator(a.type, a.title),
     href: entityHref(a.entityType, a.entityId),
     entityLabel: entityLabel(a.entityType, a.entityId),
@@ -225,17 +215,17 @@ export default async function ActivityPage({
     isRecent: now - a.createdAt.getTime() <= 2 * 60 * 1000,
   }));
 
-  const groupedActivities = groupActivities(activities);
-
   const title =
-    q || type
-      ? `Recent Activity${q ? ` — Search: ${q}` : ""}${type ? ` — Type: ${type}` : ""}`
+    q || type || period !== "ALL"
+      ? `Recent Activity${q ? ` — Search: ${q}` : ""}${
+          type ? ` — Action: ${getActionLabel(type)}` : ""
+        }${period !== "ALL" ? ` — Period: ${period}` : ""}`
       : "Recent Activity";
 
   const exportRows = activities.map((a) => ({
     No: a.no,
     Time: a.exportTime,
-    Type: a.type,
+    Action: a.typeLabel,
     Reason: a.reason,
     Details: a.details,
     By: a.actorEmail === "-" ? "" : a.actorEmail,
@@ -246,7 +236,7 @@ export default async function ActivityPage({
   const exportCols = [
     { key: "No", label: "No" },
     { key: "Time", label: "Time" },
-    { key: "Type", label: "Type" },
+    { key: "Action", label: "Action" },
     { key: "Reason", label: "Reason" },
     { key: "Details", label: "Details" },
     { key: "By", label: "By" },
@@ -254,49 +244,14 @@ export default async function ActivityPage({
     { key: "EntityId", label: "Entity ID" },
   ];
 
-  const typeOptions = [
-    "USER_LOGIN",
-
-    "SITE_CREATED",
-    "SITE_UPDATED",
-    "SITE_STATUS_CHANGED",
-    "SITE_TOWER_UPDATED",
-    "SITE_HEIGHT_UPDATED",
-    "SITE_GPS_UPDATED",
-    "SITE_DELETED",
-
-    "ASSET_CREATED",
-    "ASSET_UPDATED",
-    "ASSET_DELETED",
-    "ASSET_STATUS_CHANGED",
-    "ASSET_SERIAL_UPDATED",
-
-    "INVENTORY_ITEM_CREATED",
-    "INVENTORY_ITEM_UPDATED",
-    "INVENTORY_ITEM_DELETED",
-
-    "INVENTORY_RESTOCK_ADDED",
-    "INVENTORY_ITEM_ISSUED",
-    "INVENTORY_EQUIPMENT_RETURNED",
-
-    "INVENTORY_LOW_STOCK",
-    "INVENTORY_OUT_OF_STOCK",
-
-    "INVENTORY_IMPORT",
-    "SYSTEM_EVENT",
-
-    "STORE_ITEM_STATUS_CHANGED",
-    "STORE_ITEM_DELETED",
-  ];
-
   return (
     <ActivityClient
       q={q}
       type={type}
-      typeOptions={typeOptions}
+      period={period}
+      actionOptions={actionOptions}
       title={title}
       activities={activities}
-      groupedActivities={groupedActivities}
       exportRows={exportRows}
       exportCols={exportCols}
       refreshIntervalMs={5000}
