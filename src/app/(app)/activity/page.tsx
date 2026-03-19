@@ -21,11 +21,19 @@ function activityIndicator(type: string, reason: string) {
     return { color: "bg-sky-500", label: "LOGIN" as const };
   }
 
-  if (r.includes("down")) {
+  if (r.includes(" down ")) {
     return { color: "bg-red-500", label: "DOWN" as const };
   }
 
-  if (r.includes("active") || r.includes("up") || r.includes("restored")) {
+  if (r.includes(" active ") || r.includes(" up ") || r.includes(" restored ")) {
+    return { color: "bg-emerald-500", label: "UP" as const };
+  }
+
+  if (r.startsWith("down")) {
+    return { color: "bg-red-500", label: "DOWN" as const };
+  }
+
+  if (r.startsWith("active")) {
     return { color: "bg-emerald-500", label: "UP" as const };
   }
 
@@ -61,7 +69,7 @@ function activityIndicator(type: string, reason: string) {
     return { color: "bg-emerald-500", label: "CREATED" as const };
   }
 
-  if (t.includes("updated") || t.includes("changed") || r.includes("update") || r.includes("edit")) {
+  if (t.includes("updated") || t.includes("changed")) {
     return { color: "bg-blue-500", label: "UPDATED" as const };
   }
 
@@ -85,6 +93,86 @@ function entityLabel(entityType: string | null, entityId: string | null) {
   if (!entityType) return "-";
   if (!entityId) return entityType;
   return `${entityType} (${entityId})`;
+}
+
+type ActivityItem = {
+  id: string;
+  no: number;
+  timeLabel: string;
+  reason: string;
+  details: string;
+  actorEmail: string;
+  type: string;
+  indicator: {
+    color: string;
+    label:
+      | "DOWN"
+      | "UP"
+      | "FAULT"
+      | "UPDATED"
+      | "SYSTEM"
+      | "LOGIN"
+      | "ISSUED"
+      | "RETURNED"
+      | "RESTOCK"
+      | "LOW STOCK"
+      | "OUT"
+      | "DELETED"
+      | "CREATED";
+  };
+  href: string | null;
+  entityLabel: string;
+  exportTime: string;
+  entityType: string;
+  entityId: string;
+  createdAtISO: string;
+  isRecent: boolean;
+};
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function startOfYesterday() {
+  const today = startOfToday();
+  return new Date(today.getTime() - 24 * 60 * 60 * 1000);
+}
+
+function startOfWeek() {
+  const today = startOfToday();
+  const day = today.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  return new Date(today.getTime() - diff * 24 * 60 * 60 * 1000);
+}
+
+function startOfMonth() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function groupActivities(items: ActivityItem[]) {
+  const today = startOfToday();
+  const yesterday = startOfYesterday();
+  const week = startOfWeek();
+  const month = startOfMonth();
+
+  return {
+    today: items.filter((a) => new Date(a.createdAtISO) >= today),
+    yesterday: items.filter((a) => {
+      const d = new Date(a.createdAtISO);
+      return d >= yesterday && d < today;
+    }),
+    week: items.filter((a) => {
+      const d = new Date(a.createdAtISO);
+      return d >= week && d < yesterday;
+    }),
+    month: items.filter((a) => {
+      const d = new Date(a.createdAtISO);
+      return d >= month && d < week;
+    }),
+    older: items.filter((a) => new Date(a.createdAtISO) < month),
+  };
 }
 
 export default async function ActivityPage({
@@ -117,12 +205,9 @@ export default async function ActivityPage({
     take: 300,
   });
 
-  const title =
-    q || type
-      ? `Recent Activity${q ? ` — Search: ${q}` : ""}${type ? ` — Type: ${type}` : ""}`
-      : "Recent Activity";
+  const now = Date.now();
 
-  const activities = activitiesRaw.map((a, index) => ({
+  const activities: ActivityItem[] = activitiesRaw.map((a, index) => ({
     id: a.id,
     no: index + 1,
     timeLabel: formatDate(a.createdAt),
@@ -136,7 +221,16 @@ export default async function ActivityPage({
     exportTime: a.createdAt.toISOString(),
     entityType: a.entityType ?? "",
     entityId: a.entityId ?? "",
+    createdAtISO: a.createdAt.toISOString(),
+    isRecent: now - a.createdAt.getTime() <= 2 * 60 * 1000,
   }));
+
+  const groupedActivities = groupActivities(activities);
+
+  const title =
+    q || type
+      ? `Recent Activity${q ? ` — Search: ${q}` : ""}${type ? ` — Type: ${type}` : ""}`
+      : "Recent Activity";
 
   const exportRows = activities.map((a) => ({
     No: a.no,
@@ -202,8 +296,10 @@ export default async function ActivityPage({
       typeOptions={typeOptions}
       title={title}
       activities={activities}
+      groupedActivities={groupedActivities}
       exportRows={exportRows}
       exportCols={exportCols}
+      refreshIntervalMs={5000}
     />
   );
 }
