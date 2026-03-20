@@ -8,9 +8,14 @@ import { useThemeMode } from "@/context/ThemeContext";
 type Props = {
   email: string;
   role: "ADMIN" | "EDITOR" | "VIEWER";
+  displayName: string;
 };
 
-export default function AppNavbarClient({ email, role }: Props) {
+export default function AppNavbarClient({
+  email,
+  role,
+  displayName,
+}: Props) {
   const { mode } = useThemeMode();
   const isDark = mode === "dark";
 
@@ -68,7 +73,11 @@ export default function AppNavbarClient({ email, role }: Props) {
           <NavItem href="/store" label="Store" isDark={isDark} />
         </nav>
 
-        <SettingsMenu email={email} role={role} />
+        <SettingsMenu
+          email={email}
+          role={role}
+          displayName={displayName}
+        />
       </div>
 
       <div

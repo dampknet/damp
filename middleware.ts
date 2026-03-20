@@ -23,22 +23,28 @@ export async function middleware(req: NextRequest) {
 
   const { data } = await supabase.auth.getUser();
   const user = data.user;
-
   const pathname = req.nextUrl.pathname;
 
-  // ✅ Allow auth routes (login/logout/post-login)
-  if (pathname.startsWith("/auth")) return res;
+  // allow auth routes
+  if (pathname.startsWith("/auth")) {
+    return res;
+  }
 
-  // ✅ Always send home to login
+  // send home to login
   if (pathname === "/") {
     const url = req.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
   }
 
-  // ✅ Protect /sites and /admin (must be logged in)
+  // protect all main app routes
   const isProtected =
-    pathname.startsWith("/sites") || pathname.startsWith("/admin");
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/sites") ||
+    pathname.startsWith("/store") ||
+    pathname.startsWith("/activity") ||
+    pathname.startsWith("/assets") ||
+    pathname.startsWith("/admin");
 
   if (isProtected && !user) {
     const url = req.nextUrl.clone();
@@ -46,12 +52,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ✅ Whitelist check (extra security)
-  if (isProtected && user?.email) {
-    const email = user.email.toLowerCase();
+  if (isProtected) {
+    const email = user?.email?.toLowerCase() ?? "";
     const allowed = WHITELISTED_EMAILS.map((e) => e.toLowerCase());
 
-    if (!allowed.includes(email)) {
+    if (!email || !allowed.includes(email)) {
       const url = req.nextUrl.clone();
       url.pathname = "/auth/login";
       return NextResponse.redirect(url);
@@ -62,5 +67,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/sites/:path*", "/admin/:path*", "/auth/:path*"],
+  matcher: [
+    "/",
+    "/auth/:path*",
+    "/dashboard/:path*",
+    "/sites/:path*",
+    "/store/:path*",
+    "/activity/:path*",
+    "/assets/:path*",
+    "/admin/:path*",
+  ],
 };

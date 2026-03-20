@@ -7,16 +7,22 @@ import { useThemeMode } from "@/context/ThemeContext";
 type Props = {
   email: string;
   role: "ADMIN" | "EDITOR" | "VIEWER";
+  displayName: string;
 };
 
-export default function SettingsMenu({ email, role }: Props) {
+export default function SettingsMenu({
+  email,
+  role,
+  displayName,
+}: Props) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const { mode, toggleMode } = useThemeMode();
 
   const isAdmin = role === "ADMIN";
   const isDark = mode === "dark";
-  const initial = (email?.[0] ?? "U").toUpperCase();
+  const safeName = displayName.trim() || email;
+  const initial = (safeName?.[0] ?? email?.[0] ?? "U").toUpperCase();
 
   function closeMenu() {
     if (detailsRef.current) detailsRef.current.open = false;
@@ -76,7 +82,7 @@ export default function SettingsMenu({ email, role }: Props) {
                 isDark ? "text-slate-100" : "text-gray-900"
               }`}
             >
-              {email}
+              {safeName}
             </div>
             <div
               className={`text-[11px] font-medium ${
@@ -122,10 +128,17 @@ export default function SettingsMenu({ email, role }: Props) {
                   isDark ? "text-slate-100" : "text-[#1a1814]"
                 }`}
               >
+                {safeName}
+              </div>
+              <div
+                className={`mt-0.5 truncate text-[11px] ${
+                  isDark ? "text-slate-500" : "text-[#8b857c]"
+                }`}
+              >
                 {email}
               </div>
               <div
-                className={`mt-0.5 text-[11px] font-bold uppercase tracking-[0.14em] ${
+                className={`mt-1 text-[11px] font-bold uppercase tracking-[0.14em] ${
                   isDark ? "text-[#60a5fa]" : "text-[#c8611a]"
                 }`}
               >
