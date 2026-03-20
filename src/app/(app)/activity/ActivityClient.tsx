@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import { useThemeMode } from "@/context/ThemeContext";
 
@@ -37,8 +35,6 @@ type ActivityItem = {
   exportTime: string;
   entityType: string;
   entityId: string;
-  createdAtISO: string;
-  isRecent: boolean;
 };
 
 type ActionOption = {
@@ -55,7 +51,6 @@ export default function ActivityClient({
   activities,
   exportRows,
   exportCols,
-  refreshIntervalMs,
 }: {
   q: string;
   type: string;
@@ -65,66 +60,9 @@ export default function ActivityClient({
   activities: ActivityItem[];
   exportRows: Array<Record<string, string | number>>;
   exportCols: Array<{ key: string; label: string }>;
-  refreshIntervalMs: number;
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-  const router = useRouter();
-
-  const previousTopIdRef = useRef<string | null>(null);
-  const [liveNotice, setLiveNotice] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      router.refresh();
-    }, refreshIntervalMs);
-
-    return () => clearInterval(interval);
-  }, [router, refreshIntervalMs]);
-
-  useEffect(() => {
-    const currentTopId = activities[0]?.id ?? null;
-
-    if (!previousTopIdRef.current) {
-      previousTopIdRef.current = currentTopId;
-      return;
-    }
-
-    if (currentTopId && previousTopIdRef.current !== currentTopId) {
-      previousTopIdRef.current = currentTopId;
-      setLiveNotice(true);
-
-      try {
-        const AudioCtx =
-          window.AudioContext ||
-          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-
-        if (AudioCtx) {
-          const ctx = new AudioCtx();
-          const oscillator = ctx.createOscillator();
-          const gainNode = ctx.createGain();
-
-          oscillator.type = "sine";
-          oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-
-          gainNode.gain.setValueAtTime(0.001, ctx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-
-          oscillator.connect(gainNode);
-          gainNode.connect(ctx.destination);
-
-          oscillator.start(ctx.currentTime);
-          oscillator.stop(ctx.currentTime + 0.25);
-        }
-      } catch {}
-
-      const timer = setTimeout(() => setLiveNotice(false), 4000);
-      return () => clearTimeout(timer);
-    }
-
-    previousTopIdRef.current = currentTopId;
-  }, [activities]);
 
   return (
     <div
@@ -271,18 +209,6 @@ export default function ActivityClient({
           </div>
         </div>
 
-        {liveNotice ? (
-          <div
-            className={
-              dark
-                ? "mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300"
-                : "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"
-            }
-          >
-            New activity detected.
-          </div>
-        ) : null}
-
         <div
           className={
             dark
@@ -351,15 +277,7 @@ export default function ActivityClient({
                   activities.map((a) => (
                     <tr
                       key={a.id}
-                      className={
-                        a.isRecent
-                          ? dark
-                            ? "bg-emerald-500/5 hover:bg-white/5"
-                            : "bg-emerald-50/60 hover:bg-[#fcfaf7]"
-                          : dark
-                          ? "hover:bg-white/5"
-                          : "hover:bg-[#fcfaf7]"
-                      }
+                      className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}
                     >
                       <td className={dark ? "px-5 py-3 font-medium text-slate-500" : "px-5 py-3 font-medium text-[#6b655d]"}>
                         {a.no}

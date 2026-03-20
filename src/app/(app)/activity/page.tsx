@@ -22,20 +22,29 @@ function activityIndicator(type: string, reason: string) {
     return { color: "bg-sky-500", label: "LOGIN" as const };
   }
 
-  if (r.includes(" down ")) {
-    return { color: "bg-red-500", label: "DOWN" as const };
-  }
-
-  if (r.includes(" active ") || r.includes(" up ") || r.includes(" restored ")) {
+  // Most specific status transitions first
+  if (r.includes("from down to active")) {
     return { color: "bg-emerald-500", label: "UP" as const };
   }
 
-  if (r.startsWith("down")) {
+  if (r.includes("from active to down")) {
     return { color: "bg-red-500", label: "DOWN" as const };
   }
 
-  if (r.startsWith("active")) {
+  if (r.includes("status changed to active")) {
     return { color: "bg-emerald-500", label: "UP" as const };
+  }
+
+  if (r.includes("status changed to down")) {
+    return { color: "bg-red-500", label: "DOWN" as const };
+  }
+
+  if (r.includes(" active again ") || r.includes(" restored ")) {
+    return { color: "bg-emerald-500", label: "UP" as const };
+  }
+
+  if (r.includes(" down due to ") || r.startsWith("down ")) {
+    return { color: "bg-red-500", label: "DOWN" as const };
   }
 
   if (t.includes("equipment_returned") || t.includes("returned")) {
@@ -194,7 +203,12 @@ export default async function ActivityPage({
     take: 300,
   });
 
-  const now = Date.now();
+  const title =
+    q || type || period !== "ALL"
+      ? `Recent Activity${q ? ` — Search: ${q}` : ""}${
+          type ? ` — Action: ${getActionLabel(type)}` : ""
+        }${period !== "ALL" ? ` — Period: ${period}` : ""}`
+      : "Recent Activity";
 
   const activities = activitiesRaw.map((a, index) => ({
     id: a.id,
@@ -211,16 +225,7 @@ export default async function ActivityPage({
     exportTime: a.createdAt.toISOString(),
     entityType: a.entityType ?? "",
     entityId: a.entityId ?? "",
-    createdAtISO: a.createdAt.toISOString(),
-    isRecent: now - a.createdAt.getTime() <= 2 * 60 * 1000,
   }));
-
-  const title =
-    q || type || period !== "ALL"
-      ? `Recent Activity${q ? ` — Search: ${q}` : ""}${
-          type ? ` — Action: ${getActionLabel(type)}` : ""
-        }${period !== "ALL" ? ` — Period: ${period}` : ""}`
-      : "Recent Activity";
 
   const exportRows = activities.map((a) => ({
     No: a.no,
@@ -254,7 +259,6 @@ export default async function ActivityPage({
       activities={activities}
       exportRows={exportRows}
       exportCols={exportCols}
-      refreshIntervalMs={5000}
     />
   );
 }
