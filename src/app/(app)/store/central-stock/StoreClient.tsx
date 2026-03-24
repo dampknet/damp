@@ -118,8 +118,8 @@ export default function StoreClient({
                     : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
                 }
               >
-                This is your original stock register. Search, filter, print, export,
-                and keep legacy stock records safely separated from the new site inventory module.
+                Search, filter, print, export,
+                and keep central stock records safely.
               </p>
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
