@@ -152,7 +152,7 @@ export default function StoreDashboardClient({
                 }
               >
                 Manage site-based inventory, track equipment and materials, monitor low
-                stock alerts, and keep the old stock register safely under Central Stock.
+                stock alerts, and monitor Central Stock.
               </p>
 
               <div
