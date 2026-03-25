@@ -18,11 +18,14 @@ function activityIndicator(type: string, reason: string) {
   const t = type.toLowerCase();
   const r = reason.toLowerCase();
 
+  if (t.includes("logout")) {
+    return { color: "bg-violet-500", label: "SYSTEM" as const };
+  }
+
   if (t.includes("login")) {
     return { color: "bg-sky-500", label: "LOGIN" as const };
   }
 
-  // Most specific status transitions first
   if (r.includes("from down to active")) {
     return { color: "bg-emerald-500", label: "UP" as const };
   }
@@ -132,6 +135,7 @@ function getPeriodStart(period: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR") {
 
 const actionOptions = [
   { value: "USER_LOGIN", label: "User Login" },
+  { value: "USER_LOGOUT", label: "User Logout" },
 
   { value: "SITE_CREATED", label: "Site Created" },
   { value: "SITE_UPDATED", label: "Site Updated" },
