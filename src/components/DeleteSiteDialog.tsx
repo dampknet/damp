@@ -18,6 +18,7 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
 
   const [open, setOpen] = React.useState(false);
   const [siteId, setSiteId] = React.useState<string>(sites[0]?.id ?? "");
+  const [reason, setReason] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
   const selected = sites.find((s) => s.id === siteId);
@@ -48,17 +49,15 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
       return;
     }
 
-    const ok = window.confirm(
-      `DELETE SITE?\n\nYou are about to permanently delete:\n${selected?.name ?? "Selected site"}\n\nThis will also delete all assets under the site.\n\nClick OK to confirm.`
-    );
-    if (!ok) return;
-
     setLoading(true);
     try {
       const res = await fetch("/sites/api/site-delete", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId }),
+        body: JSON.stringify({
+          siteId,
+          reason: reason.trim() || null,
+        }),
       });
 
       if (!res.ok) {
@@ -68,6 +67,7 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
       }
 
       setOpen(false);
+      setReason("");
       router.refresh();
     } finally {
       setLoading(false);
@@ -106,8 +106,8 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
           <div
             className={
               dark
-                ? "absolute right-0 z-100 mt-2 w-80 overflow-hidden rounded-2xl border border-white/10 bg-[#101720] shadow-2xl"
-                : "absolute right-0 z-100 mt-2 w-80 overflow-hidden rounded-2xl border bg-white shadow-lg"
+                ? "absolute right-0 z-100 mt-2 w-96 overflow-hidden rounded-2xl border border-white/10 bg-[#101720] shadow-2xl"
+                : "absolute right-0 z-100 mt-2 w-96 overflow-hidden rounded-2xl border bg-white shadow-lg"
             }
           >
             <div className="px-4 py-3">
@@ -127,7 +127,7 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
                     : "mt-1 text-xs text-gray-500"
                 }
               >
-                Select a site, then confirm.
+                This will move the site to Deleted Items and soft-delete its assets.
               </div>
             </div>
 
@@ -161,6 +161,28 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
                 ))}
               </select>
 
+              <label
+                className={
+                  dark
+                    ? "mt-4 block text-xs font-medium text-slate-400"
+                    : "mt-4 block text-xs font-medium text-gray-600"
+                }
+              >
+                Reason (optional)
+              </label>
+
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={3}
+                placeholder="Why is this site being deleted?"
+                className={
+                  dark
+                    ? "mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500"
+                    : "mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none"
+                }
+              />
+
               <div
                 className={
                   dark
@@ -168,7 +190,7 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
                     : "mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
                 }
               >
-                Warning: deleting a site will also delete all assets under that site.
+                This is a soft delete. Admin can restore it later from Deleted Items.
               </div>
 
               <button
@@ -177,7 +199,7 @@ export default function DeleteSiteDialog({ sites, canEdit }: Props) {
                 disabled={!canEdit || loading}
                 className="mt-3 w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
               >
-                {loading ? "Deleting..." : "Delete"}
+                {loading ? "Deleting..." : "Move to Deleted Items"}
               </button>
 
               <button

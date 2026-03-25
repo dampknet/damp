@@ -41,24 +41,11 @@ export async function restoreDeletedItem(entityType: EntityType, id: string) {
         },
       });
 
-      await tx.asset.updateMany({
-        where: {
-          siteId: id,
-          isDeleted: true,
-        },
-        data: {
-          isDeleted: false,
-          deletedAt: null,
-          deletedByEmail: null,
-          deleteReason: null,
-        },
-      });
-
       await tx.activityLog.create({
         data: {
           type: "SITE_UPDATED",
           title: `${item.name} restored`,
-          details: "Soft-deleted site restored by admin, including site assets",
+          details: "Soft-deleted site restored by admin",
           entityType: "SITE",
           entityId: item.id,
           actorEmail: me.email ?? null,
@@ -184,9 +171,7 @@ export async function permanentlyDeleteItem(entityType: EntityType, id: string) 
     });
 
     if (!item) throw new Error("Site not found.");
-    if (!item.isDeleted) {
-      throw new Error("Only deleted sites can be permanently deleted.");
-    }
+    if (!item.isDeleted) throw new Error("Only deleted sites can be permanently deleted.");
 
     await prisma.$transaction(async (tx) => {
       await tx.asset.deleteMany({
@@ -217,9 +202,7 @@ export async function permanentlyDeleteItem(entityType: EntityType, id: string) 
     });
 
     if (!item) throw new Error("Asset not found.");
-    if (!item.isDeleted) {
-      throw new Error("Only deleted assets can be permanently deleted.");
-    }
+    if (!item.isDeleted) throw new Error("Only deleted assets can be permanently deleted.");
 
     await prisma.$transaction(async (tx) => {
       await tx.asset.delete({
@@ -246,9 +229,7 @@ export async function permanentlyDeleteItem(entityType: EntityType, id: string) 
     });
 
     if (!item) throw new Error("Inventory item not found.");
-    if (!item.isDeleted) {
-      throw new Error("Only deleted inventory items can be permanently deleted.");
-    }
+    if (!item.isDeleted) throw new Error("Only deleted inventory items can be permanently deleted.");
 
     await prisma.$transaction(async (tx) => {
       await tx.inventoryItem.delete({
@@ -275,9 +256,7 @@ export async function permanentlyDeleteItem(entityType: EntityType, id: string) 
     });
 
     if (!item) throw new Error("Store item not found.");
-    if (!item.isDeleted) {
-      throw new Error("Only deleted store items can be permanently deleted.");
-    }
+    if (!item.isDeleted) throw new Error("Only deleted store items can be permanently deleted.");
 
     await prisma.$transaction(async (tx) => {
       await tx.storeItem.delete({

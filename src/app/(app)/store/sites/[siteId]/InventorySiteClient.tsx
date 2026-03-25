@@ -170,6 +170,7 @@ export default function InventorySiteClient({
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
 
   const filteredItems = useMemo(() => {
     const search = q.trim().toLowerCase();
@@ -195,9 +196,7 @@ export default function InventorySiteClient({
     });
   }, [items, q, typeFilter, statusFilter]);
 
-  const selectedItems = filteredItems.filter((item) =>
-    selectedItemIds.includes(item.id)
-  );
+  const selectedItems = filteredItems.filter((item) => selectedItemIds.includes(item.id));
 
   const allVisibleSelected =
     filteredItems.length > 0 &&
@@ -248,9 +247,7 @@ export default function InventorySiteClient({
   }
 
   async function handleDeleteSelected() {
-    if (selectedItems.length === 0) {
-      return;
-    }
+    if (selectedItems.length === 0) return;
 
     setDeleting(true);
 
@@ -260,7 +257,10 @@ export default function InventorySiteClient({
           fetch("/store/api/inventory-item-delete", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ itemId: item.id }),
+            body: JSON.stringify({
+              itemId: item.id,
+              reason: deleteReason.trim() || null,
+            }),
           })
         )
       );
@@ -269,12 +269,12 @@ export default function InventorySiteClient({
 
       if (failed.length > 0) {
         alert(`Failed to delete ${failed.length} item(s).`);
-        setDeleting(false);
         return;
       }
 
       setSelectedItemIds([]);
       setShowDeleteDialog(false);
+      setDeleteReason("");
       router.refresh();
     } catch {
       alert("Failed to delete selected items");
@@ -295,8 +295,13 @@ export default function InventorySiteClient({
           itemType: item.itemType,
         }))}
         deleting={deleting}
+        reason={deleteReason}
+        onReasonChange={setDeleteReason}
         onClose={() => {
-          if (!deleting) setShowDeleteDialog(false);
+          if (!deleting) {
+            setShowDeleteDialog(false);
+            setDeleteReason("");
+          }
         }}
         onConfirm={handleDeleteSelected}
       />
@@ -414,7 +419,10 @@ export default function InventorySiteClient({
 
                       <button
                         type="button"
-                        onClick={() => setShowDeleteDialog(true)}
+                        onClick={() => {
+                          setDeleteReason("");
+                          setShowDeleteDialog(true);
+                        }}
                         disabled={selectedItems.length === 0 || deleting}
                         className={
                           dark
@@ -580,9 +588,7 @@ export default function InventorySiteClient({
               <div id="print-title" className="text-lg font-semibold text-gray-900">
                 {site.name} Inventory
               </div>
-              <div className="mt-1 text-xs text-gray-500">
-                {filteredItems.length} shown
-              </div>
+              <div className="mt-1 text-xs text-gray-500">{filteredItems.length} shown</div>
             </div>
             <div className="print-only h-px bg-gray-200" />
 

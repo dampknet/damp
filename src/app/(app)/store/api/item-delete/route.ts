@@ -12,14 +12,23 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = (await req.json()) as { itemId?: string };
+    const body = (await req.json()) as {
+      itemId?: string;
+      reason?: string;
+    };
 
-    if (!body.itemId) {
+    const itemId = body.itemId?.trim();
+    const reason = body.reason?.trim() || null;
+
+    if (!itemId) {
       return NextResponse.json({ error: "itemId is required" }, { status: 400 });
     }
 
-    const item = await prisma.storeItem.findUnique({
-      where: { id: body.itemId },
+    const item = await prisma.storeItem.findFirst({
+      where: {
+        id: itemId,
+        isDeleted: false,
+      },
       select: {
         id: true,
         itemNo: true,
@@ -32,12 +41,20 @@ export async function DELETE(req: Request) {
     }
 
     await prisma.$transaction([
-      prisma.storeItem.delete({ where: { id: body.itemId } }),
+      prisma.storeItem.update({
+        where: { id: itemId },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedByEmail: profile?.email ?? null,
+          deleteReason: reason,
+        },
+      }),
       prisma.activityLog.create({
         data: {
           type: "STORE_ITEM_DELETED",
           title: `Store item #${item.itemNo} deleted`,
-          details: item.description,
+          details: reason ?? item.description,
           entityType: "STORE_ITEM",
           entityId: item.id,
           actorEmail: profile?.email ?? null,

@@ -23,6 +23,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
 
   const [open, setOpen] = React.useState(false);
   const [itemId, setItemId] = React.useState<string>(items[0]?.id ?? "");
+  const [reason, setReason] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -33,6 +34,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
   function show() {
     if (!canEdit) return;
     setError(null);
+    setReason("");
 
     const first = items[0]?.id ?? "";
     setItemId((prev) => prev || first);
@@ -46,6 +48,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
     setOpen(false);
     setDeleting(false);
     setError(null);
+    setReason("");
   }
 
   async function onDelete() {
@@ -56,11 +59,6 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
       return;
     }
 
-    const ok = window.confirm(
-      `Are you sure you want to delete store item #${selectedItemNo ?? ""}? This cannot be undone.`
-    );
-    if (!ok) return;
-
     setDeleting(true);
     setError(null);
 
@@ -68,7 +66,10 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
       const res = await fetch("/store/api/item-delete", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
+        body: JSON.stringify({
+          itemId,
+          reason: reason.trim() || null,
+        }),
       });
 
       if (!res.ok) {
@@ -132,7 +133,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
                 : "mt-1 text-sm text-gray-600"
             }
           >
-            Select an item and confirm deletion. This will remove it from the database.
+            Select an item and move it to Deleted Items. Admin can restore it later.
           </p>
 
           <div className="mt-4">
@@ -165,6 +166,30 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
             </select>
           </div>
 
+          <div className="mt-4">
+            <label
+              className={
+                dark
+                  ? "block text-xs font-medium text-slate-400"
+                  : "block text-xs font-medium text-gray-600"
+              }
+            >
+              Reason (optional)
+            </label>
+
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder="Why are you deleting this item?"
+              className={
+                dark
+                  ? "mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
+                  : "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-gray-400"
+              }
+            />
+          </div>
+
           <div
             className={
               dark
@@ -172,7 +197,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
                 : "mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
             }
           >
-            Warning: This action cannot be undone.
+            This is a soft delete. The item will move to Deleted Items, not be removed permanently.
           </div>
 
           {error ? (
@@ -206,7 +231,7 @@ export default function DeleteStoreItemDialog({ items, canEdit = true }: Props) 
               disabled={!canEdit || deleting || !itemId}
               className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {deleting ? "Deleting..." : "Delete"}
+              {deleting ? "Deleting..." : "Move to Deleted Items"}
             </button>
           </div>
         </div>

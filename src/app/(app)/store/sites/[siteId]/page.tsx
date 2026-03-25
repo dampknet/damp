@@ -14,8 +14,11 @@ export default async function InventorySitePage({
   const role = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
 
-  const site = await prisma.inventorySite.findUnique({
-    where: { id: siteId },
+  const site = await prisma.inventorySite.findFirst({
+    where: {
+      id: siteId,
+      isDeleted: false,
+    },
     select: {
       id: true,
       name: true,
@@ -23,6 +26,9 @@ export default async function InventorySitePage({
       description: true,
       createdAt: true,
       items: {
+        where: {
+          isDeleted: false,
+        },
         orderBy: { createdAt: "desc" },
         select: {
           id: true,

@@ -12,6 +12,8 @@ export default function DeleteInventoryItemsDialog({
   dark,
   items,
   deleting,
+  reason,
+  onReasonChange,
   onClose,
   onConfirm,
 }: {
@@ -19,6 +21,8 @@ export default function DeleteInventoryItemsDialog({
   dark: boolean;
   items: SelectedItem[];
   deleting: boolean;
+  reason: string;
+  onReasonChange: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -78,11 +82,11 @@ export default function DeleteInventoryItemsDialog({
                     : "mt-2 text-sm leading-6 text-[#746d64]"
                 }
               >
-                You are about to permanently delete{" "}
+                You are about to delete{" "}
                 <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
                   {items.length}
                 </span>{" "}
-                selected item{items.length > 1 ? "s" : ""}. This action cannot be undone.
+                selected item{items.length > 1 ? "s" : ""}.
               </p>
             </div>
 
@@ -137,6 +141,30 @@ export default function DeleteInventoryItemsDialog({
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-5">
+            <label
+              className={
+                dark
+                  ? "mb-2 block text-sm font-semibold text-slate-200"
+                  : "mb-2 block text-sm font-semibold text-[#2c2823]"
+              }
+            >
+              Reason for deletion
+            </label>
+
+            <textarea
+              value={reason}
+              onChange={(e) => onReasonChange(e.target.value)}
+              rows={4}
+              placeholder="e.g. Wrong entry, duplicate item, obsolete record..."
+              className={
+                dark
+                  ? "w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
+                  : "w-full rounded-2xl border border-[#d9d3c8] bg-white px-4 py-3 text-sm outline-none focus:border-[#1a1814]"
+              }
+            />
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-end gap-2">

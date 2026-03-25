@@ -143,7 +143,13 @@ export default function UsersTable({
                         </div>
                       </td>
 
-                      <td className={dark ? "px-4 py-3 text-slate-400" : "px-4 py-3 text-gray-700"}>
+                      <td
+                        className={
+                          dark
+                            ? "px-4 py-3 text-slate-400"
+                            : "px-4 py-3 text-gray-700"
+                        }
+                      >
                         {u.fullName ?? "-"}
                       </td>
 
@@ -154,7 +160,7 @@ export default function UsersTable({
                       <td className="px-4 py-3">
                         <select
                           aria-label={`Role for ${u.email}`}
-                          defaultValue={u.role}
+                          value={u.role}
                           disabled={isPending}
                           onChange={(e) => onChangeRole(u.id, e.target.value as Role)}
                           className={

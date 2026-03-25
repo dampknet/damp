@@ -52,6 +52,8 @@ export default async function SitesPage({
   const sites = (await prisma.site.findMany({
     where: {
       AND: [
+        { isDeleted: false }, // ✅ SOFT DELETE FILTER (IMPORTANT)
+
         q
           ? {
               OR: [
@@ -61,6 +63,7 @@ export default async function SitesPage({
               ],
             }
           : {},
+
         tt !== "ALL" && group !== "tt" ? { transmitterType: tt } : {},
         ss !== "ALL" && group !== "status" ? { status: ss } : {},
         tw !== "ALL" && group !== "tower" ? { towerType: tw } : {},

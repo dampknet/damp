@@ -19,13 +19,17 @@ export default async function AllAssetsPage({
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();
   const rawStatus = (sp.status ?? "").trim();
-const status: "" | "ACTIVE" | "FAULTY" | "DECOMMISSIONED" =
-  rawStatus === "ACTIVE" || rawStatus === "FAULTY" || rawStatus === "DECOMMISSIONED"
-    ? rawStatus
-    : "";
+
+  const status: "" | "ACTIVE" | "FAULTY" | "DECOMMISSIONED" =
+    rawStatus === "ACTIVE" ||
+    rawStatus === "FAULTY" ||
+    rawStatus === "DECOMMISSIONED"
+      ? rawStatus
+      : "";
 
   const assets = await prisma.asset.findMany({
     where: {
+      isDeleted: false,
       ...(status ? { status } : {}),
       ...(q
         ? {

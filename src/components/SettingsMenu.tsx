@@ -189,6 +189,7 @@ export default function SettingsMenu({
         {isAdmin ? (
           <>
             <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
+
             <Link
               href="/admin/users"
               className={`block px-5 py-3 text-sm font-medium transition ${
@@ -205,6 +206,27 @@ export default function SettingsMenu({
                 }`}
               >
                 Manage users and access
+              </div>
+            </Link>
+
+            <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
+
+            <Link
+              href="/admin/deleted-items"
+              className={`block px-5 py-3 text-sm font-medium transition ${
+                isDark
+                  ? "text-slate-200 hover:bg-white/5"
+                  : "text-[#2f2a25] hover:bg-[#faf7f2]"
+              }`}
+              onClick={closeMenu}
+            >
+              <div className="font-semibold">Deleted Items</div>
+              <div
+                className={`mt-0.5 text-[11px] ${
+                  isDark ? "text-slate-500" : "text-[#8b857c]"
+                }`}
+              >
+                Restore or permanently remove deleted records
               </div>
             </Link>
           </>

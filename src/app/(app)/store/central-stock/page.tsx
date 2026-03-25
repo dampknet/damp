@@ -24,33 +24,40 @@ export default async function CentralStockPage({
   const isNumberSearch = q.length > 0 && Number.isFinite(qAsNumber);
 
   const items = await prisma.storeItem.findMany({
-    where: {
-      AND: [
-        q
-          ? {
-              OR: [
-                { description: { contains: q, mode: "insensitive" } },
-                ...(isNumberSearch ? [{ itemNo: qAsNumber }] : []),
-              ],
-            }
-          : {},
-        status !== "ALL" ? { status } : {},
-      ],
-    },
-    orderBy: { itemNo: "asc" },
-    select: {
-      id: true,
-      itemNo: true,
-      description: true,
-      quantity: true,
-      status: true,
-    },
-  });
+  where: {
+    AND: [
+      { isDeleted: false }, // ✅ IMPORTANT
+
+      q
+        ? {
+            OR: [
+              { description: { contains: q, mode: "insensitive" } },
+              ...(isNumberSearch ? [{ itemNo: qAsNumber }] : []),
+            ],
+          }
+        : {},
+
+      status !== "ALL" ? { status } : {},
+    ],
+  },
+  orderBy: { itemNo: "asc" },
+  select: {
+    id: true,
+    itemNo: true,
+    description: true,
+    quantity: true,
+    status: true,
+  },
+});
 
   const [receivedCount, notReceivedCount] = await Promise.all([
-    prisma.storeItem.count({ where: { status: "RECEIVED" } }),
-    prisma.storeItem.count({ where: { status: "NOT_RECEIVED" } }),
-  ]);
+  prisma.storeItem.count({
+    where: { status: "RECEIVED", isDeleted: false },
+  }),
+  prisma.storeItem.count({
+    where: { status: "NOT_RECEIVED", isDeleted: false },
+  }),
+]);
 
   const statusLabel =
     status === "ALL" ? "All" : status === "RECEIVED" ? "Received" : "Not received";

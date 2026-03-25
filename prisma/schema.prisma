@@ -44,6 +44,7 @@ enum TowerType {
 
 enum ActivityType {
   USER_LOGIN
+  USER_LOGOUT
 
   SITE_CREATED
   SITE_UPDATED
@@ -118,7 +119,7 @@ model UserProfile {
 
 model Site {
   id              String          @id @default(cuid())
-  name            String          @unique
+  name            String
   regMFreq        String?
   power           Int?
   transmitterType TransmitterType @default(AIR)
@@ -132,10 +133,19 @@ model Site {
   txMux2Serial    String?
   txMux3Serial    String?
 
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  deletedByEmail String?
+  deleteReason   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   assets Asset[]
+
+  @@unique([name, isDeleted])
+  @@index([isDeleted])
+  @@index([deletedAt])
 }
 
 model ActivityLog {
@@ -201,6 +211,11 @@ model Asset {
    */
   specs Json @default("{}")
 
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  deletedByEmail String?
+  deleteReason   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -211,32 +226,46 @@ model Asset {
   @@index([siteId])
   @@index([categoryId])
   @@index([serialNumber])
+  @@index([isDeleted])
+  @@index([deletedAt])
 }
 
 model StoreItem {
   id          String      @id @default(cuid())
-  itemNo      Int         @unique
+  itemNo      Int
   description String
   quantity    Int
   status      StoreStatus
 
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  deletedByEmail String?
+  deleteReason   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([itemNo, isDeleted])
   @@index([status])
   @@index([itemNo])
+  @@index([isDeleted])
+  @@index([deletedAt])
 }
 
 /**
  * NEW INVENTORY MODULE
  * Keep StoreItem as Central Stock.
  */
-
 model InventorySite {
   id          String  @id @default(cuid())
-  name        String  @unique
+  name        String
   location    String?
   description String?
+
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  deletedByEmail String?
+  deleteReason   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -246,6 +275,10 @@ model InventorySite {
   materialIssues     MaterialIssue[]
   equipmentCheckouts EquipmentCheckout[]
   issues             InventoryIssue[]
+
+  @@unique([name, isDeleted])
+  @@index([isDeleted])
+  @@index([deletedAt])
 }
 
 model InventoryItem {
@@ -270,6 +303,11 @@ model InventoryItem {
   status    InventoryItemStatus @default(AVAILABLE)
   condition EquipmentCondition?
 
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  deletedByEmail String?
+  deleteReason   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -285,6 +323,8 @@ model InventoryItem {
   @@index([name])
   @@index([stockNumber])
   @@index([serialNumber])
+  @@index([isDeleted])
+  @@index([deletedAt])
 }
 
 model InventoryRestock {
@@ -363,12 +403,12 @@ model EquipmentCheckout {
 }
 
 model InventoryIssue {
-  id              String               @id @default(cuid())
+  id              String @id @default(cuid())
   inventoryItemId String
   inventorySiteId String
 
   itemType InventoryItemType
-  quantity Int                  @default(1)
+  quantity Int               @default(1)
 
   requesterName    String
   requesterContact String?
@@ -378,7 +418,7 @@ model InventoryIssue {
 
   authorizedBy String
 
-  issuedAt           DateTime @default(now())
+  issuedAt           DateTime  @default(now())
   expectedReturnDate DateTime?
 
   conditionAtIssue EquipmentCondition?

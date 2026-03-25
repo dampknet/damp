@@ -16,20 +16,29 @@ export default function StoreDeleteButton({ itemId, itemNo, canEdit = true }: Pr
   async function onDelete() {
     if (!canEdit) return;
 
-    const ok = window.confirm(
-      `Delete store item${typeof itemNo === "number" ? ` #${itemNo}` : ""}? This cannot be undone.`
+    const reason = window.prompt(
+      `Delete store item${typeof itemNo === "number" ? ` #${itemNo}` : ""}?\n\nThis will move it to Deleted Items.\n\nOptional: enter a reason for deletion:`
     );
-    if (!ok) return;
+
+    if (reason === null) return;
 
     setDeleting(true);
     try {
       const res = await fetch("/store/api/item-delete", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
+        body: JSON.stringify({
+          itemId,
+          reason: reason.trim() || null,
+        }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        window.alert(data?.error ?? "Failed to delete store item.");
+        return;
+      }
+
       router.refresh();
     } finally {
       setDeleting(false);
