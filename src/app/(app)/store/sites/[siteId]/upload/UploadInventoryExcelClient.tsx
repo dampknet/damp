@@ -24,7 +24,8 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export default function UploadInventoryExcelClient({
   site,
-  action,
+  previewAction,
+  confirmAction,
   templateHref,
   templateFileName,
 }: {
@@ -33,7 +34,8 @@ export default function UploadInventoryExcelClient({
     name: string;
     location: string | null;
   };
-  action: (formData: FormData) => void;
+  previewAction: (formData: FormData) => void;
+  confirmAction: (formData: FormData) => void;
   templateHref: string;
   templateFileName: string;
 }) {
@@ -46,14 +48,16 @@ export default function UploadInventoryExcelClient({
 
   const error = searchParams.get("error");
   const success = searchParams.get("success");
+  const ready = searchParams.get("ready");
   const previewRaw = searchParams.get("preview");
+  const validRowsRaw = searchParams.get("validRows");
 
   const previewRows = useMemo(() => {
     if (!previewRaw) return [] as PreviewRow[];
     try {
       return JSON.parse(decodeURIComponent(previewRaw)) as PreviewRow[];
     } catch {
-      return [] as PreviewRow[];
+      return [];
     }
   }, [previewRaw]);
 
@@ -165,9 +169,7 @@ export default function UploadInventoryExcelClient({
                     : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
                 }
               >
-                Upload an Excel sheet to create inventory items for this site.
-                Required columns are <span className="font-semibold">itemType</span> and{" "}
-                <span className="font-semibold">name</span>.
+                Upload an Excel sheet, review the preview, then confirm before anything is imported.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
@@ -247,7 +249,7 @@ export default function UploadInventoryExcelClient({
           ) : null}
 
           <form
-            action={action}
+            action={previewAction}
             className={
               dark
                 ? "mt-6 rounded-3xl border border-white/10 bg-white/5 p-5"
@@ -272,8 +274,6 @@ export default function UploadInventoryExcelClient({
                   type="file"
                   name="file"
                   accept=".xlsx,.xls"
-                  aria-label="Upload inventory Excel file"
-                  title="Upload inventory Excel file"
                   onChange={handleFileChange}
                   className={
                     dark
@@ -292,10 +292,58 @@ export default function UploadInventoryExcelClient({
                     : "rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
                 }
               >
-                Upload and Import
+                Preview Import
               </button>
             </div>
           </form>
+
+          {ready === "yes" && validRowsRaw ? (
+            <form
+              action={confirmAction}
+              className={
+                dark
+                  ? "mt-4 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5"
+                  : "mt-4 rounded-3xl border border-emerald-200 bg-emerald-50 p-5"
+              }
+            >
+              <input type="hidden" name="previewPayload" value={previewRaw ?? ""} />
+              <input type="hidden" name="validRowsPayload" value={validRowsRaw} />
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div
+                    className={
+                      dark
+                        ? "text-sm font-semibold text-emerald-300"
+                        : "text-sm font-semibold text-emerald-700"
+                    }
+                  >
+                    Preview ready
+                  </div>
+                  <div
+                    className={
+                      dark
+                        ? "mt-1 text-xs text-slate-300"
+                        : "mt-1 text-xs text-[#5b564d]"
+                    }
+                  >
+                    {validCount} valid row(s) will be imported. {invalidCount} row(s) will be skipped.
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className={
+                    dark
+                      ? "rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
+                      : "rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+                  }
+                >
+                  Confirm Import
+                </button>
+              </div>
+            </form>
+          ) : null}
         </section>
 
         {previewRows.length > 0 ? (
