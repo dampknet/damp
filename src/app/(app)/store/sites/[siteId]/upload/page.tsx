@@ -49,6 +49,20 @@ function normalizeUpper(v: unknown) {
   return normalizeText(v).toUpperCase();
 }
 
+function encodeData(data: unknown) {
+  return encodeURIComponent(JSON.stringify(data));
+}
+
+function decodeData<T>(value: string | null): T | null {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(decodeURIComponent(value)) as T;
+  } catch {
+    return null;
+  }
+}
+
 async function buildInventoryTemplateDataUrl() {
   const XLSX = await import("xlsx");
 
@@ -112,19 +126,6 @@ async function buildInventoryTemplateDataUrl() {
   return `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
 }
 
-function encodeData(data: unknown) {
-  return encodeURIComponent(JSON.stringify(data));
-}
-
-function decodeData<T>(value: string | null): T | null {
-  if (!value) return null;
-  try {
-    return JSON.parse(decodeURIComponent(value)) as T;
-  } catch {
-    return null;
-  }
-}
-
 async function parseInventoryFile({
   file,
   siteId,
@@ -136,6 +137,7 @@ async function parseInventoryFile({
   validRows: ValidRow[];
 }> {
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
+  const MAX_ROWS = 5000;
 
   if (file.size <= 0) {
     throw new Error("Uploaded file is empty");
@@ -209,7 +211,6 @@ async function parseInventoryFile({
     throw new Error("The uploaded sheet is empty");
   }
 
-  const MAX_ROWS = 5000;
   if (rows.length > MAX_ROWS) {
     throw new Error(`Too many rows. Maximum allowed is ${MAX_ROWS}`);
   }
@@ -219,7 +220,10 @@ async function parseInventoryFile({
       inventorySiteId: siteId,
       isDeleted: false,
     },
-    select: { stockNumber: true, serialNumber: true },
+    select: {
+      stockNumber: true,
+      serialNumber: true,
+    },
   });
 
   const existingStockNumbers = new Set(
@@ -406,7 +410,6 @@ export default async function UploadInventoryExcelPage({
   });
 
   if (!site) return notFound();
-  const safeSite = site;
 
   async function previewInventoryExcel(formData: FormData) {
     "use server";
@@ -416,42 +419,52 @@ export default async function UploadInventoryExcelPage({
     const freshCanEdit = freshRole === "ADMIN" || freshRole === "EDITOR";
 
     if (!freshCanEdit) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent("You are not allowed to upload inventory files")}`
+      return redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
+          "You are not allowed to upload inventory files"
+        )}`
       );
     }
 
     const file = formData.get("file");
 
     if (!(file instanceof File)) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Please choose an Excel file")}`
+      return redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
+          "Please choose an Excel file"
+        )}`
       );
     }
 
+    let preview: PreviewRow[];
+    let validRows: ValidRow[];
+
     try {
-      const { preview, validRows } = await parseInventoryFile({ file, siteId });
-
-      if (validRows.length === 0) {
-        redirect(
-          `/store/sites/${siteId}/upload?preview=${encodeData(preview)}&error=${encodeURIComponent(
-            "No valid rows found to import"
-          )}`
-        );
-      }
-
-      redirect(
-        `/store/sites/${siteId}/upload?preview=${encodeData(preview)}&validRows=${encodeData(
-          validRows
-        )}&ready=yes`
-      );
+      const result = await parseInventoryFile({ file, siteId });
+      preview = result.preview;
+      validRows = result.validRows;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to preview uploaded file";
-      redirect(
+
+      return redirect(
         `/store/sites/${siteId}/upload?error=${encodeURIComponent(message)}`
       );
     }
+
+    if (validRows.length === 0) {
+      return redirect(
+        `/store/sites/${siteId}/upload?preview=${encodeData(
+          preview
+        )}&error=${encodeURIComponent("No valid rows found to import")}`
+      );
+    }
+
+    return redirect(
+      `/store/sites/${siteId}/upload?preview=${encodeData(
+        preview
+      )}&validRows=${encodeData(validRows)}&ready=yes`
+    );
   }
 
   async function confirmInventoryExcelImport(formData: FormData) {
@@ -462,8 +475,10 @@ export default async function UploadInventoryExcelPage({
     const freshCanEdit = freshRole === "ADMIN" || freshRole === "EDITOR";
 
     if (!freshCanEdit) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent("You are not allowed to import inventory files")}`
+      return redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
+          "You are not allowed to import inventory files"
+        )}`
       );
     }
 
@@ -474,8 +489,10 @@ export default async function UploadInventoryExcelPage({
     const validRows = decodeData<ValidRow[]>(validRowsPayload) ?? [];
 
     if (validRows.length === 0) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent("No valid rows available to import")}`
+      return redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
+          "No valid rows available to import"
+        )}`
       );
     }
 
@@ -485,8 +502,54 @@ export default async function UploadInventoryExcelPage({
     });
 
     if (!existingSite) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Inventory site not found")}`
+      return redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
+          "Inventory site not found"
+        )}`
+      );
+    }
+
+    const stockNumbers = validRows
+      .map((row) => normalizeUpper(row.stockNumber))
+      .filter(Boolean);
+
+    const serialNumbers = validRows
+      .map((row) => normalizeUpper(row.serialNumber))
+      .filter(Boolean);
+
+    const duplicateWhere =
+      stockNumbers.length > 0 || serialNumbers.length > 0
+        ? {
+            OR: [
+              ...(stockNumbers.length > 0
+                ? [{ stockNumber: { in: stockNumbers } }]
+                : []),
+              ...(serialNumbers.length > 0
+                ? [{ serialNumber: { in: serialNumbers } }]
+                : []),
+            ],
+          }
+        : undefined;
+
+    const existingItems = duplicateWhere
+      ? await prisma.inventoryItem.findMany({
+          where: {
+            inventorySiteId: siteId,
+            isDeleted: false,
+            ...duplicateWhere,
+          },
+          select: {
+            stockNumber: true,
+            serialNumber: true,
+          },
+        })
+      : [];
+
+    if (existingItems.length > 0) {
+      return redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
+          "Some rows can no longer be imported because matching stock or serial numbers now exist. Please upload the file again."
+        )}`
       );
     }
 
@@ -499,16 +562,16 @@ export default async function UploadInventoryExcelPage({
 
     await logActivity({
       type: "INVENTORY_IMPORT",
-      title: `Inventory Excel import completed for ${safeSite.name}`,
-      details: `Imported ${created.count} valid row(s) into ${safeSite.name}. Total rows read: ${preview.length}. Invalid/skipped rows: ${preview.filter((row) => !!row.error).length}.`,
+      title: `Inventory Excel import completed for ${existingSite.name}`,
+      details: `Imported ${created.count} valid row(s) into ${existingSite.name}. Total rows read: ${preview.length}. Invalid/skipped rows: ${preview.filter((row) => !!row.error).length}.`,
       actorEmail: freshProfile?.email ?? null,
       entityType: "INVENTORY_SITE",
-      entityId: safeSite.id,
+      entityId: existingSite.id,
     });
 
-    redirect(
-      `/store/sites/${siteId}/upload?preview=${encodeData(preview)}&success=${encodeURIComponent(
-        `${validRows.length} row(s) imported successfully`
+    return redirect(
+      `/store/sites/${siteId}/upload?success=${encodeURIComponent(
+        `${created.count} row(s) imported successfully`
       )}`
     );
   }
@@ -517,7 +580,7 @@ export default async function UploadInventoryExcelPage({
 
   return (
     <UploadInventoryExcelClient
-      site={safeSite}
+      site={site}
       previewAction={previewInventoryExcel}
       confirmAction={confirmInventoryExcelImport}
       templateHref={templateHref}

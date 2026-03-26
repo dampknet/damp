@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
+import { useFormStatus } from "react-dom";
 
 type PreviewRow = {
   rowNumber: number;
@@ -21,6 +22,72 @@ type PreviewRow = {
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function Spinner({ dark }: { dark: boolean }) {
+  return (
+    <span
+      className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${
+        dark ? "border-white/30 border-t-white" : "border-white/40 border-t-white"
+      }`}
+    />
+  );
+}
+
+function PreviewSubmitButton({
+  dark,
+  disabled,
+}: {
+  dark: boolean;
+  disabled: boolean;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={disabled || pending}
+      className={
+        dark
+          ? "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#10b981,#34d399)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+      }
+    >
+      {pending ? (
+        <>
+          <Spinner dark={dark} />
+          Preparing Preview...
+        </>
+      ) : (
+        "Preview Import"
+      )}
+    </button>
+  );
+}
+
+function ConfirmSubmitButton({ dark }: { dark: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={
+        dark
+          ? "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+          : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+      }
+    >
+      {pending ? (
+        <>
+          <Spinner dark={dark} />
+          Importing...
+        </>
+      ) : (
+        "Confirm Import"
+      )}
+    </button>
+  );
+}
 
 export default function UploadInventoryExcelClient({
   site,
@@ -42,7 +109,6 @@ export default function UploadInventoryExcelClient({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
   const searchParams = useSearchParams();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [clientFileError, setClientFileError] = useState<string | null>(null);
 
@@ -54,6 +120,7 @@ export default function UploadInventoryExcelClient({
 
   const previewRows = useMemo(() => {
     if (!previewRaw) return [] as PreviewRow[];
+
     try {
       return JSON.parse(decodeURIComponent(previewRaw)) as PreviewRow[];
     } catch {
@@ -269,7 +336,6 @@ export default function UploadInventoryExcelClient({
                   Excel file
                 </label>
                 <input
-                  ref={fileInputRef}
                   id="inventory-excel-file"
                   type="file"
                   name="file"
@@ -284,16 +350,7 @@ export default function UploadInventoryExcelClient({
                 />
               </div>
 
-              <button
-                type="submit"
-                className={
-                  dark
-                    ? "rounded-xl bg-[linear-gradient(135deg,#10b981,#34d399)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-95"
-                    : "rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
-                }
-              >
-                Preview Import
-              </button>
+              <PreviewSubmitButton dark={dark} disabled={!!clientFileError} />
             </div>
           </form>
 
@@ -331,16 +388,7 @@ export default function UploadInventoryExcelClient({
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className={
-                    dark
-                      ? "rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
-                      : "rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
-                  }
-                >
-                  Confirm Import
-                </button>
+                <ConfirmSubmitButton dark={dark} />
               </div>
             </form>
           ) : null}
