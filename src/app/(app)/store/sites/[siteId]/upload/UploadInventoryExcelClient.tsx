@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useFormStatus } from "react-dom";
 
@@ -21,6 +20,27 @@ type PreviewRow = {
   error: string | null;
 };
 
+type ValidRow = {
+  itemType: "MATERIAL" | "EQUIPMENT";
+  name: string;
+  description: string | null;
+  stockNumber: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  quantity: number;
+  unit: string | null;
+  reorderLevel: number;
+  targetStockLevel: number | null;
+  status:
+    | "AVAILABLE"
+    | "LOW_STOCK"
+    | "OUT_OF_STOCK"
+    | "CHECKED_OUT"
+    | "INACTIVE";
+  condition: "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null;
+};
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 function Spinner({ dark }: { dark: boolean }) {
@@ -30,37 +50,6 @@ function Spinner({ dark }: { dark: boolean }) {
         dark ? "border-white/30 border-t-white" : "border-white/40 border-t-white"
       }`}
     />
-  );
-}
-
-function PreviewSubmitButton({
-  dark,
-  disabled,
-}: {
-  dark: boolean;
-  disabled: boolean;
-}) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      className={
-        dark
-          ? "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#10b981,#34d399)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-          : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-      }
-    >
-      {pending ? (
-        <>
-          <Spinner dark={dark} />
-          Preparing Preview...
-        </>
-      ) : (
-        "Preview Import"
-      )}
-    </button>
   );
 }
 
@@ -91,49 +80,45 @@ function ConfirmSubmitButton({ dark }: { dark: boolean }) {
 
 export default function UploadInventoryExcelClient({
   site,
-  previewAction,
   confirmAction,
   templateHref,
   templateFileName,
+  serverError,
+  serverSuccess,
 }: {
   site: {
     id: string;
     name: string;
     location: string | null;
   };
-  previewAction: (formData: FormData) => void;
   confirmAction: (formData: FormData) => void;
   templateHref: string;
   templateFileName: string;
+  serverError: string | null;
+  serverSuccess: string | null;
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-  const searchParams = useSearchParams();
 
   const [clientFileError, setClientFileError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
+  const [validRows, setValidRows] = useState<ValidRow[]>([]);
 
-  const error = searchParams.get("error");
-  const success = searchParams.get("success");
-  const ready = searchParams.get("ready");
-  const previewRaw = searchParams.get("preview");
-  const validRowsRaw = searchParams.get("validRows");
-
-  const previewRows = useMemo(() => {
-    if (!previewRaw) return [] as PreviewRow[];
-
-    try {
-      return JSON.parse(decodeURIComponent(previewRaw)) as PreviewRow[];
-    } catch {
-      return [];
-    }
-  }, [previewRaw]);
-
-  const validCount = previewRows.filter((r) => !r.error).length;
-  const invalidCount = previewRows.filter((r) => !!r.error).length;
+  const validCount = useMemo(
+    () => previewRows.filter((r) => !r.error).length,
+    [previewRows]
+  );
+  const invalidCount = useMemo(
+    () => previewRows.filter((r) => !!r.error).length,
+    [previewRows]
+  );
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     setClientFileError(null);
+    setPreviewError(null);
 
     if (!file) return;
 
@@ -166,6 +151,62 @@ export default function UploadInventoryExcelClient({
     if (file.size > MAX_FILE_SIZE) {
       setClientFileError("File too large. Maximum allowed size is 5MB");
       e.target.value = "";
+    }
+  }
+
+  async function handlePreviewSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    setPreviewError(null);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      setPreviewError("Please choose an Excel file");
+      return;
+    }
+
+    if (clientFileError) return;
+
+    formData.append("siteId", site.id);
+
+    setPreviewLoading(true);
+    try {
+      const res = await fetch("/store/api/inventory-upload-preview", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            preview?: PreviewRow[];
+            validRows?: ValidRow[];
+          }
+        | null;
+
+      if (!res.ok || !data?.ok) {
+        setPreviewRows([]);
+        setValidRows([]);
+        setPreviewError(data?.error ?? "Failed to preview uploaded file");
+        return;
+      }
+
+      setPreviewRows(data.preview ?? []);
+      setValidRows(data.validRows ?? []);
+
+      if ((data.validRows ?? []).length === 0) {
+        setPreviewError("No valid rows found to import");
+      }
+    } catch {
+      setPreviewRows([]);
+      setValidRows([]);
+      setPreviewError("Failed to preview uploaded file");
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -279,7 +320,7 @@ export default function UploadInventoryExcelClient({
             </div>
           </div>
 
-          {error ? (
+          {serverError ? (
             <div
               className={
                 dark
@@ -287,7 +328,7 @@ export default function UploadInventoryExcelClient({
                   : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
               }
             >
-              {error}
+              {serverError}
             </div>
           ) : null}
 
@@ -303,7 +344,19 @@ export default function UploadInventoryExcelClient({
             </div>
           ) : null}
 
-          {success ? (
+          {previewError ? (
+            <div
+              className={
+                dark
+                  ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                  : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+              }
+            >
+              {previewError}
+            </div>
+          ) : null}
+
+          {serverSuccess ? (
             <div
               className={
                 dark
@@ -311,12 +364,12 @@ export default function UploadInventoryExcelClient({
                   : "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
               }
             >
-              {success}
+              {serverSuccess}
             </div>
           ) : null}
 
           <form
-            action={previewAction}
+            onSubmit={handlePreviewSubmit}
             className={
               dark
                 ? "mt-6 rounded-3xl border border-white/10 bg-white/5 p-5"
@@ -350,11 +403,28 @@ export default function UploadInventoryExcelClient({
                 />
               </div>
 
-              <PreviewSubmitButton dark={dark} disabled={!!clientFileError} />
+              <button
+                type="submit"
+                disabled={!!clientFileError || previewLoading}
+                className={
+                  dark
+                    ? "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#10b981,#34d399)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                }
+              >
+                {previewLoading ? (
+                  <>
+                    <Spinner dark={dark} />
+                    Preparing Preview...
+                  </>
+                ) : (
+                  "Preview Import"
+                )}
+              </button>
             </div>
           </form>
 
-          {ready === "yes" && validRowsRaw ? (
+          {validRows.length > 0 ? (
             <form
               action={confirmAction}
               className={
@@ -363,8 +433,16 @@ export default function UploadInventoryExcelClient({
                   : "mt-4 rounded-3xl border border-emerald-200 bg-emerald-50 p-5"
               }
             >
-              <input type="hidden" name="previewPayload" value={previewRaw ?? ""} />
-              <input type="hidden" name="validRowsPayload" value={validRowsRaw} />
+              <input
+                type="hidden"
+                name="previewPayload"
+                value={JSON.stringify(previewRows)}
+              />
+              <input
+                type="hidden"
+                name="validRowsPayload"
+                value={JSON.stringify(validRows)}
+              />
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
