@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 
@@ -19,6 +19,8 @@ type PreviewRow = {
   condition: string;
   error: string | null;
 };
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export default function UploadInventoryExcelClient({
   site,
@@ -38,6 +40,9 @@ export default function UploadInventoryExcelClient({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
   const searchParams = useSearchParams();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [clientFileError, setClientFileError] = useState<string | null>(null);
 
   const error = searchParams.get("error");
   const success = searchParams.get("success");
@@ -54,6 +59,44 @@ export default function UploadInventoryExcelClient({
 
   const validCount = previewRows.filter((r) => !r.error).length;
   const invalidCount = previewRows.filter((r) => !!r.error).length;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    setClientFileError(null);
+
+    if (!file) return;
+
+    const allowedExtensions = /\.(xlsx|xls)$/i.test(file.name);
+    const allowedMimeTypes = new Set([
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "application/octet-stream",
+      "",
+    ]);
+
+    if (!allowedExtensions) {
+      setClientFileError("Only .xlsx or .xls files are allowed");
+      e.target.value = "";
+      return;
+    }
+
+    if (!allowedMimeTypes.has(file.type)) {
+      setClientFileError("Invalid file type");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size <= 0) {
+      setClientFileError("Uploaded file is empty");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setClientFileError("File too large. Maximum allowed size is 5MB");
+      e.target.value = "";
+    }
+  }
 
   return (
     <div
@@ -131,6 +174,7 @@ export default function UploadInventoryExcelClient({
                 <Chip dark={dark} label="Site" value={site.name} />
                 <Chip dark={dark} label="Location" value={site.location ?? "-"} />
                 <Chip dark={dark} label="Allowed Files" value=".xlsx, .xls" />
+                <Chip dark={dark} label="Max Size" value="5MB" />
               </div>
             </div>
 
@@ -178,6 +222,18 @@ export default function UploadInventoryExcelClient({
             </div>
           ) : null}
 
+          {clientFileError ? (
+            <div
+              className={
+                dark
+                  ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                  : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+              }
+            >
+              {clientFileError}
+            </div>
+          ) : null}
+
           {success ? (
             <div
               className={
@@ -211,12 +267,14 @@ export default function UploadInventoryExcelClient({
                   Excel file
                 </label>
                 <input
+                  ref={fileInputRef}
                   id="inventory-excel-file"
                   type="file"
                   name="file"
                   accept=".xlsx,.xls"
                   aria-label="Upload inventory Excel file"
                   title="Upload inventory Excel file"
+                  onChange={handleFileChange}
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-100"

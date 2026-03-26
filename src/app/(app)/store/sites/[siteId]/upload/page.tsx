@@ -109,8 +109,11 @@ export default async function UploadInventoryExcelPage({
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
-  const site = await prisma.inventorySite.findUnique({
-    where: { id: siteId },
+  const site = await prisma.inventorySite.findFirst({
+    where: {
+      id: siteId,
+      isDeleted: false,
+    },
     select: { id: true, name: true, location: true },
   });
 
@@ -120,6 +123,16 @@ export default async function UploadInventoryExcelPage({
   async function uploadInventoryExcel(formData: FormData) {
     "use server";
 
+    const freshProfile = await getCurrentProfile();
+    const freshRole = freshProfile?.role ?? "VIEWER";
+    const freshCanEdit = freshRole === "ADMIN" || freshRole === "EDITOR";
+
+    if (!freshCanEdit) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("You are not allowed to upload inventory files")}`
+      );
+    }
+
     const file = formData.get("file");
 
     if (!(file instanceof File)) {
@@ -128,9 +141,35 @@ export default async function UploadInventoryExcelPage({
       );
     }
 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size <= 0) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Uploaded file is empty")}`
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("File too large. Maximum allowed size is 5MB")}`
+      );
+    }
+
     if (!file.name.match(/\.(xlsx|xls)$/i)) {
       redirect(
         `/store/sites/${siteId}/upload?error=${encodeURIComponent("Only .xlsx or .xls files are allowed")}`
+      );
+    }
+
+    const allowedMimeTypes = new Set([
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "application/octet-stream",
+      "",
+    ]);
+
+    if (!allowedMimeTypes.has(file.type)) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Invalid file type. Please upload a valid Excel file")}`
       );
     }
 
@@ -143,8 +182,55 @@ export default async function UploadInventoryExcelPage({
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const workbook = XLSX.read(bytes, { type: "array" });
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await file.arrayBuffer();
+    } catch {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Failed to read uploaded file")}`
+      );
+    }
+
+    const header = new Uint8Array(bytes.slice(0, 8));
+    const isXlsxZip =
+      header.length >= 4 &&
+      header[0] === 0x50 &&
+      header[1] === 0x4b &&
+      header[2] === 0x03 &&
+      header[3] === 0x04;
+
+    const isLegacyXls =
+      header.length >= 8 &&
+      header[0] === 0xd0 &&
+      header[1] === 0xcf &&
+      header[2] === 0x11 &&
+      header[3] === 0xe0 &&
+      header[4] === 0xa1 &&
+      header[5] === 0xb1 &&
+      header[6] === 0x1a &&
+      header[7] === 0xe1;
+
+    if (!isXlsxZip && !isLegacyXls) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Corrupted or invalid Excel file")}`
+      );
+    }
+
+    let workbook: import("xlsx").WorkBook;
+    try {
+      workbook = XLSX.read(bytes, {
+        type: "array",
+        cellFormula: false,
+        cellHTML: false,
+        cellText: true,
+        raw: false,
+      });
+    } catch {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("The uploaded file could not be parsed as Excel")}`
+      );
+    }
+
     const firstSheetName = workbook.SheetNames[0];
 
     if (!firstSheetName) {
@@ -156,6 +242,7 @@ export default async function UploadInventoryExcelPage({
     const sheet = workbook.Sheets[firstSheetName];
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
       defval: "",
+      raw: false,
     });
 
     if (rows.length === 0) {
@@ -164,8 +251,32 @@ export default async function UploadInventoryExcelPage({
       );
     }
 
+    const MAX_ROWS = 5000;
+    if (rows.length > MAX_ROWS) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent(`Too many rows. Maximum allowed is ${MAX_ROWS}`)}`
+      );
+    }
+
+    const existingSite = await prisma.inventorySite.findFirst({
+      where: {
+        id: siteId,
+        isDeleted: false,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (!existingSite) {
+      redirect(
+        `/store/sites/${siteId}/upload?error=${encodeURIComponent("Inventory site not found")}`
+      );
+    }
+
     const existingItems = await prisma.inventoryItem.findMany({
-      where: { inventorySiteId: siteId },
+      where: {
+        inventorySiteId: siteId,
+        isDeleted: false,
+      },
       select: { stockNumber: true, serialNumber: true },
     });
 
@@ -227,6 +338,32 @@ export default async function UploadInventoryExcelPage({
         error = "itemType must be MATERIAL or EQUIPMENT";
       } else if (!name) {
         error = "name is required";
+      } else if (name.length > 150) {
+        error = "name is too long";
+      }
+
+      if (!error && description.length > 1000) {
+        error = "description is too long";
+      }
+
+      if (!error && stockNumber.length > 100) {
+        error = "stockNumber is too long";
+      }
+
+      if (!error && serialNumber.length > 100) {
+        error = "serialNumber is too long";
+      }
+
+      if (!error && manufacturer.length > 100) {
+        error = "manufacturer is too long";
+      }
+
+      if (!error && model.length > 100) {
+        error = "model is too long";
+      }
+
+      if (!error && unit.length > 40) {
+        error = "unit is too long";
       }
 
       const quantity = quantityRaw === "" ? 0 : Number(quantityRaw);
@@ -354,7 +491,7 @@ export default async function UploadInventoryExcelPage({
       type: "INVENTORY_IMPORT",
       title: `Inventory Excel import completed for ${safeSite.name}`,
       details: `Imported ${created.count} valid row(s) into ${safeSite.name}. Total rows read: ${preview.length}. Invalid/skipped rows: ${preview.filter((row) => !!row.error).length}.`,
-      actorEmail: profile?.email ?? null,
+      actorEmail: freshProfile?.email ?? null,
       entityType: "INVENTORY_SITE",
       entityId: safeSite.id,
     });
