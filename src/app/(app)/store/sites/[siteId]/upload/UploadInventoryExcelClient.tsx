@@ -652,7 +652,7 @@ function StatCard({
         <div
           className={
             dark
-              ? "mt-2 text-2xl font-semibold tex4t-slate-100"
+              ? "mt-2 text-2xl font-semibold text-slate-100"
               : "mt-2 text-2xl font-semibold text-[#1a1814]"
           }
         >
