@@ -1,32 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { updateUserRole } from "./actions";
+import { updateUserRole, addUser, removeUser } from "./actions";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
-
-function roleBadge(role: Role, dark: boolean) {
-  const base =
-    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold";
-
-  if (role === "ADMIN") {
-    return dark
-      ? `${base} border-red-500/30 bg-red-500/10 text-red-300`
-      : `${base} border-red-200 bg-red-50 text-red-700`;
-  }
-
-  if (role === "EDITOR") {
-    return dark
-      ? `${base} border-blue-500/30 bg-blue-500/10 text-blue-300`
-      : `${base} border-blue-200 bg-blue-50 text-blue-700`;
-  }
-
-  return dark
-    ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`
-    : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
-}
 
 export default function UsersTable({
   users,
@@ -39,140 +18,160 @@ export default function UsersTable({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
 
+  // Form State
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState<Role>("VIEWER");
+
+
+const onAddUser = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!newEmail) return;
+
+  startTransition(async () => {
+    try {
+      await addUser(newEmail, newName, newRole);
+      setNewEmail("");
+      setNewName("");
+      setNewRole("VIEWER");
+      alert("Invitation email sent successfully!"); // Added confirmation
+    } catch (error: any) {
+  const errorMessage = error?.message || "An unexpected error occurred while adding the user.";
+  alert(errorMessage);
+}
+  });
+};
+
+  const onRemoveUser = (id: string, email: string) => {
+    if (!confirm(`Are you sure you want to remove ${email}?`)) return;
+    
+    startTransition(async () => {
+      try {
+        await removeUser(id);
+      } catch (e: any) {
+        alert(e.message);
+      }
+    });
+  };
+
   const onChangeRole = (id: string, role: Role) => {
     startTransition(async () => {
       try {
         await updateUserRole(id, role);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Failed to update role";
-        alert(msg);
+      } catch (e: any) {
+        alert(e instanceof Error ? e.message : "Failed to update role");
       }
     });
   };
 
   return (
-    <div
-      className={
-        dark
-          ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200"
-          : "min-h-screen bg-gray-50"
-      }
-    >
+    <div className={dark ? "min-h-screen bg-[#0d1117] text-slate-200" : "min-h-screen bg-gray-50"}>
       <div className="mx-auto max-w-6xl px-4 py-10">
-        <Link
-          href="/dashboard"
-          className={
-            dark
-              ? "text-sm text-slate-400 hover:underline"
-              : "text-sm text-gray-600 hover:underline"
-          }
-        >
+        <Link href="/dashboard" className={dark ? "text-sm text-slate-400 hover:underline" : "text-sm text-gray-600 hover:underline"}>
           ← Back to Dashboard
         </Link>
 
-        <h1
-          className={
-            dark
-              ? "mt-3 text-2xl font-semibold text-slate-100"
-              : "mt-3 text-2xl font-semibold text-gray-900"
-          }
-        >
+        <h1 className={dark ? "mt-3 text-2xl font-semibold text-slate-100" : "mt-3 text-2xl font-semibold text-gray-900"}>
           User Management
         </h1>
 
-        <p
-          className={
-            dark
-              ? "mt-1 text-sm text-slate-500"
-              : "mt-1 text-sm text-gray-600"
-          }
-        >
-          Admin only: assign roles (ADMIN / EDITOR / VIEWER).
-        </p>
+        {/* ADD USER SECTION */}
+        <div className={dark ? "mt-6 rounded-2xl border border-white/10 bg-white/5 p-6" : "mt-6 rounded-2xl border bg-white p-6 shadow-sm"}>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[#f97316] mb-4">Add New User</h2>
+          <form onSubmit={onAddUser} className="grid grid-cols-1 gap-4 md:grid-cols-4 items-end">
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Email Address</label>
+              <input 
+                type="email" 
+                value={newEmail} 
+                onChange={e => setNewEmail(e.target.value)}
+                className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm" : "w-full rounded-lg border px-3 py-2 text-sm"}
+                placeholder="email@company.com"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Full Name</label>
+              <input 
+                type="text" 
+                value={newName} 
+                onChange={e => setNewName(e.target.value)}
+                className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm" : "w-full rounded-lg border px-3 py-2 text-sm"}
+                placeholder="John Doe"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Assign Role</label>
+              <select 
+                  value={newRole} 
+                  onChange={e => setNewRole(e.target.value as Role)}
+                  title="Select role for new user"
+                  aria-label="New user role"
+                  className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm" : "w-full rounded-lg border px-3 py-2 text-sm"}
+                >
+                  <option value="VIEWER">VIEWER</option>
+                  <option value="EDITOR">EDITOR</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+            </div>
+            <button 
+              type="submit" 
+              disabled={isPending}
+              className="bg-[#1d5fa8] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3b82f6] disabled:opacity-50"
+            >
+              {isPending ? "Processing..." : "Add User"}
+            </button>
+          </form>
+        </div>
 
-        <div
-          className={
-            dark
-              ? "mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-sm backdrop-blur-xl"
-              : "mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm"
-          }
-        >
+        {/* USERS LIST TABLE */}
+        <div className={dark ? "mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/5" : "mt-8 overflow-hidden rounded-2xl border bg-white shadow-sm"}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead
-                className={
-                  dark
-                    ? "bg-[#101720] text-left text-slate-400"
-                    : "bg-gray-100 text-left text-gray-700"
-                }
-              >
+              <thead className={dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-gray-700"}>
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Email</th>
-                  <th className="px-4 py-3 font-semibold">Full name</th>
-                  <th className="px-4 py-3 font-semibold">Current role</th>
-                  <th className="px-4 py-3 font-semibold">Change role</th>
+                  <th className="px-4 py-3 text-left">User</th>
+                  <th className="px-4 py-3 text-left">Role</th>
+                  <th className="px-4 py-3 text-left">Change Role</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-
-              <tbody className={dark ? "divide-y divide-white/8" : ""}>
+              <tbody className={dark ? "divide-y divide-white/8" : "divide-y"}>
                 {users.map((u) => {
                   const isMe = currentEmail === u.email;
-
                   return (
-                    <tr key={u.id} className={dark ? "hover:bg-white/5" : "border-t"}>
-                      <td
-                        className={
-                          dark
-                            ? "px-4 py-3 font-medium text-slate-100"
-                            : "px-4 py-3 font-medium text-gray-900"
-                        }
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>{u.email}</span>
-                          {isMe ? (
-                            <span
-                              className={
-                                dark
-                                  ? "rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-400"
-                                  : "rounded-full border bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-600"
-                              }
-                            >
-                              You
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td
-                        className={
-                          dark
-                            ? "px-4 py-3 text-slate-400"
-                            : "px-4 py-3 text-gray-700"
-                        }
-                      >
-                        {u.fullName ?? "-"}
-                      </td>
-
+                    <tr key={u.id} className={dark ? "hover:bg-white/5" : "hover:bg-gray-50"}>
                       <td className="px-4 py-3">
-                        <span className={roleBadge(u.role, dark)}>{u.role}</span>
+                        <div className="font-medium text-slate-100">{u.fullName || "Unnamed User"}</div>
+                        <div className="text-xs text-slate-500">{u.email} {isMe && "(You)"}</div>
                       </td>
-
+                      <td className="px-4 py-3">
+                         <span className={roleBadge(u.role, dark)}>{u.role}</span>
+                      </td>
                       <td className="px-4 py-3">
                         <select
-                          aria-label={`Role for ${u.email}`}
                           value={u.role}
-                          disabled={isPending}
+                          disabled={isPending || isMe}
+                          title={`Change role for ${u.email}`}
+                          aria-label="Change user role"
                           onChange={(e) => onChangeRole(u.id, e.target.value as Role)}
-                          className={
-                            dark
-                              ? "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-white/20 disabled:opacity-60"
-                              : "rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 disabled:opacity-60"
-                          }
+                          className={dark ? "rounded bg-transparent border border-white/10 text-xs p-1" : "rounded border text-xs p-1"}
                         >
                           <option value="ADMIN">ADMIN</option>
                           <option value="EDITOR">EDITOR</option>
                           <option value="VIEWER">VIEWER</option>
                         </select>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {!isMe && (
+                          <button
+                            onClick={() => onRemoveUser(u.id, u.email)}
+                            disabled={isPending}
+                            className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -181,17 +180,15 @@ export default function UsersTable({
             </table>
           </div>
         </div>
-
-        <p
-          className={
-            dark
-              ? "mt-3 text-xs text-slate-500"
-              : "mt-3 text-xs text-gray-500"
-          }
-        >
-          Note: A new user becomes VIEWER automatically after their first login.
-        </p>
       </div>
     </div>
   );
+}
+
+// Helper function for badges (re-used from your snippet)
+function roleBadge(role: Role, dark: boolean) {
+    const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold";
+    if (role === "ADMIN") return dark ? `${base} border-red-500/30 text-red-400` : `${base} border-red-200 text-red-700 bg-red-50`;
+    if (role === "EDITOR") return dark ? `${base} border-blue-500/30 text-blue-400` : `${base} border-blue-200 text-blue-700 bg-blue-50`;
+    return dark ? `${base} border-emerald-500/30 text-emerald-400` : `${base} border-emerald-200 text-emerald-700 bg-emerald-50`;
 }

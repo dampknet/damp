@@ -1,55 +1,61 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 
-type Role = "ADMIN" | "EDITOR" | "VIEWER";
+// Admin client to handle invitations
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! 
+);
 
-export async function updateUserRole(userId: string, role: Role) {
+export async function addUser(email: string, fullName: string, role: string) {
   const me = await getCurrentProfile();
+  if (me?.role !== "ADMIN") throw new Error("Unauthorized");
 
-  if (!me || me.role !== "ADMIN") {
-    throw new Error("Forbidden");
-  }
+  const normalizedEmail = email.toLowerCase().trim();
 
-  if (!userId) {
-    throw new Error("User ID is required.");
-  }
+  // 1. Invite via Supabase
+  const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalizedEmail, {
+    data: { full_name: fullName },
+  });
 
-  if (role !== "ADMIN" && role !== "EDITOR" && role !== "VIEWER") {
-    throw new Error("Invalid role.");
-  }
+  if (inviteError) throw new Error(inviteError.message);
 
-  const targetUser = await prisma.userProfile.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      role: true,
+  // 2. Upsert in Prisma
+  await prisma.userProfile.upsert({
+    where: { email: normalizedEmail },
+    update: { role: role as any, fullName },
+    create: {
+      id: data.user.id,
+      email: normalizedEmail,
+      fullName: fullName.trim(),
+      role: role as any,
     },
   });
 
-  if (!targetUser) {
-    throw new Error("User not found.");
-  }
+  revalidatePath("/admin/users");
+}
 
-  // Safety: don't let admin remove their own admin role accidentally
-  if (me.id === userId && role !== "ADMIN") {
-    throw new Error("You cannot remove your own ADMIN role.");
-  }
+export async function removeUser(userId: string) {
+  const me = await getCurrentProfile();
+  if (me?.role !== "ADMIN") throw new Error("Unauthorized");
+  if (me.id === userId) throw new Error("You cannot remove yourself");
 
-  // no-op protection
-  if (targetUser.role === role) {
-    return { ok: true };
-  }
+  await prisma.userProfile.delete({ where: { id: userId } });
+  revalidatePath("/admin/users");
+}
+
+export async function updateUserRole(userId: string, role: string) {
+  const me = await getCurrentProfile();
+  if (me?.role !== "ADMIN") throw new Error("Unauthorized");
 
   await prisma.userProfile.update({
     where: { id: userId },
-    data: { role },
+    data: { role: role as any },
   });
 
   revalidatePath("/admin/users");
-
-  return { ok: true };
 }
