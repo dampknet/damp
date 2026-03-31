@@ -23,33 +23,32 @@ export default function UsersTable({
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<Role>("VIEWER");
 
+  const onAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail) return;
 
-const onAddUser = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!newEmail) return;
-
-  startTransition(async () => {
-    try {
-      await addUser(newEmail, newName, newRole);
-      setNewEmail("");
-      setNewName("");
-      setNewRole("VIEWER");
-      alert("Invitation email sent successfully!"); // Added confirmation
-    } catch (error: any) {
-  const errorMessage = error?.message || "An unexpected error occurred while adding the user.";
-  alert(errorMessage);
-}
-  });
-};
+    startTransition(async () => {
+      try {
+        await addUser(newEmail, newName, newRole);
+        setNewEmail("");
+        setNewName("");
+        setNewRole("VIEWER");
+        alert("Invitation email sent successfully!");
+      } catch (error: any) {
+        const errorMessage = error?.message || "An unexpected error occurred while adding the user.";
+        alert(errorMessage);
+      }
+    });
+  };
 
   const onRemoveUser = (id: string, email: string) => {
-    if (!confirm(`Are you sure you want to remove ${email}?`)) return;
+    if (!confirm(`Are you sure you want to remove ${email}? This will revoke their access entirely.`)) return;
     
     startTransition(async () => {
       try {
         await removeUser(id);
-      } catch (e: any) {
-        alert(e.message);
+      } catch (error: any) {
+        alert(error?.message || "Failed to remove user");
       }
     });
   };
@@ -58,8 +57,8 @@ const onAddUser = async (e: React.FormEvent) => {
     startTransition(async () => {
       try {
         await updateUserRole(id, role);
-      } catch (e: any) {
-        alert(e instanceof Error ? e.message : "Failed to update role");
+      } catch (error: any) {
+        alert(error?.message || "Failed to update role");
       }
     });
   };
@@ -76,64 +75,64 @@ const onAddUser = async (e: React.FormEvent) => {
         </h1>
 
         {/* ADD USER SECTION */}
-        <div className={dark ? "mt-6 rounded-2xl border border-white/10 bg-white/5 p-6" : "mt-6 rounded-2xl border bg-white p-6 shadow-sm"}>
+        <div className={dark ? "mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur-xl" : "mt-6 rounded-2xl border bg-white p-6 shadow-sm"}>
           <h2 className="text-sm font-bold uppercase tracking-wider text-[#f97316] mb-4">Add New User</h2>
           <form onSubmit={onAddUser} className="grid grid-cols-1 gap-4 md:grid-cols-4 items-end">
             <div>
-              <label className="block text-xs font-medium mb-1.5">Email Address</label>
+              <label className="block text-xs font-medium mb-1.5 text-slate-500">Email Address</label>
               <input 
                 type="email" 
                 value={newEmail} 
                 onChange={e => setNewEmail(e.target.value)}
-                className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm" : "w-full rounded-lg border px-3 py-2 text-sm"}
+                className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" : "w-full rounded-lg border px-3 py-2 text-sm"}
                 placeholder="email@company.com"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1.5">Full Name</label>
+              <label className="block text-xs font-medium mb-1.5 text-slate-500">Full Name</label>
               <input 
                 type="text" 
                 value={newName} 
                 onChange={e => setNewName(e.target.value)}
-                className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm" : "w-full rounded-lg border px-3 py-2 text-sm"}
+                className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" : "w-full rounded-lg border px-3 py-2 text-sm"}
                 placeholder="John Doe"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1.5">Assign Role</label>
+              <label className="block text-xs font-medium mb-1.5 text-slate-500">Assign Role</label>
               <select 
-                  value={newRole} 
-                  onChange={e => setNewRole(e.target.value as Role)}
-                  title="Select role for new user"
-                  aria-label="New user role"
-                  className={dark ? "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm" : "w-full rounded-lg border px-3 py-2 text-sm"}
-                >
-                  <option value="VIEWER">VIEWER</option>
-                  <option value="EDITOR">EDITOR</option>
-                  <option value="ADMIN">ADMIN</option>
-                </select>
+                value={newRole} 
+                onChange={e => setNewRole(e.target.value as Role)}
+                title="Select role for new user"
+                aria-label="New user role"
+                className={dark ? "w-full rounded-lg border border-white/10 bg-[#101720] px-3 py-2 text-sm text-white" : "w-full rounded-lg border px-3 py-2 text-sm"}
+              >
+                <option value="VIEWER">VIEWER</option>
+                <option value="EDITOR">EDITOR</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
             </div>
             <button 
               type="submit" 
               disabled={isPending}
-              className="bg-[#1d5fa8] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3b82f6] disabled:opacity-50"
+              className="bg-[#1d5fa8] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3b82f6] disabled:opacity-50 h-9.5"
             >
-              {isPending ? "Processing..." : "Add User"}
+              {isPending ? "Inviting..." : "Add User"}
             </button>
           </form>
         </div>
 
         {/* USERS LIST TABLE */}
-        <div className={dark ? "mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/5" : "mt-8 overflow-hidden rounded-2xl border bg-white shadow-sm"}>
+        <div className={dark ? "mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-sm backdrop-blur-xl" : "mt-8 overflow-hidden rounded-2xl border bg-white shadow-sm"}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className={dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-gray-700"}>
                 <tr>
-                  <th className="px-4 py-3 text-left">User</th>
-                  <th className="px-4 py-3 text-left">Role</th>
-                  <th className="px-4 py-3 text-left">Change Role</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-left font-semibold">User</th>
+                  <th className="px-4 py-3 text-left font-semibold">Role</th>
+                  <th className="px-4 py-3 text-left font-semibold">Change Role</th>
+                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className={dark ? "divide-y divide-white/8" : "divide-y"}>
@@ -155,7 +154,7 @@ const onAddUser = async (e: React.FormEvent) => {
                           title={`Change role for ${u.email}`}
                           aria-label="Change user role"
                           onChange={(e) => onChangeRole(u.id, e.target.value as Role)}
-                          className={dark ? "rounded bg-transparent border border-white/10 text-xs p-1" : "rounded border text-xs p-1"}
+                          className={dark ? "rounded-lg bg-[#101720] border border-white/10 text-xs p-1.5 text-slate-100" : "rounded border text-xs p-1.5"}
                         >
                           <option value="ADMIN">ADMIN</option>
                           <option value="EDITOR">EDITOR</option>
@@ -167,7 +166,7 @@ const onAddUser = async (e: React.FormEvent) => {
                           <button
                             onClick={() => onRemoveUser(u.id, u.email)}
                             disabled={isPending}
-                            className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1"
+                            className="text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 transition-colors"
                           >
                             Remove
                           </button>
@@ -185,10 +184,9 @@ const onAddUser = async (e: React.FormEvent) => {
   );
 }
 
-// Helper function for badges (re-used from your snippet)
 function roleBadge(role: Role, dark: boolean) {
-    const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold";
-    if (role === "ADMIN") return dark ? `${base} border-red-500/30 text-red-400` : `${base} border-red-200 text-red-700 bg-red-50`;
-    if (role === "EDITOR") return dark ? `${base} border-blue-500/30 text-blue-400` : `${base} border-blue-200 text-blue-700 bg-blue-50`;
-    return dark ? `${base} border-emerald-500/30 text-emerald-400` : `${base} border-emerald-200 text-emerald-700 bg-emerald-50`;
+    const base = "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold";
+    if (role === "ADMIN") return dark ? `${base} border-red-500/30 text-red-400 bg-red-500/5` : `${base} border-red-200 text-red-700 bg-red-50`;
+    if (role === "EDITOR") return dark ? `${base} border-blue-500/30 text-blue-400 bg-blue-500/5` : `${base} border-blue-200 text-blue-700 bg-blue-50`;
+    return dark ? `${base} border-emerald-500/30 text-emerald-400 bg-emerald-500/5` : `${base} border-emerald-200 text-emerald-700 bg-emerald-50`;
 }

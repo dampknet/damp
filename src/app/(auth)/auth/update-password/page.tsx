@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -15,17 +15,31 @@ export default function UpdatePasswordPage() {
   const supabase = supabaseBrowser();
   const router = useRouter();
 
+  useEffect(() => {
+    // This part is CRITICAL for email links.
+    // It captures the session from the URL hash/query before the user submits the form.
+    const getSessionFromUrl = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        setError("Your invitation link may have expired. Please contact the admin.");
+      }
+    };
+    getSessionFromUrl();
+  }, [supabase.auth]);
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    // Use the captured session to update the user's password
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       setError(error.message);
       setLoading(false);
     } else {
+      // Redirect to dashboard with a success flag
       router.push("/dashboard?success=Account activated successfully");
     }
   };
@@ -46,7 +60,6 @@ export default function UpdatePasswordPage() {
         }
       >
         <div className="flex flex-col items-center">
-           {/* Catchy Icon Area */}
           <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] text-white shadow-lg mb-6">
              <span className="text-2xl font-bold">D</span>
           </div>
