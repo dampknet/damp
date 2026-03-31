@@ -6,41 +6,68 @@ import { useRouter } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 
 export default function UpdatePasswordPage() {
+  // State for Passwords
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // UI State
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [error, setError] = useState("");
+  
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-  
   const supabase = supabaseBrowser();
   const router = useRouter();
 
   useEffect(() => {
-    // This part is CRITICAL for email links.
-    // It captures the session from the URL hash/query before the user submits the form.
-    const getSessionFromUrl = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        setError("Your invitation link may have expired. Please contact the admin.");
+    const initializeSession = async () => {
+      // 1. Check if we already have a session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        setSessionReady(true);
+      } else {
+        // 2. If no session, try to exchange the code in the URL for one
+        // This is what prevents the "Auth Session Missing" error
+        const { error } = await supabase.auth.getSession();
+        if (error) {
+          setError("Your session has expired or the link is invalid. Please ask for a new invite.");
+        } else {
+          setSessionReady(true);
+        }
       }
     };
-    getSessionFromUrl();
+    initializeSession();
   }, [supabase.auth]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
-    // Use the captured session to update the user's password
-    const { error } = await supabase.auth.updateUser({ password });
+    // Validation
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
 
-    if (error) {
-      setError(error.message);
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+
+    // This updates the user record with the new password
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+
+    if (updateError) {
+      setError(updateError.message);
       setLoading(false);
     } else {
-      // Redirect to dashboard with a success flag
-      router.push("/dashboard?success=Account activated successfully");
+      // Success!
+      router.push("/dashboard?success=Your account is now active");
     }
   };
 
@@ -65,30 +92,58 @@ export default function UpdatePasswordPage() {
           </div>
           
           <h1 className={dark ? "text-2xl font-bold tracking-tight text-slate-100" : "text-2xl font-bold tracking-tight text-[#1a1814]"}>
-            Set Your Password
+            Activate Your Account
           </h1>
           <p className={dark ? "mt-2 text-center text-sm text-slate-400" : "mt-2 text-center text-sm text-[#6f6a62]"}>
-            Choose a strong password to activate your secure access to the DAMP Platform.
+            Please set a strong password to complete your registration.
           </p>
         </div>
 
         <form onSubmit={handleUpdate} className="mt-8 space-y-5">
-          <div>
+          {/* Password Input */}
+          <div className="relative">
             <label className={dark ? "block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2" : "block text-xs font-bold uppercase tracking-wider text-[#9c9890] mb-2"}>
               New Password
             </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={
+                  dark
+                    ? "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-sm text-slate-100 outline-none focus:border-blue-500/50"
+                    : "w-full rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 pr-12 text-sm outline-none focus:border-[#1d5fa8]"
+                }
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                {showPassword ? "👁️" : "🙈"}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Password Input */}
+          <div>
+            <label className={dark ? "block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2" : "block text-xs font-bold uppercase tracking-wider text-[#9c9890] mb-2"}>
+              Confirm Password
+            </label>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               className={
                 dark
                   ? "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500/50"
                   : "w-full rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1d5fa8]"
               }
               placeholder="••••••••"
-              minLength={8}
             />
           </div>
 
@@ -100,14 +155,18 @@ export default function UpdatePasswordPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !sessionReady}
             className={
               dark
                 ? "w-full rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] py-3.5 font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
                 : "w-full rounded-xl bg-[#1a1814] py-3.5 font-semibold text-white shadow-lg transition hover:bg-black disabled:opacity-50"
             }
           >
-            {loading ? "Activating..." : "Activate Account"}
+            {!sessionReady 
+              ? "Verifying link..." 
+              : loading 
+                ? "Activating..." 
+                : "Activate Account"}
           </button>
         </form>
       </div>
