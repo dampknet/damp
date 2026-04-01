@@ -1,19 +1,17 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { WHITELISTED_EMAILS } from "@/lib/whitelist";
 
 export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
   const pathname = req.nextUrl.pathname;
 
-  // 1. ABSOLUTE BYPASS
-  // If the URL contains 'update-password' or 'confirm', 
-  // we stop the middleware immediately. No redirects allowed.
-  if (pathname.includes("update-password") || pathname.includes("confirm")) {
-    return NextResponse.next();
+  // 1. Always allow auth routes to bypass checks
+  if (pathname.startsWith("/auth")) {
+    return res;
   }
 
-  const res = NextResponse.next();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,21 +27,15 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  // Get the authenticated user from Supabase
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // allow auth routes
-  if (pathname.startsWith("/auth")) {
-    return res;
-  }
-
-  // send home to login
+  // 2. Redirect root to login
   if (pathname === "/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/auth/login", req.url));
   }
 
+  // 3. Define Protected Routes
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/sites") ||
@@ -52,21 +44,22 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/assets") ||
     pathname.startsWith("/admin");
 
-  if (isProtected && !user) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
-  }
-
   if (isProtected) {
-    const email = user?.email?.toLowerCase() ?? "";
-    const allowed = WHITELISTED_EMAILS.map((e) => e.toLowerCase());
-
-    if (!email || !allowed.includes(email)) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/auth/login";
-      return NextResponse.redirect(url);
+    // If NOT logged in at all
+    if (!user) {
+      return NextResponse.redirect(new URL("/auth/login", req.url));
     }
+
+    /* CRITICAL CHANGE: 
+      Instead of checking a hardcoded WHITELISTED_EMAILS file, 
+      we rely on the fact that your 'addUser' action already 
+      created a row in the 'userProfile' table.
+      
+      If you want an extra layer of security here, you would fetch 
+      the profile from Prisma, but since Middleware runs on every 
+      request, it's faster to trust the Supabase Auth + your 
+      'requireCurrentProfile' check inside the layouts.
+    */
   }
 
   return res;
