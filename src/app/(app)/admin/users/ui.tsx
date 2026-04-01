@@ -196,15 +196,18 @@ export default function UsersTable({
 
       {/* ADD USER MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-          <div className={`relative w-full max-w-lg rounded-[32px] border ${dark ? "border-white/10 bg-[#0d1117]" : "bg-white"} p-10 shadow-2xl scale-in-center`}>
+          <div className={`relative w-full max-w-lg rounded-4xl border ${dark ? "border-white/10 bg-[#0d1117]" : "bg-white"} p-10 shadow-2xl scale-in-center`}>
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-2xl font-bold">Add New User</h2>
                 <p className="text-slate-500 text-sm mt-1">Send an invitation to join the platform.</p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+              <button onClick={() => setIsModalOpen(false)}
+              title="Close modal" 
+              aria-label="Close add user modal" 
+              className="text-slate-400 hover:text-red-500 transition-colors">
                 <X size={28} />
               </button>
             </div>
@@ -230,6 +233,8 @@ export default function UsersTable({
                 <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block ml-1">Assign Role</label>
                 <select 
                   value={newRole} onChange={e => setNewRole(e.target.value as Role)}
+                  title="Assign a role" 
+                  aria-label="Select role for new user" 
                   className={`w-full rounded-2xl border ${dark ? "border-white/10 bg-[#161b22]" : "border-slate-200 bg-slate-50"} px-5 py-4 text-sm outline-none`}
                 >
                   <option value="VIEWER">Viewer (Read Only)</option>
