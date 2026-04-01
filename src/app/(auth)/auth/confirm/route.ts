@@ -5,10 +5,11 @@ import type { NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
+  const token_hash = searchParams.get('token_hash')
+  const type = searchParams.get('type') as any
   const next = searchParams.get('next') ?? '/dashboard'
 
-  if (code) {
+  if (token_hash && type) {
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,13 +26,11 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) {
-      // Once exchanged, we redirect to the set-password page with a real session!
       return NextResponse.redirect(new URL(next, request.url))
     }
   }
 
-  // If there's an error, send to login
-  return NextResponse.redirect(new URL('/auth/login', request.url))
+  return NextResponse.redirect(new URL('/auth/login?error=invalid_link', request.url))
 }
