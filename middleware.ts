@@ -6,9 +6,10 @@ import { WHITELISTED_EMAILS } from "@/lib/whitelist";
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
-  // STEP 1: ABSOLUTE BYPASS FOR UPDATE PASSWORD
-  // Returning immediately here means NO redirects to /auth/login can happen
-  if (pathname.startsWith("/auth/update-password")) {
+  // 1. ABSOLUTE BYPASS
+  // If the URL contains 'update-password' or 'confirm', 
+  // we stop the middleware immediately. No redirects allowed.
+  if (pathname.includes("update-password") || pathname.includes("confirm")) {
     return NextResponse.next();
   }
 
