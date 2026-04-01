@@ -77,7 +77,7 @@ export default function UsersTable({
         <div className="mx-auto max-w-7xl px-8 py-4 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
            <Link href="/dashboard" className="hover:text-[#1d5fa8] transition-colors">Dashboard</Link>
            <ChevronRight size={14} />
-           <span className={dark ? "text-slate-100" : "text-slate-900"}>User Management</span>
+           <span className={dark ? "text-slate-100" : "text-slate-900"}>Admin Management</span>
         </div>
       </div>
 
