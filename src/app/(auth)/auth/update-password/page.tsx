@@ -19,25 +19,50 @@ export default function UpdatePasswordPage() {
   const supabase = supabaseBrowser();
   const router = useRouter();
 
-  useEffect(() => {
-    // 1. Listen for the auth state change (Supabase handles the URL hash automatically)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        setSessionReady(true);
-      }
-    });
-
-    // 2. Initial check for session
-    const checkInitialSession = async () => {
+ useEffect(() => {
+    const initializeSession = async () => {
+      // 1. Try to get session normally
       const { data } = await supabase.auth.getSession();
-      if (data.session) setSessionReady(true);
+      if (data.session) {
+        setSessionReady(true);
+        return;
+      }
+
+      // 2. Backup: Manually check the URL for a hash (Implicit Flow)
+      // Supabase sometimes needs a nudge to process the #access_token
+      if (window.location.hash) {
+        const { data: hashData, error: hashError } = await supabase.auth.getSession();
+        if (hashData.session) {
+          setSessionReady(true);
+          return;
+        }
+      }
+
+      // 3. Listen for changes (Standard)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session) {
+          setSessionReady(true);
+        } else if (event === 'SIGNED_OUT') {
+          setSessionReady(false);
+        }
+      });
+
+      // 4. Final timeout - if after 5 seconds nothing happens, show an error
+      const timer = setTimeout(() => {
+        if (!sessionReady) {
+          setError("Verification taking longer than expected. Please ensure you clicked the link from your most recent invite email.");
+        }
+      }, 5000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+      };
     };
-    
-    checkInitialSession();
 
-    return () => subscription.unsubscribe();
+    initializeSession();
   }, [supabase.auth]);
-
+  
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
