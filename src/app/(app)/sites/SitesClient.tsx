@@ -760,7 +760,7 @@ function SitesSection({
               <th className="min-w-30 px-2 py-3 font-semibold">Site</th>
 
               <th className="min-w-28 px-1.5 py-3 font-semibold">
-                <span className="print-only">REG M FREQ</span>
+                <span className="print-only">REGION MUX FREQUENCY</span>
                 <div className="no-print">
                 <select
                   value={filters.regMFreq}
@@ -771,7 +771,7 @@ function SitesSection({
                   aria-label="Filter by REG M FREQ"
                   title="Filter by REG M FREQ"
                 >
-                  <option value="">REG M FREQ ▼</option>
+                  <option value="">REGION MUX FREQUENCY ▼</option>
                   {regMFreqOptions.map((value) => (
                     <option key={value} value={value}>
                       {value}
