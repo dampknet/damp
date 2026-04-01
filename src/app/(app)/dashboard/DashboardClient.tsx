@@ -3,19 +3,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { 
-  BarChart3, 
-  Settings2, 
-  Activity, 
-  Database, 
-  Globe, 
-  Package, 
-  AlertCircle,
-  ChevronRight,
-  User,
-  ShieldCheck,
-  Clock
-} from "lucide-react";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
 
@@ -80,12 +67,14 @@ export default function DashboardClient({
   role,
   email,
   displayName,
+  currentTime,
   stats,
   recentActivity,
 }: {
   role: Role;
   email: string | null;
   displayName: string;
+  currentTime: string;
   stats: Stats;
   recentActivity: ActivityItem[];
 }) {
@@ -93,246 +82,247 @@ export default function DashboardClient({
   const dark = mode === "dark";
 
   return (
-    <div className={dark ? "min-h-screen bg-[#0b0e14] text-slate-200" : "min-h-screen bg-[#fcfcfc] text-slate-900"}>
-      
-      {/* SYSTEM STATUS BAR */}
-      <div className={`${dark ? "bg-[#11141d] border-white/5" : "bg-white border-slate-200"} border-b shadow-sm`}>
-        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            System Live • April 2026
-          </div>
-          <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-            <User size={12} className="text-slate-400" /> {displayName} <span className="opacity-40">|</span> {role}
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-6 py-10">
+    <div className={`min-h-screen ${dark ? "bg-[#0b0e14] text-slate-200" : "bg-[#fcfcfc]"}`}>
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
         
-        {/* HEADER SECTION */}
-        <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        {/* AUTOMATIC LIVE HEADER */}
+        <div className={`mb-8 flex flex-col gap-5 border-b pb-7 lg:flex-row lg:items-end lg:justify-between ${dark ? "border-white/5" : "border-slate-200"}`}>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Enterprise Asset Dashboard
+            <div className={`mb-2 text-[11px] font-bold uppercase tracking-[0.18em] ${dark ? "text-orange-500" : "text-[#c8611a]"}`}>
+              ● Live · {currentTime}
+            </div>
+
+            <h1 className={`text-4xl font-bold tracking-tight ${dark ? "text-slate-50" : "text-slate-900"}`}>
+              Asset Dashboard
             </h1>
-            <p className="text-slate-500 text-sm mt-1">Operational summary for network sites, assets, and inventory.</p>
+
+            <p className={`mt-2 text-sm font-medium ${dark ? "text-slate-500" : "text-slate-500"}`}>
+              Welcome back, {displayName}. Here is a live summary of your sites,
+              assets and store activity.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/sites" className={`rounded-lg border px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${dark ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
-              Sites
+
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/sites"
+              className={`rounded-lg border px-4 py-2 text-sm font-bold transition-all shadow-sm ${dark ? "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10" : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50"}`}
+            >
+              Go to Sites
             </Link>
-            <Link href="/store" className="rounded-lg bg-[#1d5fa8] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-[#164a82] transition-all">
-              Store
+
+            <Link
+              href="/store"
+              className="rounded-lg bg-[#1d5fa8] px-4 py-2 text-sm font-bold text-white shadow-md hover:bg-[#164a82] transition-all"
+            >
+              Go to Store
             </Link>
           </div>
         </div>
 
-        {/* TOP KPI CARDS */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
+        {/* KPI CARDS */}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             dark={dark}
             href="/sites"
             label="Total Sites"
             value={String(stats.sites)}
-            icon={<Globe size={18} className="text-[#1d5fa8]" />}
-            tag={`${stats.sitesActive} Active`}
-            meta="registered"
+            stripe={dark ? "bg-blue-600" : "bg-[#1d5fa8]"}
+            tag={`${stats.sites} total`}
+            tagClass={dark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-[#1d5fa8]"}
+            meta="registered in system"
           />
+
           <KpiCard
             dark={dark}
             href="/sites?group=status"
-            label="Availability"
-            value={`${stats.sitesActive} / ${stats.sites}`}
-            icon={<Activity size={18} className="text-emerald-600" />}
-            tag={`${stats.sitesDown} Offline`}
-            tagColor={stats.sitesDown > 0 ? "text-red-500 bg-red-500/10" : "text-emerald-500 bg-emerald-500/10"}
-            meta="network health"
+            label="Active / Down"
+            value={`${stats.sitesActive} / ${stats.sitesDown}`}
+            stripe={dark ? "bg-emerald-600" : "bg-emerald-700"}
+            tag={`${stats.sitesDown} offline`}
+            tagClass={dark ? "bg-red-500/10 text-red-400" : "bg-red-50 text-red-700"}
+            meta="view grouped status"
           />
+
           <KpiCard
             dark={dark}
             href="/sites?group=tt"
-            label="Cooling Distribution"
-            value={`${stats.airSites} Air`}
-            icon={<Settings2 size={18} className="text-amber-600" />}
-            tag={`${stats.liquidSites} Liquid`}
-            meta="thermal config"
+            label="Air / Liquid"
+            value={`${stats.airSites} / ${stats.liquidSites}`}
+            stripe={dark ? "bg-amber-600" : "bg-[#b08b2c]"}
+            tag={`${stats.airPct}% air`}
+            tagClass={dark ? "bg-amber-500/10 text-amber-400" : "bg-amber-50 text-[#b08b2c]"}
+            meta="view grouped cooling"
           />
+
           <KpiCard
             dark={dark}
             href="/sites?group=tower"
-            label="Tower Ownership"
-            value={String(stats.knetSites)}
-            icon={<Database size={18} className="text-slate-500" />}
+            label="KNET / GBC"
+            value={`${stats.knetSites} / ${stats.gbcSites}`}
+            stripe={dark ? "bg-orange-600" : "bg-[#c8611a]"}
             tag={`${stats.knetPct}% KNET`}
-            meta="core vs GBC"
+            tagClass={dark ? "bg-orange-500/10 text-orange-400" : "bg-orange-50 text-[#c8611a]"}
+            meta="view grouped towers"
           />
         </div>
 
-        {/* MIDDLE SECTION - PROGRESS & STORE */}
-        <div className="grid gap-6 lg:grid-cols-3 mb-8">
-          {/* Assets Card */}
-          <Card dark={dark} title="Asset Inventory" rightTag={`${stats.assets} Total`}>
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <MiniStat dark={dark} label="Total Assets" value={String(stats.assets)} color="text-[#1d5fa8]" />
-                <MiniStat dark={dark} label="Site Nodes" value={String(stats.sites)} color="text-slate-500" />
-              </div>
+        {/* MAIN DATA SECTION */}
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <Card dark={dark} title="Assets" rightTag={`${stats.assets} total`} href="/assets">
+            <ProgressRow
+              dark={dark}
+              label="Utilization"
+              value={`${stats.assetUtilPct}%`}
+              width={stats.assetUtilPct}
+              fill={dark ? "bg-blue-600" : "bg-slate-900"}
+            />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MiniStat dark={dark} label="Registered Assets" value={String(stats.assets)} valueClass="text-emerald-600" />
+              <MiniStat dark={dark} label="Site Records" value={String(stats.sites)} valueClass="text-amber-600" />
+            </div>
+          </Card>
+
+          <Card dark={dark} title="Store" rightTag={`${stats.storeTotal} items`}>
+            <StoreRow dark={dark} label="Received" value={String(stats.received)} valueClass="text-emerald-600" icon="✓" iconBg={dark ? "bg-emerald-500/10" : "bg-emerald-50"} />
+            <StoreRow dark={dark} label="Pending" value={String(stats.notReceived)} valueClass="text-orange-600" icon="⏳" iconBg={dark ? "bg-orange-500/10" : "bg-orange-50"} />
+            <div className="mt-4">
               <ProgressRow
                 dark={dark}
-                label="Resource Utilization"
-                value={`${stats.assetUtilPct}%`}
-                width={stats.assetUtilPct}
-                fill="bg-[#1d5fa8]"
+                label="Fulfilment rate"
+                value={`${stats.receivedPct}%`}
+                width={stats.receivedPct}
+                fill="bg-emerald-600"
               />
             </div>
           </Card>
 
-          {/* Store Card */}
-          <Card dark={dark} title="Store Logistics" rightTag={`${stats.storeTotal} Items`}>
-            <div className="space-y-4">
-              <StoreRow dark={dark} label="Received" value={String(stats.received)} color="text-emerald-600" />
-              <StoreRow dark={dark} label="Pending" value={String(stats.notReceived)} color="text-orange-600" />
-              <div className="pt-2">
-                <ProgressRow
-                  dark={dark}
-                  label="Fulfilment Rate"
-                  value={`${stats.receivedPct}%`}
-                  width={stats.receivedPct}
-                  fill="bg-emerald-600"
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Site Health Card */}
-          <Card dark={dark} title="Site Analytics" rightTag={`${stats.activePct}% Health`}>
-            <div className="space-y-5">
-              <ProgressRow dark={dark} label="Online Status" value={`${stats.sitesActive}/${stats.sites}`} width={stats.activePct} fill="bg-emerald-600" />
-              <ProgressRow dark={dark} label="Air-Cooled Sites" value={`${stats.airSites}/${stats.sites}`} width={stats.airPct} fill="bg-[#1d5fa8]" />
-              <ProgressRow dark={dark} label="KNET Infrastructure" value={`${stats.knetSites}/${stats.sites}`} width={stats.knetPct} fill="bg-slate-700" />
-            </div>
+          <Card dark={dark} title="Site Health" rightTag={`${stats.activePct}% up`}>
+            <ProgressRow dark={dark} label="Active" value={`${stats.sitesActive} / ${stats.sites}`} width={stats.activePct} fill="bg-emerald-600" />
+            <ProgressRow dark={dark} label="Air-cooled" value={`${stats.airSites} / ${stats.sites}`} width={stats.airPct} fill={dark ? "bg-blue-600" : "bg-[#1d5fa8]"} />
+            <ProgressRow dark={dark} label="KNET" value={`${stats.knetSites} / ${stats.sites}`} width={stats.knetPct} fill={dark ? "bg-orange-600" : "bg-[#c8611a]"} />
           </Card>
         </div>
 
-        {/* BOTTOM SECTION - LOGS & ACTIONS */}
-        <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
-          <Card 
-            dark={dark} 
-            title="System Activity Log" 
-            action={<Link href="/activity" className="text-[10px] font-bold text-[#1d5fa8] uppercase tracking-widest hover:underline">Full Audit Trail</Link>}
+        {/* LOGS SECTION */}
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+          <Card
+            dark={dark}
+            title="Recent Activity"
+            action={<Link href="/activity" className={`text-xs font-bold uppercase tracking-widest hover:underline ${dark ? "text-orange-500" : "text-[#c8611a]"}`}>View all →</Link>}
+            href="/activity"
           >
-            <div className="divide-y dark:divide-white/5 divide-slate-100">
+            <div className="space-y-1">
               {recentActivity.length === 0 ? (
-                <div className="py-10 text-center text-sm text-slate-400">No logs found.</div>
+                <div className="py-8 text-sm text-slate-500">No recent activity yet.</div>
               ) : (
                 recentActivity.map((item) => (
-                  <div key={item.id} className="py-4 flex items-start justify-between gap-4">
-                    <div className="flex gap-3">
-                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#1d5fa8]" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{item.title}</p>
-                        <p className="text-xs text-slate-400 truncate">{item.actorEmail}</p>
-                      </div>
+                  <div key={item.id} className={`flex items-start gap-3 border-b py-3 last:border-b-0 ${dark ? "border-white/5" : "border-slate-100"}`}>
+                    <span className={`mt-1.5 h-2 w-2 rounded-full ${dark ? "bg-orange-500" : "bg-[#c8611a]"}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className={`text-sm font-bold ${dark ? "text-slate-200" : "text-slate-900"}`}>{item.title}</div>
+                      {item.details && <div className="mt-0.5 text-xs text-slate-500">{item.details}</div>}
+                      {item.actorEmail && <div className="mt-1 text-[10px] font-bold uppercase text-slate-400">By {item.actorEmail}</div>}
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap pt-1">
-                      <Clock size={10} className="inline mr-1" /> {item.createdAtLabel}
-                    </span>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase pt-1">{item.createdAtLabel}</div>
                   </div>
                 ))
               )}
             </div>
           </Card>
 
-          <Card dark={dark} title="Operations Menu">
-            <div className="space-y-3">
-              <QuickAction dark={dark} href="/sites" title="Network Sites" subtitle="Browse global registry" icon="🌐" />
-              <QuickAction dark={dark} href="/store" title="Inventory Flow" subtitle="Verify pending items" icon="📦" />
-              <QuickAction dark={dark} href="/sites?group=status" title="Maintenance" subtitle={`${stats.sitesDown} issues found`} icon="⚠️" />
-            </div>
+          <Card dark={dark} title="Quick Actions">
+            <QuickAction dark={dark} href="/sites" title="Go to Sites" subtitle={`Manage all ${stats.sites} sites`} iconBg={dark ? "bg-blue-500/10" : "bg-blue-50"} iconColor="text-[#1d5fa8]" icon="🗺" />
+            <QuickAction dark={dark} href="/store" title="Go to Store" subtitle={`${stats.storeTotal} items total`} iconBg={dark ? "bg-amber-500/10" : "bg-amber-50"} iconColor="text-[#b08b2c]" icon="📦" />
+            <QuickAction dark={dark} href="/sites?group=status" title="Review Down Sites" subtitle={`${stats.sitesDown} offline`} iconBg={dark ? "bg-red-500/10" : "bg-red-50"} iconColor="text-red-700" icon="⚠️" />
           </Card>
         </div>
-      </div>
-    </div>
-  );
-}
 
-// --- SHARED UI COMPONENTS ---
-
-function KpiCard({ dark, href, label, value, icon, tag, meta, tagColor }: any) {
-  const content = (
-    <div className={`rounded-xl border ${dark ? "border-white/5 bg-[#11141d]" : "border-slate-200 bg-white"} p-5 shadow-sm hover:shadow-md transition-all`}>
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</span>
-        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${dark ? "bg-white/5" : "bg-slate-50"}`}>
-          {icon}
+        {/* FOOTER */}
+        <div className={`mt-10 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}>
+          Authenticated Profile: <span className={dark ? "text-slate-400" : "text-slate-700"}>{role}</span>
+          {email ? <> • {email}</> : null}
         </div>
       </div>
-      <div className="text-2xl font-bold dark:text-white text-slate-900 mb-4">{value}</div>
-      <div className="flex items-center gap-2 border-t dark:border-white/5 border-slate-100 pt-4">
-        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${tagColor || "bg-slate-100 dark:bg-white/10 text-slate-500"}`}>
-          {tag}
-        </span>
-        <span className="text-[9px] font-bold text-slate-400 uppercase">{meta}</span>
-      </div>
     </div>
   );
-  return href ? <Link href={href}>{content}</Link> : content;
 }
 
-function Card({ dark, title, rightTag, action, children }: any) {
-  return (
-    <div className={`rounded-xl border ${dark ? "border-white/5 bg-[#11141d]" : "border-slate-200 bg-white"} shadow-sm overflow-hidden`}>
-      <div className="px-6 py-4 border-b border-inherit flex items-center justify-between bg-slate-50/50 dark:bg-white/5">
-        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-widest">{title}</span>
-        {action || (rightTag && <span className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 px-2 py-1 rounded text-slate-500">{rightTag}</span>)}
+// --- SHARED COMPONENTS (Restored to your raw structure) ---
+
+function KpiCard({ dark, href, label, value, stripe, tag, tagClass, meta }: any) {
+  const content = (
+    <div className={`overflow-hidden rounded-xl border shadow-sm transition hover:-translate-y-0.5 ${dark ? "border-white/5 bg-[#11141d]" : "border-slate-200 bg-white"}`}>
+      <div className={`h-1 ${stripe}`} />
+      <div className="p-5">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</div>
+        <div className={`mt-3 text-3xl font-bold ${dark ? "text-slate-50" : "text-slate-900"}`}>{value}</div>
+        <div className={`mt-4 flex items-center gap-2 border-t pt-3 ${dark ? "border-white/5" : "border-slate-100"}`}>
+          <span className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase ${tagClass}`}>{tag}</span>
+          <span className="text-[9px] font-bold uppercase text-slate-400">{meta}</span>
+        </div>
       </div>
-      <div className="p-6">{children}</div>
     </div>
   );
+  return href ? <Link href={href} className="block">{content}</Link> : content;
+}
+
+function Card({ dark, title, rightTag, action, children, href }: any) {
+  const content = (
+    <div className={`rounded-xl border p-5 shadow-sm ${dark ? "border-white/5 bg-[#11141d]" : "border-slate-200 bg-white"}`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className={`text-sm font-bold uppercase tracking-widest ${dark ? "text-slate-200" : "text-slate-800"}`}>{title}</div>
+        {action || (rightTag && <span className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase ${dark ? "bg-white/5 text-slate-500" : "bg-slate-100 text-slate-500"}`}>{rightTag}</span>)}
+      </div>
+      {children}
+    </div>
+  );
+  return href ? <Link href={href} className="block">{content}</Link> : content;
 }
 
 function ProgressRow({ dark, label, value, width, fill }: any) {
   return (
-    <div className="space-y-2 mb-4 last:mb-0">
-      <div className="flex justify-between text-xs font-bold uppercase tracking-tighter">
+    <div className="mb-4 last:mb-0">
+      <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-tight">
         <span className="text-slate-400">{label}</span>
-        <span className="dark:text-slate-200 text-slate-800">{value}</span>
+        <span className={dark ? "text-slate-200" : "text-slate-900"}>{value}</span>
       </div>
-      <div className={`h-1.5 w-full rounded-full ${dark ? "bg-white/5" : "bg-slate-100"} overflow-hidden`}>
+      <div className={`h-1.5 overflow-hidden rounded-full ${dark ? "bg-white/5" : "bg-slate-100"}`}>
         <div className={`h-full rounded-full ${fill} ${progressWidthClass(width)}`} />
       </div>
     </div>
   );
 }
 
-function MiniStat({ dark, label, value, color }: any) {
+function MiniStat({ dark, label, value, valueClass }: any) {
   return (
-    <div className={`p-4 rounded-lg border ${dark ? "border-white/5 bg-white/2" : "border-slate-100 bg-slate-50"}`}>
-      <div className="text-[9px] font-bold uppercase text-slate-400 mb-1 tracking-widest">{label}</div>
-      <div className={`text-xl font-bold ${color}`}>{value}</div>
+    <div className={`rounded-lg p-3 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
+      <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400">{label}</div>
+      <div className={`mt-1 text-xl font-bold ${valueClass}`}>{value}</div>
     </div>
   );
 }
 
-function StoreRow({ dark, label, value, color }: any) {
+function StoreRow({ dark, label, value, valueClass, icon, iconBg }: any) {
   return (
-    <div className="flex items-center justify-between py-2 border-b last:border-0 border-slate-50 dark:border-white/5">
-      <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">{label}</span>
-      <span className={`text-lg font-bold ${color}`}>{value}</span>
-    </div>
-  );
-}
-
-function QuickAction({ dark, href, title, subtitle, icon }: any) {
-  return (
-    <Link href={href} className={`flex items-center gap-4 p-4 rounded-lg border ${dark ? "border-white/5 bg-white/2 hover:bg-white/5" : "border-slate-100 bg-slate-50 hover:bg-slate-100"} transition-colors group`}>
-      <div className="text-lg opacity-60 group-hover:opacity-100 transition-opacity">{icon}</div>
-      <div className="flex-1">
-        <div className="text-xs font-bold dark:text-slate-200 text-slate-800 tracking-tight">{title}</div>
-        <div className="text-[10px] font-medium text-slate-400">{subtitle}</div>
+    <div className={`flex items-center justify-between border-b py-2 last:border-b-0 ${dark ? "border-white/5" : "border-slate-100"}`}>
+      <div>
+        <div className="text-[11px] font-bold uppercase text-slate-400">{label}</div>
+        <div className={`text-lg font-bold ${valueClass}`}>{value}</div>
       </div>
-      <ChevronRight size={14} className="text-slate-300" />
+      <div className={`grid h-9 w-9 place-items-center rounded-lg ${iconBg}`}><span className="text-sm">{icon}</span></div>
+    </div>
+  );
+}
+
+function QuickAction({ dark, href, title, subtitle, iconBg, iconColor, icon }: any) {
+  return (
+    <Link href={href} className={`mb-2 flex items-center gap-3 rounded-lg border p-3 transition-colors last:mb-0 ${dark ? "border-white/5 bg-white/2 hover:bg-white/5" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
+      <div className={`grid h-8 w-8 place-items-center rounded-lg ${iconBg}`}><span className={`text-sm ${iconColor}`}>{icon}</span></div>
+      <div className="min-w-0 flex-1">
+        <div className={`text-xs font-bold ${dark ? "text-slate-200" : "text-slate-900"}`}>{title}</div>
+        <div className="text-[10px] font-medium text-slate-500">{subtitle}</div>
+      </div>
+      <span className="text-slate-300">›</span>
     </Link>
   );
 }

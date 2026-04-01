@@ -24,6 +24,10 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
+  // Automatic Timestamp for the Dashboard header
+  const now = new Date();
+  const currentTime = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
   const [
     sites,
     sitesActive,
@@ -77,6 +81,7 @@ export default async function DashboardPage() {
       role={role}
       email={profile?.email ?? null}
       displayName={displayName}
+      currentTime={currentTime}
       stats={{
         sites,
         sitesActive,
