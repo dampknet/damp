@@ -24,10 +24,6 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
-  // Automatic Real-Time Timestamp
-  const now = new Date();
-  const currentTime = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-
   const [
     sites,
     sitesActive,
@@ -65,7 +61,8 @@ export default async function DashboardPage() {
   const receivedPct = percent(received, storeTotal);
   const assetUtilPct = assets > 0 ? 100 : 0;
 
-  const displayName = profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
+  const displayName =
+    profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
 
   const recentActivity = recentActivityRaw.map((item) => ({
     id: item.id,
@@ -80,7 +77,6 @@ export default async function DashboardPage() {
       role={role}
       email={profile?.email ?? null}
       displayName={displayName}
-      currentTime={currentTime}
       stats={{
         sites,
         sitesActive,
