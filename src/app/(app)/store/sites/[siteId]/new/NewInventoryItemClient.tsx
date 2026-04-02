@@ -22,17 +22,16 @@ export default function NewInventoryItemClient({
   const error = searchParams.get("error");
   const [itemType, setItemType] = useState<"MATERIAL" | "EQUIPMENT">("MATERIAL");
 
+  // UPDATED: Status options are now available for both MATERIAL and EQUIPMENT
   const statusOptions = useMemo(
     () => [
       { value: "AVAILABLE", label: "AVAILABLE" },
       { value: "LOW_STOCK", label: "LOW STOCK" },
       { value: "OUT_OF_STOCK", label: "OUT OF STOCK" },
-      ...(itemType === "EQUIPMENT"
-        ? [{ value: "CHECKED_OUT", label: "CHECKED OUT" }]
-        : []),
+      { value: "CHECKED_OUT", label: "CHECKED OUT" },
       { value: "INACTIVE", label: "INACTIVE" },
     ],
-    [itemType]
+    []
   );
 
   return (
@@ -100,8 +99,7 @@ export default function NewInventoryItemClient({
                 : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
             }
           >
-            Add a new material or equipment item to {site.name}. Equipment can carry
-            condition details, while materials stay focused on stock quantity and thresholds.
+            Add a new material or equipment item to {site.name}. Both materials and equipment track thresholds and current stock status.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">

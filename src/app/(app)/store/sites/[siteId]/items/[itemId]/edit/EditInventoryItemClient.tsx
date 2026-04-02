@@ -39,17 +39,16 @@ export default function EditInventoryItemClient({
   const error = searchParams.get("error");
   const [itemType, setItemType] = useState<"MATERIAL" | "EQUIPMENT">(item.itemType);
 
+  // UPDATED: Standardized status options for both MATERIAL and EQUIPMENT
   const statusOptions = useMemo(
     () => [
       { value: "AVAILABLE", label: "AVAILABLE" },
       { value: "LOW_STOCK", label: "LOW STOCK" },
       { value: "OUT_OF_STOCK", label: "OUT OF STOCK" },
-      ...(itemType === "EQUIPMENT"
-        ? [{ value: "CHECKED_OUT", label: "CHECKED OUT" }]
-        : []),
+      { value: "CHECKED_OUT", label: "CHECKED OUT" },
       { value: "INACTIVE", label: "INACTIVE" },
     ],
-    [itemType]
+    []
   );
 
   return (
