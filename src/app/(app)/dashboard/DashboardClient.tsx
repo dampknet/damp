@@ -125,7 +125,7 @@ export default function DashboardClient({
                   : "mt-2 text-sm font-medium text-[#8b857c]"
               }
             >
-              Welcome back, {displayName}. Here is a live summary of your sites,
+              Welcome back, {displayName}. Here is a live summary of sites,
               assets and store activity.
             </p>
           </div>

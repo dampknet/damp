@@ -99,18 +99,17 @@ export default async function NewInventoryItemPage({
       preferredStatus,
     });
 
+    // UPDATED: Process condition for BOTH types
     let condition: EquipmentCondition | null = null;
-    if (itemType === "EQUIPMENT") {
-      if (
-        conditionRaw === "GOOD" ||
-        conditionRaw === "FAULTY" ||
-        conditionRaw === "DAMAGED" ||
-        conditionRaw === "UNDER_REPAIR"
-      ) {
-        condition = conditionRaw as EquipmentCondition;
-      } else {
-        condition = "GOOD";
-      }
+    if (
+      conditionRaw === "GOOD" ||
+      conditionRaw === "FAULTY" ||
+      conditionRaw === "DAMAGED" ||
+      conditionRaw === "UNDER_REPAIR"
+    ) {
+      condition = conditionRaw as EquipmentCondition;
+    } else {
+      condition = "GOOD"; // Default condition
     }
 
     try {
@@ -137,7 +136,7 @@ export default async function NewInventoryItemPage({
       await logActivity({
         type: "INVENTORY_ITEM_CREATED",
         title: `Inventory item created: ${createdItem.name}`,
-        details: `Created ${createdItem.itemType} item at ${safeSite.name}. Qty: ${createdItem.quantity}${createdItem.unit ? ` ${createdItem.unit}` : ""}. Status: ${createdItem.status}.`,
+        details: `Created ${createdItem.itemType} item at ${safeSite.name}. Qty: ${createdItem.quantity}${createdItem.unit ? ` ${createdItem.unit}` : ""}. Status: ${createdItem.status}. Condition: ${createdItem.condition}.`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
         entityId: createdItem.id,

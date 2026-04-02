@@ -39,7 +39,6 @@ export default function EditInventoryItemClient({
   const error = searchParams.get("error");
   const [itemType, setItemType] = useState<"MATERIAL" | "EQUIPMENT">(item.itemType);
 
-  // UPDATED: Standardized status options for both MATERIAL and EQUIPMENT
   const statusOptions = useMemo(
     () => [
       { value: "AVAILABLE", label: "AVAILABLE" },
@@ -229,7 +228,7 @@ export default function EditInventoryItemClient({
                 <input
                   name="serialNumber"
                   defaultValue={item.serialNumber ?? ""}
-                  placeholder={itemType === "EQUIPMENT" ? "recommended" : "optional"}
+                  placeholder="optional"
                   aria-label="Serial number"
                   title="Serial number"
                   className={
@@ -328,28 +327,27 @@ export default function EditInventoryItemClient({
               </Field>
             </div>
 
-            {itemType === "EQUIPMENT" ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Condition" dark={dark}>
-                  <select
-                    name="condition"
-                    defaultValue={item.condition ?? "GOOD"}
-                    aria-label="Select equipment condition"
-                    title="Select equipment condition"
-                    className={
-                      dark
-                        ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
-                        : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"
-                    }
-                  >
-                    <option value="GOOD">GOOD</option>
-                    <option value="FAULTY">FAULTY</option>
-                    <option value="DAMAGED">DAMAGED</option>
-                    <option value="UNDER_REPAIR">UNDER REPAIR</option>
-                  </select>
-                </Field>
-              </div>
-            ) : null}
+            {/* UPDATED: Condition dropdown is now available for BOTH Types */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Condition" dark={dark}>
+                <select
+                  name="condition"
+                  defaultValue={item.condition ?? "GOOD"}
+                  aria-label="Select item condition"
+                  title="Select item condition"
+                  className={
+                    dark
+                      ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
+                      : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"
+                  }
+                >
+                  <option value="GOOD">GOOD</option>
+                  <option value="FAULTY">FAULTY</option>
+                  <option value="DAMAGED">DAMAGED</option>
+                  <option value="UNDER_REPAIR">UNDER REPAIR</option>
+                </select>
+              </Field>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <button

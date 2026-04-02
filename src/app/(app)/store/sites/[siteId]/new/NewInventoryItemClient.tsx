@@ -22,7 +22,6 @@ export default function NewInventoryItemClient({
   const error = searchParams.get("error");
   const [itemType, setItemType] = useState<"MATERIAL" | "EQUIPMENT">("MATERIAL");
 
-  // UPDATED: Status options are now available for both MATERIAL and EQUIPMENT
   const statusOptions = useMemo(
     () => [
       { value: "AVAILABLE", label: "AVAILABLE" },
@@ -99,7 +98,7 @@ export default function NewInventoryItemClient({
                 : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
             }
           >
-            Add a new material or equipment item to {site.name}. Both materials and equipment track thresholds and current stock status.
+            Add a new material or equipment item to {site.name}. Both materials and equipment track stock status and item condition.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -211,7 +210,7 @@ export default function NewInventoryItemClient({
               <Field label="Serial Number" dark={dark}>
                 <input
                   name="serialNumber"
-                  placeholder={itemType === "EQUIPMENT" ? "recommended" : "optional"}
+                  placeholder="optional"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -304,28 +303,27 @@ export default function NewInventoryItemClient({
               </Field>
             </div>
 
-            {itemType === "EQUIPMENT" ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Condition" dark={dark}>
-                  <select
-                    name="condition"
-                    defaultValue="GOOD"
-                    aria-label="Select equipment condition"
-                    title="Select equipment condition"
-                    className={
-                      dark
-                        ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-white/20"
-                        : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-400"
-                    }
-                  >
-                    <option value="GOOD">GOOD</option>
-                    <option value="FAULTY">FAULTY</option>
-                    <option value="DAMAGED">DAMAGED</option>
-                    <option value="UNDER_REPAIR">UNDER REPAIR</option>
-                  </select>
-                </Field>
-              </div>
-            ) : null}
+            {/* UPDATED: Condition dropdown is now visible for MATERIAL as well */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Condition" dark={dark}>
+                <select
+                  name="condition"
+                  defaultValue="GOOD"
+                  aria-label="Select item condition"
+                  title="Select item condition"
+                  className={
+                    dark
+                      ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-white/20"
+                      : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-400"
+                  }
+                >
+                  <option value="GOOD">GOOD</option>
+                  <option value="FAULTY">FAULTY</option>
+                  <option value="DAMAGED">DAMAGED</option>
+                  <option value="UNDER_REPAIR">UNDER REPAIR</option>
+                </select>
+              </Field>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
@@ -357,52 +355,19 @@ export default function NewInventoryItemClient({
   );
 }
 
-function Field({
-  label,
-  children,
-  dark,
-}: {
-  label: string;
-  children: React.ReactNode;
-  dark: boolean;
-}) {
+function Field({ label, children, dark }: any) {
   return (
     <label className="block">
-      <div
-        className={
-          dark
-            ? "mb-1 text-xs font-medium text-slate-400"
-            : "mb-1 text-xs font-medium text-gray-600"
-        }
-      >
-        {label}
-      </div>
+      <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>{label}</div>
       {children}
     </label>
   );
 }
 
-function Chip({
-  dark,
-  label,
-  value,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-}) {
+function Chip({ dark, label, value }: any) {
   return (
-    <span
-      className={
-        dark
-          ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
-          : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"
-      }
-    >
-      {label}:{" "}
-      <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
-        {value}
-      </span>
+    <span className={dark ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300" : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"}>
+      {label}: <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>{value}</span>
     </span>
   );
 }
