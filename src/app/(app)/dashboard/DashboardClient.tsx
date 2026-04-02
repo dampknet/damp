@@ -16,12 +16,13 @@ type Stats = {
   gbcSites: number;
   assets: number;
   storeTotal: number;
-  received: number;
-  notReceived: number;
+  whMain: number;
+  whRegional: number;
+  whTransit: number;
   activePct: number;
   airPct: number;
   knetPct: number;
-  receivedPct: number;
+  receivedPct: number; // Added to fix TypeScript error
   assetUtilPct: number;
 };
 
@@ -85,23 +86,23 @@ export default function DashboardClient({
     <div
       className={
         dark
-          ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200"
-          : "min-h-screen bg-[#f5f2ed]"
+          ? "min-h-screen bg-[#0b0e14] text-slate-200"
+          : "min-h-screen bg-[#fcfcfc]"
       }
     >
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
         <div
           className={
             dark
-              ? "mb-8 flex flex-col gap-5 pb-7 lg:flex-row lg:items-end lg:justify-between"
-              : "mb-8 flex flex-col gap-5 border-b border-[#e0dbd2] pb-7 lg:flex-row lg:items-end lg:justify-between"
+              ? "mb-8 flex flex-col gap-5 border-b border-white/5 pb-7 lg:flex-row lg:items-end lg:justify-between"
+              : "mb-8 flex flex-col gap-5 border-b border-slate-200 pb-7 lg:flex-row lg:items-end lg:justify-between"
           }
         >
           <div>
             <div
               className={
                 dark
-                  ? "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
+                  ? "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-orange-500"
                   : "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
               }
             >
@@ -112,7 +113,7 @@ export default function DashboardClient({
               className={
                 dark
                   ? "text-4xl font-semibold tracking-tight text-slate-50"
-                  : "text-4xl font-semibold tracking-tight text-[#1a1814]"
+                  : "text-4xl font-semibold tracking-tight text-slate-900"
               }
             >
               Asset Dashboard
@@ -122,7 +123,7 @@ export default function DashboardClient({
               className={
                 dark
                   ? "mt-2 text-sm font-medium text-slate-500"
-                  : "mt-2 text-sm font-medium text-[#8b857c]"
+                  : "mt-2 text-sm font-medium text-slate-500"
               }
             >
               Welcome back, {displayName}. Here is a live summary of your sites,
@@ -136,8 +137,8 @@ export default function DashboardClient({
               onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
               className={
                 dark
-                  ? "rounded-xl border border-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/25"
-                  : "rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] transition hover:border-[#4a4740]"
+                  ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                  : "rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 shadow-sm"
               }
             >
               Go to Sites
@@ -148,8 +149,8 @@ export default function DashboardClient({
               onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
               className={
                 dark
-                  ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_20px_rgba(59,130,246,0.3)] transition hover:opacity-95"
-                  : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2c2823]"
+                  ? "rounded-xl bg-[#1d5fa8] px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-[#164a82] transition-all"
+                  : "rounded-xl bg-[#1d5fa8] px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-[#164a82] shadow-md"
               }
             >
               Go to Store
@@ -163,16 +164,12 @@ export default function DashboardClient({
             href="/sites"
             label="Total Sites"
             value={String(stats.sites)}
-            stripe={
-              dark
-                ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]"
-                : "bg-[#1d5fa8]"
-            }
+            stripe="bg-[#1d5fa8]"
             tag={`${stats.sites} total`}
             tagClass={
               dark
-                ? "bg-[rgba(59,130,246,0.12)] text-[#60a5fa]"
-                : "bg-[#e8f0fb] text-[#1d5fa8]"
+                ? "bg-blue-500/10 text-blue-400"
+                : "bg-blue-50 text-[#1d5fa8]"
             }
             meta="registered in system"
           />
@@ -182,16 +179,12 @@ export default function DashboardClient({
             href="/sites?group=status"
             label="Active / Down"
             value={`${stats.sitesActive} / ${stats.sitesDown}`}
-            stripe={
-              dark
-                ? "bg-[linear-gradient(90deg,#10b981,#34d399)]"
-                : "bg-[#2a7d52]"
-            }
+            stripe="bg-emerald-600"
             tag={`${stats.sitesDown} offline`}
             tagClass={
               dark
-                ? "bg-[rgba(248,113,113,0.12)] text-[#f87171]"
-                : "bg-[#fdecea] text-[#c0392b]"
+                ? "bg-red-500/10 text-red-400"
+                : "bg-red-50 text-red-700"
             }
             meta="view grouped status"
           />
@@ -201,16 +194,12 @@ export default function DashboardClient({
             href="/sites?group=tt"
             label="Air / Liquid"
             value={`${stats.airSites} / ${stats.liquidSites}`}
-            stripe={
-              dark
-                ? "bg-[linear-gradient(90deg,#f59e0b,#fbbf24)]"
-                : "bg-[#b08b2c]"
-            }
+            stripe="bg-amber-600"
             tag={`${stats.airPct}% air`}
             tagClass={
               dark
-                ? "bg-[rgba(251,191,36,0.12)] text-[#fbbf24]"
-                : "bg-[#fdf6e3] text-[#b08b2c]"
+                ? "bg-amber-500/10 text-amber-400"
+                : "bg-amber-50 text-[#b08b2c]"
             }
             meta="view grouped cooling"
           />
@@ -220,16 +209,12 @@ export default function DashboardClient({
             href="/sites?group=tower"
             label="KNET / GBC"
             value={`${stats.knetSites} / ${stats.gbcSites}`}
-            stripe={
-              dark
-                ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]"
-                : "bg-[#c8611a]"
-            }
+            stripe="bg-[#c8611a]"
             tag={`${stats.knetPct}% KNET`}
             tagClass={
               dark
-                ? "bg-[rgba(249,115,22,0.12)] text-[#fb923c]"
-                : "bg-[#fdf0e6] text-[#c8611a]"
+                ? "bg-orange-500/10 text-orange-400"
+                : "bg-orange-50 text-[#c8611a]"
             }
             meta="view grouped towers"
           />
@@ -244,8 +229,8 @@ export default function DashboardClient({
               width={stats.assetUtilPct}
               fill={
                 dark
-                  ? "bg-[linear-gradient(90deg,#1d5fa8,#60a5fa)]"
-                  : "bg-[#1a1814]"
+                  ? "bg-blue-600"
+                  : "bg-slate-900"
               }
             />
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -253,46 +238,42 @@ export default function DashboardClient({
                 dark={dark}
                 label="Registered Assets"
                 value={String(stats.assets)}
-                valueClass="text-[#10b981]"
+                valueClass="text-emerald-600"
               />
               <MiniStat
                 dark={dark}
                 label="Site Records"
                 value={String(stats.sites)}
-                valueClass="text-[#f59e0b]"
+                valueClass="text-amber-600"
               />
             </div>
           </Card>
 
-          <Card dark={dark} title="Store" rightTag={`${stats.storeTotal} items`}>
-            <StoreRow
-              dark={dark}
-              label="Received"
-              value={String(stats.received)}
-              valueClass="text-[#10b981]"
-              icon="✓"
-              iconBg={dark ? "bg-[rgba(16,185,129,0.1)]" : "bg-[#ecfdf5]"}
-            />
-            <StoreRow
-              dark={dark}
-              label="Pending"
-              value={String(stats.notReceived)}
-              valueClass="text-[#f97316]"
-              icon="⏳"
-              iconBg={dark ? "bg-[rgba(249,115,22,0.1)]" : "bg-[#fff7ed]"}
-            />
-
-            <div className="mt-4">
-              <ProgressRow
+          <Card dark={dark} title="Warehouse Inventory" rightTag={`${stats.storeTotal} items`}>
+            <div className="space-y-1">
+              <StoreRow
                 dark={dark}
-                label="Fulfilment rate"
-                value={`${stats.receivedPct}%`}
-                width={stats.receivedPct}
-                fill={
-                  dark
-                    ? "bg-[linear-gradient(90deg,#059669,#10b981)]"
-                    : "bg-[#2a7d52]"
-                }
+                label="Main Warehouse"
+                value={String(stats.whMain)}
+                valueClass="text-[#1d5fa8]"
+                icon="🏢"
+                iconBg={dark ? "bg-blue-500/10" : "bg-blue-50"}
+              />
+              <StoreRow
+                dark={dark}
+                label="Regional Hub"
+                value={String(stats.whRegional)}
+                valueClass="text-emerald-600"
+                icon="📦"
+                iconBg={dark ? "bg-emerald-500/10" : "bg-emerald-50"}
+              />
+              <StoreRow
+                dark={dark}
+                label="In Transit"
+                value={String(stats.whTransit)}
+                valueClass="text-orange-600"
+                icon="🚚"
+                iconBg={dark ? "bg-orange-500/10" : "bg-orange-50"}
               />
             </div>
           </Card>
@@ -303,11 +284,7 @@ export default function DashboardClient({
               label="Active"
               value={`${stats.sitesActive} / ${stats.sites}`}
               width={stats.activePct}
-              fill={
-                dark
-                  ? "bg-[linear-gradient(90deg,#059669,#10b981)]"
-                  : "bg-[#2a7d52]"
-              }
+              fill="bg-emerald-600"
             />
             <ProgressRow
               dark={dark}
@@ -316,7 +293,7 @@ export default function DashboardClient({
               width={stats.airPct}
               fill={
                 dark
-                  ? "bg-[linear-gradient(90deg,#1d5fa8,#3b82f6)]"
+                  ? "bg-blue-600"
                   : "bg-[#1d5fa8]"
               }
             />
@@ -327,7 +304,7 @@ export default function DashboardClient({
               width={stats.knetPct}
               fill={
                 dark
-                  ? "bg-[linear-gradient(90deg,#ea6c00,#f97316)]"
+                  ? "bg-orange-600"
                   : "bg-[#c8611a]"
               }
             />
@@ -344,8 +321,8 @@ export default function DashboardClient({
                 onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
                 className={
                   dark
-                    ? "text-xs font-bold text-[#f97316] hover:underline"
-                    : "text-xs font-bold text-[#c8611a] hover:underline"
+                    ? "text-xs font-bold uppercase tracking-widest text-orange-500 hover:underline"
+                    : "text-xs font-bold uppercase tracking-widest text-[#c8611a] hover:underline"
                 }
               >
                 View all →
@@ -357,7 +334,7 @@ export default function DashboardClient({
               {recentActivity.length === 0 ? (
                 <div
                   className={
-                    dark ? "py-8 text-sm text-slate-500" : "py-8 text-sm text-[#8b857c]"
+                    dark ? "py-8 text-sm text-slate-500" : "py-8 text-sm text-slate-400"
                   }
                 >
                   No recent activity yet.
@@ -368,14 +345,14 @@ export default function DashboardClient({
                     key={item.id}
                     className={
                       dark
-                        ? "flex items-start gap-3 border-b border-white/6 py-3 last:border-b-0"
-                        : "flex items-start gap-3 border-b border-[#e9e2d8] py-3 last:border-b-0"
+                        ? "flex items-start gap-3 border-b border-white/5 py-3 last:border-b-0"
+                        : "flex items-start gap-3 border-b border-slate-100 py-3 last:border-b-0"
                     }
                   >
                     <span
                       className={
                         dark
-                          ? "mt-1.5 h-2 w-2 rounded-full bg-[#f97316]"
+                          ? "mt-1.5 h-2 w-2 rounded-full bg-orange-500"
                           : "mt-1.5 h-2 w-2 rounded-full bg-[#c8611a]"
                       }
                     />
@@ -383,41 +360,29 @@ export default function DashboardClient({
                       <div
                         className={
                           dark
-                            ? "text-sm font-semibold text-slate-200"
-                            : "text-sm font-semibold text-[#1a1814]"
+                            ? "text-sm font-bold text-slate-200"
+                            : "text-sm font-bold text-slate-900"
                         }
                       >
                         {item.title}
                       </div>
                       {item.details ? (
                         <div
-                          className={
-                            dark
-                              ? "mt-1 text-sm text-slate-500"
-                              : "mt-1 text-sm text-[#6f6a62]"
-                          }
+                          className="mt-0.5 text-xs text-slate-500"
                         >
                           {item.details}
                         </div>
                       ) : null}
                       {item.actorEmail ? (
                         <div
-                          className={
-                            dark
-                              ? "mt-1 text-xs font-medium text-slate-600"
-                              : "mt-1 text-xs font-medium text-[#9c9890]"
-                          }
+                          className="mt-1 text-[10px] font-bold uppercase text-slate-400"
                         >
                           By {item.actorEmail}
                         </div>
                       ) : null}
                     </div>
                     <div
-                      className={
-                        dark
-                          ? "whitespace-nowrap rounded-md bg-white/5 px-2 py-1 text-xs font-semibold text-slate-500"
-                          : "whitespace-nowrap pt-0.5 text-xs font-semibold text-[#9c9890]"
-                      }
+                      className="text-[10px] font-bold text-slate-400 uppercase pt-1"
                     >
                       {item.createdAtLabel}
                     </div>
@@ -433,7 +398,7 @@ export default function DashboardClient({
               href="/sites"
               title="Go to Sites"
               subtitle={`Manage all ${stats.sites} sites`}
-              iconBg={dark ? "bg-[rgba(59,130,246,0.12)]" : "bg-[#e8f0fb]"}
+              iconBg={dark ? "bg-blue-500/10" : "bg-blue-50"}
               iconColor="text-[#1d5fa8]"
               icon="🗺"
             />
@@ -441,8 +406,8 @@ export default function DashboardClient({
               dark={dark}
               href="/store"
               title="Go to Store"
-              subtitle={`${stats.storeTotal} items · ${stats.notReceived} pending`}
-              iconBg={dark ? "bg-[rgba(245,158,11,0.12)]" : "bg-[#fdf6e3]"}
+              subtitle={`${stats.storeTotal} items total`}
+              iconBg={dark ? "bg-amber-500/10" : "bg-amber-50"}
               iconColor="text-[#b08b2c]"
               icon="📦"
             />
@@ -450,9 +415,9 @@ export default function DashboardClient({
               dark={dark}
               href="/sites?group=status"
               title="Review Down Sites"
-              subtitle={`${stats.sitesDown} currently offline`}
-              iconBg={dark ? "bg-[rgba(248,113,113,0.12)]" : "bg-[#fdecea]"}
-              iconColor="text-[#c0392b]"
+              subtitle={`${stats.sitesDown} offline`}
+              iconBg={dark ? "bg-red-500/10" : "bg-red-50"}
+              iconColor="text-red-700"
               icon="⚠️"
             />
           </Card>
@@ -460,13 +425,13 @@ export default function DashboardClient({
 
         <div
           className={
-            dark ? "mt-6 text-xs font-medium text-slate-600" : "mt-6 text-xs font-medium text-[#9c9890]"
+            dark ? "mt-6 text-xs font-medium text-slate-600" : "mt-6 text-xs font-medium text-slate-400"
           }
         >
           Signed in as{" "}
           <span
             className={
-              dark ? "font-semibold text-slate-200" : "font-semibold text-[#1a1814]"
+              dark ? "text-slate-200" : "text-slate-900"
             }
           >
             {role}
@@ -478,81 +443,273 @@ export default function DashboardClient({
   );
 }
 
-// Helper components preserved exactly from your original version
 function KpiCard({ dark, href, label, value, stripe, tag, tagClass, meta }: any) {
   const content = (
-    <div className={dark ? "overflow-hidden rounded-2xl border border-white/8 bg-white/5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
+    <div
+      className={
+        dark
+          ? "overflow-hidden rounded-xl border border-white/5 bg-[#11141d] shadow-sm transition hover:-translate-y-0.5"
+          : "overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      }
+    >
       <div className={`h-1 ${stripe}`} />
       <div className="p-5">
-        <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600" : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"}>{label}</div>
-        <div className={dark ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100" : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814]"}>{value}</div>
-        <div className={dark ? "mt-4 flex items-center gap-2 border-t border-white/6 pt-3" : "mt-4 flex items-center gap-2 border-t border-[#eee7dd] pt-3"}>
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tagClass}`}>{tag}</span>
-          <span className={dark ? "text-xs font-medium text-slate-600" : "text-xs font-medium text-[#9c9890]"}>{meta}</span>
+        <div
+          className="text-[10px] font-bold uppercase tracking-widest text-slate-400"
+        >
+          {label}
+        </div>
+        <div
+          className={
+            dark
+              ? "mt-3 text-3xl font-bold text-slate-50"
+              : "mt-3 text-3xl font-bold text-slate-900"
+          }
+        >
+          {value}
+        </div>
+        <div
+          className={
+            dark
+              ? "mt-4 flex items-center gap-2 border-t border-white/5 pt-3"
+              : "mt-4 flex items-center gap-2 border-t border-slate-100 pt-3"
+          }
+        >
+          <span className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase ${tagClass}`}>
+            {tag}
+          </span>
+          <span
+            className="text-[9px] font-bold uppercase text-slate-400"
+          >
+            {meta}
+          </span>
         </div>
       </div>
     </div>
   );
-  return href ? <Link href={href} className="block">{content}</Link> : content;
+
+  if (!href) return content;
+
+  return (
+    <Link href={href} className="block">
+      {content}
+    </Link>
+  );
 }
 
-function Card({ dark, title, rightTag, action, children, href }: any) {
+function Card({
+  dark,
+  title,
+  rightTag,
+  action,
+  children,
+  href,
+}: {
+  dark: boolean;
+  title: string;
+  rightTag?: string;
+  action?: ReactNode;
+  children: ReactNode;
+  href?: string;
+}) {
   const content = (
-    <div className={dark ? "rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className={dark ? "text-lg font-semibold tracking-tight text-slate-100" : "text-lg font-semibold tracking-tight text-[#1a1814]"}>{title}</div>
-        {action ? action : rightTag ? <span className={dark ? "rounded-full border border-white/8 bg-white/6 px-2.5 py-1 text-[11px] font-bold text-slate-500" : "rounded-full bg-[#f1ece4] px-2.5 py-1 text-[11px] font-bold text-[#5b564d]"}>{rightTag}</span> : null}
+    <div
+      className={
+        dark
+          ? "rounded-xl border border-white/5 bg-[#11141d] p-5 shadow-sm transition hover:shadow-md"
+          : "rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+      }
+    >
+      <div className="mb-4 flex items-center justify-between gap-3 border-b pb-3 dark:border-white/5 border-slate-50">
+        <div
+          className={
+            dark
+              ? "text-xs font-black uppercase tracking-widest text-slate-200"
+              : "text-xs font-black uppercase tracking-widest text-slate-500"
+          }
+        >
+          {title}
+        </div>
+        {action ? (
+          action
+        ) : rightTag ? (
+          <span
+            className={
+              dark
+                ? "rounded-md bg-white/5 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-500"
+                : "rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-500"
+            }
+          >
+            {rightTag}
+          </span>
+        ) : null}
       </div>
       {children}
     </div>
   );
-  return href ? <Link href={href} className="block">{content}</Link> : content;
+
+  if (!href) return content;
+
+  return (
+    <Link href={href} className="block">
+      {content}
+    </Link>
+  );
 }
 
-function ProgressRow({ dark, label, value, width, fill }: any) {
+function ProgressRow({
+  dark,
+  label,
+  value,
+  width,
+  fill,
+}: {
+  dark: boolean;
+  label: string;
+  value: string;
+  width: number;
+  fill: string;
+}) {
   return (
     <div className="mb-4 last:mb-0">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className={dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"}>{label}</span>
-        <span className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>{value}</span>
+      <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-tight">
+        <span className="text-slate-400">{label}</span>
+        <span
+          className={
+            dark ? "text-slate-200" : "text-slate-900"
+          }
+        >
+          {value}
+        </span>
       </div>
-      <div className={dark ? "h-2 overflow-hidden rounded-full bg-white/8" : "h-2 overflow-hidden rounded-full bg-[#eee7dd]"}>
+      <div
+        className={
+          dark ? "h-1.5 overflow-hidden rounded-full bg-white/5" : "h-1.5 overflow-hidden rounded-full bg-slate-100"
+        }
+      >
         <div className={`h-full rounded-full ${fill} ${progressWidthClass(width)}`} />
       </div>
     </div>
   );
 }
 
-function MiniStat({ dark, label, value, valueClass }: any) {
+function MiniStat({
+  dark,
+  label,
+  value,
+  valueClass,
+}: {
+  dark: boolean;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
   return (
-    <div className={dark ? "rounded-xl border border-white/6 bg-white/3 px-4 py-3" : "rounded-xl bg-[#f5f2ed] px-4 py-3"}>
-      <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600" : "text-[11px] font-bold uppercase tracking-[0.08em] text-[#9c9890]"}>{label}</div>
-      <div className={`mt-1 text-2xl font-semibold tracking-tight ${valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")}`}>{value}</div>
-    </div>
-  );
-}
-
-function StoreRow({ dark, label, value, valueClass, icon, iconBg }: any) {
-  return (
-    <div className={dark ? "flex items-center justify-between border-b border-white/6 py-3 last:border-b-0" : "flex items-center justify-between border-b border-[#eee7dd] py-3 last:border-b-0"}>
-      <div>
-        <div className={dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"}>{label}</div>
-        <div className={`text-xl font-semibold tracking-tight ${valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")}`}>{value}</div>
+    <div
+      className={
+        dark
+          ? "rounded-lg p-3 bg-white/5"
+          : "rounded-lg p-3 bg-slate-50"
+      }
+    >
+      <div
+        className="text-[9px] font-bold uppercase tracking-widest text-slate-400"
+      >
+        {label}
       </div>
-      {icon ? <div className={`grid h-11 w-11 place-items-center rounded-xl ${iconBg ?? ""}`}><span className="text-lg">{icon}</span></div> : null}
+      <div
+        className={`mt-1 text-xl font-bold ${valueClass}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
 
-function QuickAction({ dark, href, title, subtitle, iconBg, iconColor, icon }: any) {
+function StoreRow({
+  dark,
+  label,
+  value,
+  valueClass,
+  icon,
+  iconBg,
+}: {
+  dark: boolean;
+  label: string;
+  value: string;
+  valueClass?: string;
+  icon?: string;
+  iconBg?: string;
+}) {
   return (
-    <Link href={href} className={dark ? "mb-3 flex items-center gap-3 rounded-xl border border-white/7 bg-white/4 p-4 transition hover:border-white/14 hover:bg-white/8 last:mb-0" : "mb-3 flex items-center gap-3 rounded-xl border border-[#e0dbd2] bg-white p-4 transition hover:border-[#6b655d] hover:bg-[#faf8f4] last:mb-0"}>
-      <div className={`grid h-10 w-10 place-items-center rounded-xl ${iconBg}`}><span className={`text-base ${iconColor}`}>{icon}</span></div>
+    <div
+      className={
+        dark
+          ? "flex items-center justify-between border-b border-white/5 py-2.5 last:border-b-0"
+          : "flex items-center justify-between border-b border-slate-100 py-2.5 last:border-b-0"
+      }
+    >
+      <div className="flex items-center gap-3">
+        <div className={`h-8 w-8 rounded flex items-center justify-center text-sm ${iconBg}`}>
+          {icon}
+        </div>
+        <div className="text-[10px] font-bold uppercase tracking-tight text-slate-500">
+          {label}
+        </div>
+      </div>
+      <div
+        className={`text-lg font-bold ${valueClass}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({
+  dark,
+  href,
+  title,
+  subtitle,
+  iconBg,
+  iconColor,
+  icon,
+}: {
+  dark: boolean;
+  href: string;
+  title: string;
+  subtitle: string;
+  iconBg: string;
+  iconColor: string;
+  icon: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={
+        dark
+          ? "mb-2 flex items-center gap-3 rounded-lg border border-white/5 bg-white/2 p-3 transition hover:bg-white/5 last:mb-0"
+          : "mb-2 flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 transition hover:bg-slate-50 last:mb-0"
+      }
+    >
+      <div className={`grid h-8 w-8 place-items-center rounded-lg ${iconBg}`}>
+        <span className={`text-sm ${iconColor}`}>{icon}</span>
+      </div>
       <div className="min-w-0 flex-1">
-        <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>{title}</div>
-        <div className={dark ? "mt-0.5 text-xs font-medium text-slate-600" : "mt-0.5 text-xs font-medium text-[#8b857c]"}>{subtitle}</div>
+        <div
+          className={
+            dark ? "text-xs font-bold text-slate-200" : "text-xs font-bold text-slate-900"
+          }
+        >
+          {title}
+        </div>
+        <div
+          className="text-[10px] font-medium text-slate-500"
+        >
+          {subtitle}
+        </div>
       </div>
-      <span className={dark ? "text-lg text-slate-600" : "text-lg text-[#9c9890]"}>›</span>
+      <span className="text-slate-300">›</span>
     </Link>
   );
 }

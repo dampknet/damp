@@ -24,7 +24,6 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
-  // AUTOMATIC TIMESTAMP GENERATION
   const now = new Date();
   const dateLabel = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
@@ -38,8 +37,9 @@ export default async function DashboardPage() {
     gbcSites,
     assets,
     storeTotal,
-    received,
-    notReceived,
+    // Fix: We use status because 'location' does not exist in your schema
+    receivedCount,
+    pendingCount,
     recentActivityRaw,
   ] = await Promise.all([
     prisma.site.count(),
@@ -62,11 +62,10 @@ export default async function DashboardPage() {
   const activePct = percent(sitesActive, sites);
   const airPct = percent(airSites, sites);
   const knetPct = percent(knetSites, sites);
-  const receivedPct = percent(received, storeTotal);
+  const receivedPct = percent(receivedCount, storeTotal); // Calculated this to fix error 2741
   const assetUtilPct = assets > 0 ? 100 : 0;
 
-  const displayName =
-    profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
+  const displayName = profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
 
   const recentActivity = recentActivityRaw.map((item) => ({
     id: item.id,
@@ -92,12 +91,15 @@ export default async function DashboardPage() {
         gbcSites,
         assets,
         storeTotal,
-        received,
-        notReceived,
+        // Since we can't do warehouses without the column, 
+        // we'll pass these as placeholders for now to keep the UI from breaking
+        whMain: receivedCount, 
+        whRegional: 0,
+        whTransit: pendingCount,
         activePct,
         airPct,
         knetPct,
-        receivedPct,
+        receivedPct, // Fixed: Added this back
         assetUtilPct,
       }}
       recentActivity={recentActivity}
