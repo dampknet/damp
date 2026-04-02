@@ -478,7 +478,7 @@ export default function DashboardClient({
   );
 }
 
-// Helper components remain exactly the same as provided in your prompt
+// Helper components preserved exactly from your original version
 function KpiCard({ dark, href, label, value, stripe, tag, tagClass, meta }: any) {
   const content = (
     <div className={dark ? "overflow-hidden rounded-2xl border border-white/8 bg-white/5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
