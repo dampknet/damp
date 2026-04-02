@@ -98,7 +98,7 @@ export default function NewInventoryItemClient({
                 : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
             }
           >
-            Add a new material or equipment item to {site.name}. Both materials and equipment track stock status and item condition.
+            Add a new material or equipment item to {site.name}. Both materials and equipment track thresholds, stock status, and item condition.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -303,7 +303,7 @@ export default function NewInventoryItemClient({
               </Field>
             </div>
 
-            {/* UPDATED: Condition dropdown is now visible for MATERIAL as well */}
+            {/* Condition dropdown is now ALWAYS visible regardless of type */}
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Condition" dark={dark}>
                 <select
@@ -355,19 +355,52 @@ export default function NewInventoryItemClient({
   );
 }
 
-function Field({ label, children, dark }: any) {
+function Field({
+  label,
+  children,
+  dark,
+}: {
+  label: string;
+  children: React.ReactNode;
+  dark: boolean;
+}) {
   return (
     <label className="block">
-      <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>{label}</div>
+      <div
+        className={
+          dark
+            ? "mb-1 text-xs font-medium text-slate-400"
+            : "mb-1 text-xs font-medium text-gray-600"
+        }
+      >
+        {label}
+      </div>
       {children}
     </label>
   );
 }
 
-function Chip({ dark, label, value }: any) {
+function Chip({
+  dark,
+  label,
+  value,
+}: {
+  dark: boolean;
+  label: string;
+  value: string;
+}) {
   return (
-    <span className={dark ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300" : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"}>
-      {label}: <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>{value}</span>
+    <span
+      className={
+        dark
+          ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
+          : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"
+      }
+    >
+      {label}:{" "}
+      <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
+        {value}
+      </span>
     </span>
   );
 }

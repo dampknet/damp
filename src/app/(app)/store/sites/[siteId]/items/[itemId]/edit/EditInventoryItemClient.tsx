@@ -327,7 +327,7 @@ export default function EditInventoryItemClient({
               </Field>
             </div>
 
-            {/* UPDATED: Condition dropdown is now available for BOTH Types */}
+            {/* Condition dropdown is now ALWAYS visible regardless of type */}
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Condition" dark={dark}>
                 <select

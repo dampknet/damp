@@ -78,15 +78,45 @@ export default async function EditInventoryItemPage({
     const itemType = itemTypeRaw === "EQUIPMENT" ? "EQUIPMENT" : "MATERIAL";
 
     if (!name) {
-      redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`);
+      redirect(
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`
+      );
     }
 
     const quantity = quantityRaw === "" ? 0 : Number(quantityRaw);
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      redirect(
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Quantity must be a valid number")}`
+      );
+    }
+
     const reorderLevel = reorderLevelRaw === "" ? 0 : Number(reorderLevelRaw);
-    const targetStockLevel = targetStockLevelRaw === "" ? null : Number(targetStockLevelRaw);
+    if (!Number.isFinite(reorderLevel) || reorderLevel < 0) {
+      redirect(
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Reorder level must be a valid number")}`
+      );
+    }
+
+    const targetStockLevel =
+      targetStockLevelRaw === "" ? null : Number(targetStockLevelRaw);
+
+    if (
+      targetStockLevelRaw !== "" &&
+      (!Number.isFinite(targetStockLevel) || Number(targetStockLevel) < 0)
+    ) {
+      redirect(
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Target stock level must be a valid number")}`
+      );
+    }
 
     let preferredStatus: InventoryItemStatus | null = null;
-    if (["AVAILABLE", "LOW_STOCK", "OUT_OF_STOCK", "CHECKED_OUT", "INACTIVE"].includes(statusRaw)) {
+    if (
+      statusRaw === "AVAILABLE" ||
+      statusRaw === "LOW_STOCK" ||
+      statusRaw === "OUT_OF_STOCK" ||
+      statusRaw === "CHECKED_OUT" ||
+      statusRaw === "INACTIVE"
+    ) {
       preferredStatus = statusRaw as InventoryItemStatus;
     }
 
@@ -96,16 +126,21 @@ export default async function EditInventoryItemPage({
       preferredStatus,
     });
 
-    // UPDATED: Process condition for BOTH types
+    // Updated: Accept condition for all item types during Edit
     let condition: EquipmentCondition | null = null;
-    if (["GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR"].includes(conditionRaw)) {
-      condition = conditionRaw as EquipmentCondition;
+    if (
+        conditionRaw === "GOOD" ||
+        conditionRaw === "FAULTY" ||
+        conditionRaw === "DAMAGED" ||
+        conditionRaw === "UNDER_REPAIR"
+    ) {
+        condition = conditionRaw as EquipmentCondition;
     } else {
-      condition = "GOOD";
+        condition = "GOOD";
     }
 
     try {
-      const beforeSummary = `Before → Name: ${safeItem.name}, Type: ${safeItem.itemType}, Qty: ${safeItem.quantity}, Status: ${safeItem.status}`;
+      const beforeSummary = `Before → Name: ${safeItem.name}, Type: ${safeItem.itemType}, Qty: ${safeItem.quantity}${safeItem.unit ? ` ${safeItem.unit}` : ""}, Status: ${safeItem.status}`;
 
       const updatedItem = await prisma.inventoryItem.update({
         where: { id: itemId },
@@ -120,13 +155,14 @@ export default async function EditInventoryItemPage({
           quantity: Math.trunc(quantity),
           unit: unit || null,
           reorderLevel: Math.trunc(reorderLevel),
-          targetStockLevel: targetStockLevel === null ? null : Math.trunc(targetStockLevel),
+          targetStockLevel:
+            targetStockLevel === null ? null : Math.trunc(targetStockLevel),
           status: finalStatus,
           condition,
         },
       });
 
-      const afterSummary = `After → Name: ${updatedItem.name}, Type: ${updatedItem.itemType}, Qty: ${updatedItem.quantity}, Status: ${updatedItem.status}, Condition: ${updatedItem.condition}`;
+      const afterSummary = `After → Name: ${updatedItem.name}, Type: ${updatedItem.itemType}, Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}, Status: ${updatedItem.status}, Condition: ${updatedItem.condition}`;
 
       await logActivity({
         type: "INVENTORY_ITEM_UPDATED",
@@ -136,8 +172,34 @@ export default async function EditInventoryItemPage({
         entityType: "INVENTORY_ITEM",
         entityId: updatedItem.id,
       });
+
+      if (updatedItem.status === "LOW_STOCK") {
+        await logActivity({
+          type: "INVENTORY_LOW_STOCK",
+          title: `Low stock detected: ${updatedItem.name}`,
+          details: `${updatedItem.name} at ${safeSite.name} is low in stock. Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}. Reorder level: ${updatedItem.reorderLevel}.`,
+          actorEmail: profile?.email ?? null,
+          entityType: "INVENTORY_ITEM",
+          entityId: updatedItem.id,
+        });
+      }
+
+      if (updatedItem.status === "OUT_OF_STOCK") {
+        await logActivity({
+          type: "INVENTORY_OUT_OF_STOCK",
+          title: `Out of stock: ${updatedItem.name}`,
+          details: `${updatedItem.name} at ${safeSite.name} is out of stock.`,
+          actorEmail: profile?.email ?? null,
+          entityType: "INVENTORY_ITEM",
+          entityId: updatedItem.id,
+        });
+      }
     } catch {
-      redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Could not update inventory item")}`);
+      redirect(
+        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(
+          "Could not update inventory item"
+        )}`
+      );
     }
 
     redirect(`/store/sites/${siteId}`);

@@ -99,17 +99,17 @@ export default async function NewInventoryItemPage({
       preferredStatus,
     });
 
-    // UPDATED: Process condition for BOTH types
+    // Updated: Accept condition for all item types
     let condition: EquipmentCondition | null = null;
     if (
-      conditionRaw === "GOOD" ||
-      conditionRaw === "FAULTY" ||
-      conditionRaw === "DAMAGED" ||
-      conditionRaw === "UNDER_REPAIR"
+        conditionRaw === "GOOD" ||
+        conditionRaw === "FAULTY" ||
+        conditionRaw === "DAMAGED" ||
+        conditionRaw === "UNDER_REPAIR"
     ) {
-      condition = conditionRaw as EquipmentCondition;
+        condition = conditionRaw as EquipmentCondition;
     } else {
-      condition = "GOOD"; // Default condition
+        condition = "GOOD";
     }
 
     try {
