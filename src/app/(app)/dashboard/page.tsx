@@ -37,7 +37,6 @@ export default async function DashboardPage() {
     gbcSites,
     assets,
     storeTotal,
-    // Fix: We use status because 'location' does not exist in your schema
     receivedCount,
     pendingCount,
     recentActivityRaw,
@@ -62,7 +61,7 @@ export default async function DashboardPage() {
   const activePct = percent(sitesActive, sites);
   const airPct = percent(airSites, sites);
   const knetPct = percent(knetSites, sites);
-  const receivedPct = percent(receivedCount, storeTotal); // Calculated this to fix error 2741
+  const receivedPct = percent(receivedCount, storeTotal); 
   const assetUtilPct = assets > 0 ? 100 : 0;
 
   const displayName = profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
@@ -91,8 +90,6 @@ export default async function DashboardPage() {
         gbcSites,
         assets,
         storeTotal,
-        // Since we can't do warehouses without the column, 
-        // we'll pass these as placeholders for now to keep the UI from breaking
         whMain: receivedCount, 
         whRegional: 0,
         whTransit: pendingCount,
