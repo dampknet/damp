@@ -24,8 +24,8 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
-  const now = new Date();
-  const dateLabel = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  // Generate dynamic date label: e.g., "April 2026"
+  const dateLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const [
     sites,
@@ -37,8 +37,8 @@ export default async function DashboardPage() {
     gbcSites,
     assets,
     storeTotal,
-    receivedCount,
-    pendingCount,
+    received,
+    notReceived,
     recentActivityRaw,
   ] = await Promise.all([
     prisma.site.count(),
@@ -61,10 +61,11 @@ export default async function DashboardPage() {
   const activePct = percent(sitesActive, sites);
   const airPct = percent(airSites, sites);
   const knetPct = percent(knetSites, sites);
-  const receivedPct = percent(receivedCount, storeTotal); 
+  const receivedPct = percent(received, storeTotal);
   const assetUtilPct = assets > 0 ? 100 : 0;
 
-  const displayName = profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
+  const displayName =
+    profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
 
   const recentActivity = recentActivityRaw.map((item) => ({
     id: item.id,
@@ -90,13 +91,12 @@ export default async function DashboardPage() {
         gbcSites,
         assets,
         storeTotal,
-        whMain: receivedCount, 
-        whRegional: 0,
-        whTransit: pendingCount,
+        received,
+        notReceived,
         activePct,
         airPct,
         knetPct,
-        receivedPct, // Fixed: Added this back
+        receivedPct,
         assetUtilPct,
       }}
       recentActivity={recentActivity}
