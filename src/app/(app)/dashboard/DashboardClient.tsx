@@ -38,50 +38,28 @@ function progressWidthClass(width: number) {
   const rounded = Math.round(safe / 5) * 5;
 
   switch (rounded) {
-    case 0:
-      return "w-0";
-    case 5:
-      return "w-[5%]";
-    case 10:
-      return "w-[10%]";
-    case 15:
-      return "w-[15%]";
-    case 20:
-      return "w-[20%]";
-    case 25:
-      return "w-[25%]";
-    case 30:
-      return "w-[30%]";
-    case 35:
-      return "w-[35%]";
-    case 40:
-      return "w-[40%]";
-    case 45:
-      return "w-[45%]";
-    case 50:
-      return "w-[50%]";
-    case 55:
-      return "w-[55%]";
-    case 60:
-      return "w-[60%]";
-    case 65:
-      return "w-[65%]";
-    case 70:
-      return "w-[70%]";
-    case 75:
-      return "w-[75%]";
-    case 80:
-      return "w-[80%]";
-    case 85:
-      return "w-[85%]";
-    case 90:
-      return "w-[90%]";
-    case 95:
-      return "w-[95%]";
-    case 100:
-      return "w-full";
-    default:
-      return "w-0";
+    case 0: return "w-0";
+    case 5: return "w-[5%]";
+    case 10: return "w-[10%]";
+    case 15: return "w-[15%]";
+    case 20: return "w-[20%]";
+    case 25: return "w-[25%]";
+    case 30: return "w-[30%]";
+    case 35: return "w-[35%]";
+    case 40: return "w-[40%]";
+    case 45: return "w-[45%]";
+    case 50: return "w-[50%]";
+    case 55: return "w-[55%]";
+    case 60: return "w-[60%]";
+    case 65: return "w-[65%]";
+    case 70: return "w-[70%]";
+    case 75: return "w-[75%]";
+    case 80: return "w-[80%]";
+    case 85: return "w-[85%]";
+    case 90: return "w-[90%]";
+    case 95: return "w-[95%]";
+    case 100: return "w-full";
+    default: return "w-0";
   }
 }
 
@@ -89,12 +67,14 @@ export default function DashboardClient({
   role,
   email,
   displayName,
+  dateLabel,
   stats,
   recentActivity,
 }: {
   role: Role;
   email: string | null;
   displayName: string;
+  dateLabel: string;
   stats: Stats;
   recentActivity: ActivityItem[];
 }) {
@@ -125,7 +105,7 @@ export default function DashboardClient({
                   : "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
               }
             >
-              {dark ? "● Live · March 2026" : "● Live · March 2026"}
+              ● Live · {dateLabel}
             </div>
 
             <h1
@@ -498,318 +478,79 @@ export default function DashboardClient({
   );
 }
 
-function KpiCard({
-  dark,
-  href,
-  label,
-  value,
-  stripe,
-  tag,
-  tagClass,
-  meta,
-}: {
-  dark: boolean;
-  href?: string;
-  label: string;
-  value: string;
-  stripe: string;
-  tag: string;
-  tagClass: string;
-  meta: string;
-}) {
+// Helper components remain exactly the same as provided in your prompt
+function KpiCard({ dark, href, label, value, stripe, tag, tagClass, meta }: any) {
   const content = (
-    <div
-      className={
-        dark
-          ? "overflow-hidden rounded-2xl border border-white/8 bg-white/5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6"
-          : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-      }
-    >
+    <div className={dark ? "overflow-hidden rounded-2xl border border-white/8 bg-white/5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
       <div className={`h-1 ${stripe}`} />
       <div className="p-5">
-        <div
-          className={
-            dark
-              ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600"
-              : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"
-          }
-        >
-          {label}
-        </div>
-        <div
-          className={
-            dark
-              ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100"
-              : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814]"
-          }
-        >
-          {value}
-        </div>
-        <div
-          className={
-            dark
-              ? "mt-4 flex items-center gap-2 border-t border-white/6 pt-3"
-              : "mt-4 flex items-center gap-2 border-t border-[#eee7dd] pt-3"
-          }
-        >
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tagClass}`}>
-            {tag}
-          </span>
-          <span
-            className={
-              dark ? "text-xs font-medium text-slate-600" : "text-xs font-medium text-[#9c9890]"
-            }
-          >
-            {meta}
-          </span>
+        <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600" : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"}>{label}</div>
+        <div className={dark ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100" : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814]"}>{value}</div>
+        <div className={dark ? "mt-4 flex items-center gap-2 border-t border-white/6 pt-3" : "mt-4 flex items-center gap-2 border-t border-[#eee7dd] pt-3"}>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tagClass}`}>{tag}</span>
+          <span className={dark ? "text-xs font-medium text-slate-600" : "text-xs font-medium text-[#9c9890]"}>{meta}</span>
         </div>
       </div>
     </div>
   );
-
-  if (!href) return content;
-
-  return (
-    <Link href={href} className="block">
-      {content}
-    </Link>
-  );
+  return href ? <Link href={href} className="block">{content}</Link> : content;
 }
 
-function Card({
-  dark,
-  title,
-  rightTag,
-  action,
-  children,
-  href,
-}: {
-  dark: boolean;
-  title: string;
-  rightTag?: string;
-  action?: ReactNode;
-  children: ReactNode;
-  href?: string;
-}) {
+function Card({ dark, title, rightTag, action, children, href }: any) {
   const content = (
-    <div
-      className={
-        dark
-          ? "rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6"
-          : "rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-      }
-    >
+    <div className={dark ? "rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div
-          className={
-            dark
-              ? "text-lg font-semibold tracking-tight text-slate-100"
-              : "text-lg font-semibold tracking-tight text-[#1a1814]"
-          }
-        >
-          {title}
-        </div>
-        {action ? (
-          action
-        ) : rightTag ? (
-          <span
-            className={
-              dark
-                ? "rounded-full border border-white/8 bg-white/6 px-2.5 py-1 text-[11px] font-bold text-slate-500"
-                : "rounded-full bg-[#f1ece4] px-2.5 py-1 text-[11px] font-bold text-[#5b564d]"
-            }
-          >
-            {rightTag}
-          </span>
-        ) : null}
+        <div className={dark ? "text-lg font-semibold tracking-tight text-slate-100" : "text-lg font-semibold tracking-tight text-[#1a1814]"}>{title}</div>
+        {action ? action : rightTag ? <span className={dark ? "rounded-full border border-white/8 bg-white/6 px-2.5 py-1 text-[11px] font-bold text-slate-500" : "rounded-full bg-[#f1ece4] px-2.5 py-1 text-[11px] font-bold text-[#5b564d]"}>{rightTag}</span> : null}
       </div>
       {children}
     </div>
   );
-
-  if (!href) return content;
-
-  return (
-    <Link href={href} className="block">
-      {content}
-    </Link>
-  );
+  return href ? <Link href={href} className="block">{content}</Link> : content;
 }
 
-function ProgressRow({
-  dark,
-  label,
-  value,
-  width,
-  fill,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  width: number;
-  fill: string;
-}) {
+function ProgressRow({ dark, label, value, width, fill }: any) {
   return (
     <div className="mb-4 last:mb-0">
       <div className="mb-1.5 flex items-center justify-between">
-        <span
-          className={
-            dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"
-          }
-        >
-          {label}
-        </span>
-        <span
-          className={
-            dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"
-          }
-        >
-          {value}
-        </span>
+        <span className={dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"}>{label}</span>
+        <span className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>{value}</span>
       </div>
-      <div
-        className={
-          dark ? "h-2 overflow-hidden rounded-full bg-white/8" : "h-2 overflow-hidden rounded-full bg-[#eee7dd]"
-        }
-      >
+      <div className={dark ? "h-2 overflow-hidden rounded-full bg-white/8" : "h-2 overflow-hidden rounded-full bg-[#eee7dd]"}>
         <div className={`h-full rounded-full ${fill} ${progressWidthClass(width)}`} />
       </div>
     </div>
   );
 }
 
-function MiniStat({
-  dark,
-  label,
-  value,
-  valueClass,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
+function MiniStat({ dark, label, value, valueClass }: any) {
   return (
-    <div
-      className={
-        dark
-          ? "rounded-xl border border-white/6 bg-white/3 px-4 py-3"
-          : "rounded-xl bg-[#f5f2ed] px-4 py-3"
-      }
-    >
-      <div
-        className={
-          dark
-            ? "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600"
-            : "text-[11px] font-bold uppercase tracking-[0.08em] text-[#9c9890]"
-        }
-      >
-        {label}
-      </div>
-      <div
-        className={`mt-1 text-2xl font-semibold tracking-tight ${
-          valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")
-        }`}
-      >
-        {value}
-      </div>
+    <div className={dark ? "rounded-xl border border-white/6 bg-white/3 px-4 py-3" : "rounded-xl bg-[#f5f2ed] px-4 py-3"}>
+      <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600" : "text-[11px] font-bold uppercase tracking-[0.08em] text-[#9c9890]"}>{label}</div>
+      <div className={`mt-1 text-2xl font-semibold tracking-tight ${valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")}`}>{value}</div>
     </div>
   );
 }
 
-function StoreRow({
-  dark,
-  label,
-  value,
-  valueClass,
-  icon,
-  iconBg,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  valueClass?: string;
-  icon?: string;
-  iconBg?: string;
-}) {
+function StoreRow({ dark, label, value, valueClass, icon, iconBg }: any) {
   return (
-    <div
-      className={
-        dark
-          ? "flex items-center justify-between border-b border-white/6 py-3 last:border-b-0"
-          : "flex items-center justify-between border-b border-[#eee7dd] py-3 last:border-b-0"
-      }
-    >
+    <div className={dark ? "flex items-center justify-between border-b border-white/6 py-3 last:border-b-0" : "flex items-center justify-between border-b border-[#eee7dd] py-3 last:border-b-0"}>
       <div>
-        <div
-          className={
-            dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"
-          }
-        >
-          {label}
-        </div>
-        <div
-          className={`text-xl font-semibold tracking-tight ${
-            valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")
-          }`}
-        >
-          {value}
-        </div>
+        <div className={dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"}>{label}</div>
+        <div className={`text-xl font-semibold tracking-tight ${valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")}`}>{value}</div>
       </div>
-
-      {icon ? (
-        <div className={`grid h-11 w-11 place-items-center rounded-xl ${iconBg ?? ""}`}>
-          <span className="text-lg">{icon}</span>
-        </div>
-      ) : null}
+      {icon ? <div className={`grid h-11 w-11 place-items-center rounded-xl ${iconBg ?? ""}`}><span className="text-lg">{icon}</span></div> : null}
     </div>
   );
 }
 
-function QuickAction({
-  dark,
-  href,
-  title,
-  subtitle,
-  iconBg,
-  iconColor,
-  icon,
-}: {
-  dark: boolean;
-  href: string;
-  title: string;
-  subtitle: string;
-  iconBg: string;
-  iconColor: string;
-  icon: string;
-}) {
+function QuickAction({ dark, href, title, subtitle, iconBg, iconColor, icon }: any) {
   return (
-    <Link
-      href={href}
-      className={
-        dark
-          ? "mb-3 flex items-center gap-3 rounded-xl border border-white/7 bg-white/4 p-4 transition hover:border-white/14 hover:bg-white/8 last:mb-0"
-          : "mb-3 flex items-center gap-3 rounded-xl border border-[#e0dbd2] bg-white p-4 transition hover:border-[#6b655d] hover:bg-[#faf8f4] last:mb-0"
-      }
-    >
-      <div className={`grid h-10 w-10 place-items-center rounded-xl ${iconBg}`}>
-        <span className={`text-base ${iconColor}`}>{icon}</span>
-      </div>
+    <Link href={href} className={dark ? "mb-3 flex items-center gap-3 rounded-xl border border-white/7 bg-white/4 p-4 transition hover:border-white/14 hover:bg-white/8 last:mb-0" : "mb-3 flex items-center gap-3 rounded-xl border border-[#e0dbd2] bg-white p-4 transition hover:border-[#6b655d] hover:bg-[#faf8f4] last:mb-0"}>
+      <div className={`grid h-10 w-10 place-items-center rounded-xl ${iconBg}`}><span className={`text-base ${iconColor}`}>{icon}</span></div>
       <div className="min-w-0 flex-1">
-        <div
-          className={
-            dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"
-          }
-        >
-          {title}
-        </div>
-        <div
-          className={
-            dark ? "mt-0.5 text-xs font-medium text-slate-600" : "mt-0.5 text-xs font-medium text-[#8b857c]"
-          }
-        >
-          {subtitle}
-        </div>
+        <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>{title}</div>
+        <div className={dark ? "mt-0.5 text-xs font-medium text-slate-600" : "mt-0.5 text-xs font-medium text-[#8b857c]"}>{subtitle}</div>
       </div>
       <span className={dark ? "text-lg text-slate-600" : "text-lg text-[#9c9890]"}>›</span>
     </Link>

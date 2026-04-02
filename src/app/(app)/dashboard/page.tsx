@@ -24,6 +24,9 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
+  // Generate dynamic date label: e.g., "April 2026"
+  const dateLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
   const [
     sites,
     sitesActive,
@@ -77,6 +80,7 @@ export default async function DashboardPage() {
       role={role}
       email={profile?.email ?? null}
       displayName={displayName}
+      dateLabel={dateLabel}
       stats={{
         sites,
         sitesActive,
