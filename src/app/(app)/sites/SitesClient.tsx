@@ -760,26 +760,41 @@ function SitesSection({
               <th className="w-12 px-2 py-3 font-semibold">No</th>
               <th className="min-w-30 px-2 py-3 font-semibold">Site</th>
 
-              <th className="min-w-28 px-1.5 py-3 font-semibold">
-                <span className="print-only">REGION MUX FREQUENCY</span>
-                <div className="no-print">
-                <select
-                  value={filters.regMFreq}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, regMFreq: e.target.value }))
-                  }
-                  className={headerSelectClass(dark)}
-                  aria-label="Filter by REG M FREQ"
-                  title="Filter by REG M FREQ"
-                >
-                  <option value="">REGION MUX FREQUENCY ▼</option>
-                  {regMFreqOptions.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
+              <th className="min-w-45 px-2 py-3 font-semibold text-center">
+                {/* 1. Header Title for the group */}
+                <div className={dark ? "text-slate-500 mb-1 text-[10px] uppercase tracking-wider" : "text-[#9c9890] mb-1 text-[10px] uppercase tracking-wider"}>
+                  Regional Mux Frequencies
                 </div>
+
+                <div className="no-print">
+                  {/* 2. Three-column label header */}
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    <span className="text-[9px] opacity-60">MUX 1</span>
+                    <span className="text-[9px] font-bold text-sky-500">MUX 2</span>
+                    <span className="text-[9px] opacity-60">MUX 3</span>
+                  </div>
+
+                  {/* 3. The Filter - Still targets Mux 2 data */}
+                  <select
+                    value={filters.regMFreq}
+                    onChange={(e) =>
+                      setFilters((prev) => ({ ...prev, regMFreq: e.target.value }))
+                    }
+                    className={headerSelectClass(dark)}
+                    aria-label="Filter by MUX 2 Freq"
+                    title="Filter by MUX 2 Freq"
+                  >
+                    <option value="">Filter Mux 2 ▼</option>
+                    {regMFreqOptions.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. Print Version */}
+                <span className="print-only text-[10px]">M1 | M2 | M3</span>
               </th>
 
               <th className="min-w-21 px-1.5 py-3 font-semibold">
@@ -916,8 +931,23 @@ function SitesSection({
                     {s.name}
                   </td>
 
-                  <td className={`${plainCellClass(dark)} px-2 py-3`}>
-                    {s.regMFreq ?? "-"}
+                  <td className="px-2 py-3">
+                    <div className="grid grid-cols-3 gap-0 text-center border border-white/5 rounded-md overflow-hidden">
+                      {/* MUX 1: Constant 530 */}
+                      <div className={`py-1 text-[11px] border-r border-white/5 ${dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-gray-600"}`}>
+                        530
+                      </div>
+                      
+                      {/* MUX 2: Dynamic from DB */}
+                      <div className={`py-1 text-[11px] font-bold border-r border-white/5 ${dark ? "text-sky-400 bg-sky-500/5" : "text-blue-700 bg-blue-50"}`}>
+                        {s.regMFreq ?? "-"}
+                      </div>
+                      
+                      {/* MUX 3: Constant 474 */}
+                      <div className={`py-1 text-[11px] ${dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-gray-600"}`}>
+                        474
+                      </div>
+                    </div>
                   </td>
 
                   <td className={`${plainCellClass(dark)} px-2 py-3`}>

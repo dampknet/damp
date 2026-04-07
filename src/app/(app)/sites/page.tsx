@@ -105,7 +105,9 @@ export default async function SitesPage({
     return {
       No: index + 1,
       Site: s.name,
-      "REG M FREQ": s.regMFreq ?? "",
+      "MUX 1 (Freq)": "530", // Constant
+      "MUX 2 (Freq)": s.regMFreq ?? "", // Dynamic
+      "MUX 3 (Freq)": "474", // Constant
       Power: s.power ?? "",
       "Transmitter Type": tx === "AIR" ? "A (Air-cooled)" : "L (Liquid-cooled)",
       "Tower Type": tower,
