@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import DeleteInventoryItemsDialog from "@/components/DeleteInventoryItemsDialog";
 
-// Types for individual unit tracking
+// 1. Matches your new AssetInstance Model
 type AssetInstance = {
   id: string;
   serialNumber: string;
@@ -17,6 +17,7 @@ type AssetInstance = {
   condition: string;
 };
 
+// 2. Matches your InventoryItem Model + Relation
 type InventoryItemRow = {
   id: string;
   name: string;
@@ -32,7 +33,7 @@ type InventoryItemRow = {
   status: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
   createdAt: Date;
   updatedAt: Date;
-  instances: AssetInstance[]; // New deep tracking field
+  instances: AssetInstance[]; // This must match your prisma select!
 };
 
 type Summary = {
@@ -43,38 +44,14 @@ type Summary = {
   checkedOutCount: number;
 };
 
-function SummaryCard({
-  dark,
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  sub: string;
-  accent: string;
-}) {
+function SummaryCard({ dark, label, value, sub, accent }: { dark: boolean; label: string; value: string; sub: string; accent: string }) {
   return (
-    <div
-      className={
-        dark
-          ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl"
-          : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-[0_10px_25px_rgba(26,24,20,0.045)]"
-      }
-    >
+    <div className={dark ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl" : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm"}>
       <div className={`h-1 ${accent}`} />
       <div className="p-4">
-        <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500" : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"}>
-          {label}
-        </div>
-        <div className={dark ? "mt-2 text-2xl font-semibold tracking-tight text-slate-100" : "mt-2 text-2xl font-semibold tracking-tight text-[#1a1814]"}>
-          {value}
-        </div>
-        <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
-          {sub}
-        </div>
+        <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500" : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"}>{label}</div>
+        <div className={dark ? "mt-2 text-2xl font-semibold tracking-tight text-slate-100" : "mt-2 text-2xl font-semibold tracking-tight text-[#1a1814]"}>{value}</div>
+        <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>{sub}</div>
       </div>
     </div>
   );
@@ -83,10 +60,7 @@ function SummaryCard({
 function Chip({ dark, label, value }: { dark: boolean; label: string; value: string }) {
   return (
     <span className={dark ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300" : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"}>
-      {label}:{" "}
-      <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
-        {value}
-      </span>
+      {label}: <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>{value}</span>
     </span>
   );
 }
@@ -101,17 +75,9 @@ function statusBadge(status: string, dark: boolean) {
 }
 
 export default function InventorySiteClient({
-  role,
-  canEdit,
-  site,
-  summary,
-  items,
+  role, canEdit, site, summary, items,
 }: {
-  role: string;
-  canEdit: boolean;
-  site: { id: string; name: string; location: string | null; description: string | null };
-  summary: Summary;
-  items: InventoryItemRow[];
+  role: string; canEdit: boolean; site: any; summary: Summary; items: InventoryItemRow[];
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
@@ -140,13 +106,23 @@ export default function InventorySiteClient({
   const selectedItems = filteredItems.filter((item) => selectedItemIds.includes(item.id));
   const allVisibleSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedItemIds.includes(item.id));
 
+  // --- 3. The logic to handle dropdown changes inside the drawer ---
+  async function updateInstance(instanceId: string, field: "status" | "condition", value: string) {
+    try {
+      const res = await fetch(`/inventory/api/instances/update`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instanceId, [field]: value }),
+      });
+      if (res.ok) router.refresh();
+    } catch (e) {
+      alert("Failed to update unit");
+    }
+  }
+
   const exportRows = filteredItems.map((item, index) => ({
-    No: index + 1,
-    Item: item.name,
-    Type: item.itemType,
-    "Stock No": item.stockNumber ?? "",
-    Quantity: `${item.quantity}${item.unit ? ` ${item.unit}` : ""}`,
-    Status: item.status,
+    No: index + 1, Item: item.name, Type: item.itemType, "Stock No": item.stockNumber ?? "",
+    Quantity: `${item.quantity}${item.unit ? ` ${item.unit}` : ""}`, Status: item.status,
   }));
 
   const exportCols = [
@@ -184,24 +160,18 @@ export default function InventorySiteClient({
   return (
     <>
       <DeleteInventoryItemsDialog
-        open={showDeleteDialog}
-        dark={dark}
-        items={selectedItems.map((item) => ({ id: item.id, name: item.name, stockNumber: item.stockNumber, itemType: item.itemType }))}
-        deleting={deleting}
-        reason={deleteReason}
-        onReasonChange={setDeleteReason}
-        onClose={() => { if (!deleting) setShowDeleteDialog(false); }}
-        onConfirm={handleDeleteSelected}
+        open={showDeleteDialog} dark={dark} items={selectedItems.map((item) => ({ id: item.id, name: item.name, stockNumber: item.stockNumber, itemType: item.itemType }))}
+        deleting={deleting} reason={deleteReason} onReasonChange={setDeleteReason} onClose={() => { if (!deleting) setShowDeleteDialog(false); }} onConfirm={handleDeleteSelected}
       />
 
-      <div className={dark ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200" : "min-h-screen bg-[linear-gradient(180deg,#fbf8f3_0%,#f5f2ed_48%,#f2ede5_100%)]"}>
+      <div className={dark ? "min-h-screen bg-[#0d1117] text-slate-200" : "min-h-screen bg-[#fbf8f3]"}>
         <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-          <section className={dark ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl" : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-sm"}>
+          <section className={dark ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl" : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white p-6 shadow-sm"}>
             <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl">
-                <Link href="/store" className={dark ? "inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline mb-3" : "inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline mb-3"}>← Back to Store</Link>
-                <h1 className={dark ? "text-3xl font-semibold text-slate-100" : "text-3xl font-semibold text-[#1a1814]"}>{site.name} Inventory</h1>
+              <div>
+                <Link href="/store" className="text-sm font-medium text-slate-400 hover:underline mb-3 inline-block">← Back to Store</Link>
+                <h1 className="text-3xl font-bold tracking-tight">{site.name} Inventory</h1>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Chip dark={dark} label="Site" value={site.name} />
                   <Chip dark={dark} label="Role" value={role} />
@@ -214,6 +184,7 @@ export default function InventorySiteClient({
             </div>
           </section>
 
+          {/* Stats Grid */}
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <SummaryCard dark={dark} label="Total Items" value={String(summary.totalItems)} sub="tracked records" accent="bg-sky-500" />
             <SummaryCard dark={dark} label="Materials" value={String(summary.materialCount)} sub="consumables" accent="bg-emerald-500" />
@@ -223,16 +194,11 @@ export default function InventorySiteClient({
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-4 no-print">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item, serial, model..." className={dark ? "flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm outline-none" : "flex-1 rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm outline-none"} title="Search inventory" />
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} className={dark ? "rounded-xl border border-white/10 bg-[#101720] px-4 py-2 text-sm" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm"} title="Filter by type">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item name, stock no..." className={dark ? "flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm outline-none" : "flex-1 rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm outline-none"} title="Search inventory" />
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} title="Filter Type" className={dark ? "rounded-xl border border-white/10 bg-[#101720] px-4 py-2 text-sm" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm"}>
               <option value="ALL">All Types</option>
               <option value="MATERIAL">Material</option>
               <option value="EQUIPMENT">Equipment</option>
-            </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className={dark ? "rounded-xl border border-white/10 bg-[#101720] px-4 py-2 text-sm" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm"} title="Filter by status">
-              <option value="ALL">All Statuses</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="CHECKED_OUT">Checked Out</option>
             </select>
           </div>
 
@@ -241,9 +207,7 @@ export default function InventorySiteClient({
               <thead className={dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-[#5b564d]"}>
                 <tr>
                   <th className="w-16 px-5 py-4 font-medium">No</th>
-                  <th className="w-10 px-2 py-4 no-print">
-                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} title="Select all visible items" aria-label="Select all visible items" />
-                  </th>
+                  <th className="w-10 px-2 py-4 no-print"><input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} title="Select visible" /></th>
                   <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider">Item</th>
                   <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider">Type</th>
                   <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider text-center">In Stock</th>
@@ -256,7 +220,7 @@ export default function InventorySiteClient({
                     <tr className={`group cursor-pointer transition-colors ${expandedId === item.id ? (dark ? 'bg-sky-500/10' : 'bg-sky-50') : (dark ? 'hover:bg-white/5' : 'hover:bg-[#fcfaf7]')}`} onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
                       <td className="px-5 py-4 font-medium opacity-50">{index + 1}</td>
                       <td className="px-2 py-4 no-print" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={() => toggleItemSelection(item.id)} title={`Select ${item.name}`} aria-label={`Select ${item.name}`} />
+                        <input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={() => toggleItemSelection(item.id)} title="Select row" />
                       </td>
                       <td className="px-5 py-4">
                         <div className="font-bold text-base">{item.name}</div>
@@ -266,7 +230,7 @@ export default function InventorySiteClient({
                       <td className="px-5 py-4 text-center font-bold text-sky-500">{item.quantity} {item.unit || "pcs"}</td>
                       <td className="px-5 py-4 text-right">
                         <span className={statusBadge(item.status, dark)}>{item.status}</span>
-                        <div className="text-[9px] mt-1 font-bold text-sky-600 uppercase group-hover:underline">{expandedId === item.id ? "▲ Close" : "▼ Details"}</div>
+                        <div className="text-[9px] mt-1 font-bold text-sky-600 uppercase">{expandedId === item.id ? "▲ Close" : "▼ Details"}</div>
                       </td>
                     </tr>
 
@@ -274,24 +238,28 @@ export default function InventorySiteClient({
                       <tr>
                         <td colSpan={6} className={dark ? "bg-black/40 px-10 py-6" : "bg-[#f9f7f4] px-10 py-6"}>
                           <div className="flex flex-col gap-4 border-l-4 border-sky-500 pl-6">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-xs font-black uppercase tracking-widest text-sky-600">Unit Serial Tracking ({item.instances?.length || 0})</h3>
-                              <Link href={`/store/sites/${site.id}/items/${item.id}/edit`} className="text-[10px] font-bold text-slate-500 hover:text-sky-500 bg-white dark:bg-white/5 border px-2 py-1 rounded">Edit Metadata</Link>
-                            </div>
+                            <h3 className="text-xs font-black uppercase tracking-widest text-sky-600">Unit Tracking ({item.instances?.length || 0})</h3>
                             <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-xl">
-                              <table className="w-full text-xs">
-                                <thead className={dark ? "bg-white/5" : "bg-gray-100"}>
-                                  <tr className="text-left font-black opacity-60"><th className="px-4 py-3">No</th><th className="px-4 py-3">Serial Number</th><th className="px-4 py-3">Condition</th><th className="px-4 py-3">Status</th></tr>
+                              <table className="w-full text-xs text-left">
+                                <thead className={dark ? "bg-white/5 opacity-60" : "bg-gray-100"}>
+                                  <tr className="font-black"><th className="px-4 py-3">Serial</th><th className="px-4 py-3">Condition</th><th className="px-4 py-3">Status</th></tr>
                                 </thead>
-                                <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                  {item.instances && item.instances.length > 0 ? item.instances.map((ins, insIdx) => (
-                                    <tr key={ins.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
-                                      <td className="px-4 py-3 opacity-40">{insIdx + 1}</td>
+                                <tbody>
+                                  {item.instances?.length > 0 ? item.instances.map((ins) => (
+                                    <tr key={ins.id} className="border-t border-black/5 dark:border-white/5">
                                       <td className="px-4 py-3 font-mono font-bold text-sky-500">{ins.serialNumber}</td>
-                                      <td className="px-4 py-3 font-bold text-orange-500">{ins.condition}</td>
-                                      <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ins.status === 'AVAILABLE' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>{ins.status}</span></td>
+                                      <td className="px-4 py-3">
+                                        <select value={ins.condition} title="Condition" onChange={(e) => updateInstance(ins.id, 'condition', e.target.value)} className="bg-transparent border-none outline-none font-bold text-orange-500">
+                                          <option value="NEW">NEW</option><option value="OLD">OLD</option><option value="GOOD">GOOD</option><option value="FAULTY">FAULTY</option>
+                                        </select>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <select value={ins.status} title="Status" onChange={(e) => updateInstance(ins.id, 'status', e.target.value)} className="bg-transparent border-none outline-none font-bold text-emerald-500">
+                                          <option value="AVAILABLE">AVAILABLE</option><option value="CHECKED_OUT">CHECKED_OUT</option>
+                                        </select>
+                                      </td>
                                     </tr>
-                                  )) : <tr><td colSpan={4} className="py-8 text-center italic opacity-40">No individual serials found. Use "Restock" to add units.</td></tr>}
+                                  )) : <tr><td colSpan={3} className="py-6 text-center italic opacity-50">No serials found.</td></tr>}
                                 </tbody>
                               </table>
                             </div>
