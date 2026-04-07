@@ -30,29 +30,6 @@ function sectionTitle(group: SearchParams["group"]) {
   return "Sites";
 }
 
-// TEMPORARY AUTO-FIXER FOR DAVID
-import { getAddressFromCoords } from "@/lib/geocoding";
-const sitesToFix = await prisma.site.findMany({
-  where: { locationName: null, isDeleted: false }
-});
-
-if (sitesToFix.length > 0) {
-  console.log(`Fixing ${sitesToFix.length} sites...`);
-  for (const site of sitesToFix) {
-    if (site.gps) {
-      const name = await getAddressFromCoords(site.gps);
-      if (name) {
-        await prisma.site.update({
-          where: { id: site.id },
-          data: { locationName: name }
-        });
-        // Wait 1 second to respect API limits
-        await new Promise(res => setTimeout(res, 1000));
-      }
-    }
-  }
-}
-
 export default async function SitesPage({
   searchParams,
 }: {
