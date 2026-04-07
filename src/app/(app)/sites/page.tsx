@@ -20,6 +20,7 @@ type SiteRow = {
   towerType: "GBC" | "KNET";
   towerHeight: number | null;
   gps: string | null;
+  locationName: string | null;
 };
 
 function sectionTitle(group: SearchParams["group"]) {
