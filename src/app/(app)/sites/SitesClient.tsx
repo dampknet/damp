@@ -958,23 +958,18 @@ function SitesSection({
 
                   <td className={`${plainCellClass(dark)} px-2 py-3 wrap-break-word`}>
                     {filteringActive ? (
-                      <div className="flex flex-col">
-                        {/* Show the readable name in bold if it exists */}
+                      /* When filtering, just show the Name. If no name, show GPS as fallback */
+                      <span>{s.locationName || s.gps || "-"}</span>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {/* 1. Show only the name (No Icon) */}
                         {s.locationName && (
-                          <span className={dark ? "text-slate-100 font-semibold" : "text-[#1a1814] font-semibold"}>
+                          <span className={`text-xs font-semibold ${dark ? "text-sky-300" : "text-blue-700"}`}>
                             {s.locationName}
                           </span>
                         )}
-                        {/* Keep the link underneath for technical reference */}
-                        <GpsLink gps={s.gps ?? null} dark={dark} />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-0.5">
-                        {s.locationName && (
-                          <span className={`text-[11px] font-bold uppercase tracking-tight ${dark ? "text-sky-400" : "text-blue-600"}`}>
-                            📍 {s.locationName}
-                          </span>
-                        )}
+                        
+                        {/* 2. The Edit button still edits the GPS string */}
                         <SiteGpsInlineEdit
                           siteId={s.id}
                           initialGps={s.gps ?? null}
