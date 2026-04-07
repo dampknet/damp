@@ -38,15 +38,24 @@ export default async function InventorySitePage({
           stockNumber: true,
           manufacturer: true,
           model: true,
-          serialNumber: true,
           quantity: true,
           unit: true,
           reorderLevel: true,
           targetStockLevel: true,
           status: true,
-          condition: true,
           createdAt: true,
           updatedAt: true,
+          // FETCH THE INDIVIDUAL SERIALS
+          instances: {
+            select: {
+              id: true,
+              serialNumber: true,
+              model: true,
+              manufacturer: true,
+              status: true,
+              condition: true,
+            }
+          }
         },
       },
     },
