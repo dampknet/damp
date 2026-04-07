@@ -958,22 +958,45 @@ function SitesSection({
 
                   <td className={`${plainCellClass(dark)} px-2 py-3 wrap-break-word`}>
                     {filteringActive ? (
-                      /* When filtering, just show the Name. If no name, show GPS as fallback */
-                      <span>{s.locationName || s.gps || "-"}</span>
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        {/* 1. Show only the name (No Icon) */}
-                        {s.locationName && (
-                          <span className={`text-xs font-semibold ${dark ? "text-sky-300" : "text-blue-700"}`}>
+                      /* 1. STABLE VIEW (When searching/filtering) */
+                      <div className="flex flex-col">
+                        {s.locationName ? (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.gps || "")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`font-bold hover:underline ${dark ? "text-sky-400" : "text-blue-700"}`}
+                          >
                             {s.locationName}
-                          </span>
+                          </a>
+                        ) : (
+                          <GpsLink gps={s.gps ?? null} dark={dark} />
                         )}
-                        
-                        {/* 2. The Edit button still edits the GPS string */}
+                      </div>
+                    ) : (
+                      /* 2. INTERACTIVE VIEW (Default) */
+                      <div className="flex flex-col gap-1">
+                        {/* If we have the name, make IT the clickable link to the map */}
+                        {s.locationName ? (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.gps || "")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`text-[13px] font-bold hover:underline ${dark ? "text-sky-400" : "text-blue-700"}`}
+                          >
+                            {s.locationName}
+                          </a>
+                        ) : null}
+
+                        {/* This component handles the "Edit" button. 
+                          The coordinates will ONLY show inside the input field 
+                          once the user clicks 'Edit'.
+                        */}
                         <SiteGpsInlineEdit
                           siteId={s.id}
                           initialGps={s.gps ?? null}
                           canEdit={canEdit}
+                          showCoords={false} // You might need to pass this prop if you want to hide the text in the sub-component
                         />
                       </div>
                     )}

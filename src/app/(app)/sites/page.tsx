@@ -30,48 +30,28 @@ function sectionTitle(group: SearchParams["group"]) {
   return "Sites";
 }
 
-
+// TEMPORARY AUTO-FIXER FOR DAVID
 import { getAddressFromCoords } from "@/lib/geocoding";
+const sitesToFix = await prisma.site.findMany({
+  where: { locationName: null, isDeleted: false }
+});
 
-async function updateAllLocations() {
-  console.log("🚀 Starting bulk location update...");
-  
-  // 1. Get all sites that don't have a locationName yet
-  const sites = await prisma.site.findMany({
-    where: { 
-      isDeleted: false,
-      locationName: null // Only pick the ones we haven't fixed
+if (sitesToFix.length > 0) {
+  console.log(`Fixing ${sitesToFix.length} sites...`);
+  for (const site of sitesToFix) {
+    if (site.gps) {
+      const name = await getAddressFromCoords(site.gps);
+      if (name) {
+        await prisma.site.update({
+          where: { id: site.id },
+          data: { locationName: name }
+        });
+        // Wait 1 second to respect API limits
+        await new Promise(res => setTimeout(res, 1000));
+      }
     }
-  });
-
-  console.log(`Found ${sites.length} sites to update.`);
-
-  for (const site of sites) {
-    if (!site.gps) continue;
-
-    console.log(`Updating ${site.name}...`);
-    
-    // 2. Lookup the name
-    const name = await getAddressFromCoords(site.gps);
-    
-    // 3. Save to DB
-    if (name) {
-      await prisma.site.update({
-        where: { id: site.id },
-        data: { locationName: name }
-      });
-      console.log(`✅ ${site.name} -> ${name}`);
-    }
-
-    // 4. Important: OpenStreetMap only allows 1 request per second
-    // We must wait so they don't block your IP
-    await new Promise(resolve => setTimeout(resolve, 1100));
   }
-
-  console.log("✨ All sites updated!");
 }
-
-updateAllLocations();
 
 export default async function SitesPage({
   searchParams,
