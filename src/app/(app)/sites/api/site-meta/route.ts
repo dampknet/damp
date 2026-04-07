@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import type { TowerType } from "@prisma/client";
+// 1. Import the helper we created in Step 2
+import { getAddressFromCoords } from "@/lib/geocoding";
 
 export async function PATCH(req: Request) {
   try {
@@ -32,6 +34,8 @@ export async function PATCH(req: Request) {
         towerType: true,
         towerHeight: true,
         gps: true,
+        // include locationName so we can compare it if needed
+        locationName: true, 
       },
     });
 
@@ -43,6 +47,7 @@ export async function PATCH(req: Request) {
       towerType?: TowerType;
       towerHeight?: number | null;
       gps?: string | null;
+      locationName?: string | null; // 2. Add this to your data object
     } = {};
 
     if (body.towerType === "GBC" || body.towerType === "KNET") {
@@ -55,6 +60,12 @@ export async function PATCH(req: Request) {
 
     if (body.gps !== undefined) {
       data.gps = body.gps;
+      
+      // 3. Logic Trigger: If GPS is provided and it's different from current
+      if (body.gps !== current.gps) {
+        // We "await" the readable name from the coordinates
+        data.locationName = await getAddressFromCoords(body.gps);
+      }
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -67,6 +78,7 @@ export async function PATCH(req: Request) {
           towerType: true,
           towerHeight: true,
           gps: true,
+          locationName: true, // 4. Return the new name to the frontend
         },
       });
 
@@ -104,7 +116,8 @@ export async function PATCH(req: Request) {
           data: {
             type: "SITE_GPS_UPDATED",
             title: `${current.name} GPS updated`,
-            details: `${current.gps ?? "-"} → ${data.gps ?? "-"}`,
+            // 5. Enhance the log to show the new name too!
+            details: `${current.gps ?? "-"} → ${data.gps ?? "-"} (${site.locationName ?? "Unknown"})`,
             entityType: "SITE",
             entityId: current.id,
             actorEmail: profile?.email ?? null,

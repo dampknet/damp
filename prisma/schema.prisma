@@ -129,6 +129,7 @@ model Site {
   towerType       TowerType       @default(GBC)
   towerHeight     Int?
   gps             String?
+  locationName    String?
   txMux1Serial    String?
   txMux2Serial    String?
   txMux3Serial    String?

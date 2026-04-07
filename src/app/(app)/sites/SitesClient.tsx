@@ -22,6 +22,7 @@ type SiteRow = {
   towerType: "GBC" | "KNET";
   towerHeight: number | null;
   gps: string | null;
+  locationName: string | null;
 };
 
 type Props = {
@@ -957,13 +958,29 @@ function SitesSection({
 
                   <td className={`${plainCellClass(dark)} px-2 py-3 wrap-break-word`}>
                     {filteringActive ? (
-                      <GpsLink gps={s.gps ?? null} dark={dark} />
+                      <div className="flex flex-col">
+                        {/* Show the readable name in bold if it exists */}
+                        {s.locationName && (
+                          <span className={dark ? "text-slate-100 font-semibold" : "text-[#1a1814] font-semibold"}>
+                            {s.locationName}
+                          </span>
+                        )}
+                        {/* Keep the link underneath for technical reference */}
+                        <GpsLink gps={s.gps ?? null} dark={dark} />
+                      </div>
                     ) : (
-                      <SiteGpsInlineEdit
-                        siteId={s.id}
-                        initialGps={s.gps ?? null}
-                        canEdit={canEdit}
-                      />
+                      <div className="flex flex-col gap-0.5">
+                        {s.locationName && (
+                          <span className={`text-[11px] font-bold uppercase tracking-tight ${dark ? "text-sky-400" : "text-blue-600"}`}>
+                            📍 {s.locationName}
+                          </span>
+                        )}
+                        <SiteGpsInlineEdit
+                          siteId={s.id}
+                          initialGps={s.gps ?? null}
+                          canEdit={canEdit}
+                        />
+                      </div>
                     )}
                   </td>
 
