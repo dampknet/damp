@@ -80,6 +80,7 @@ export default async function SitesPage({
       towerType: true,
       towerHeight: true,
       gps: true,
+      locationName: true,
     },
     orderBy: { name: "asc" },
   })) as SiteRow[];

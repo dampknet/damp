@@ -99,7 +99,7 @@ function GpsLink({ gps, dark }: { gps: string | null; dark: boolean }) {
 
   return (
     <a
-      href={`https://www.google.com/maps?q=${encodeURIComponent(gps)}`}
+      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`}
       target="_blank"
       rel="noreferrer"
       className={
