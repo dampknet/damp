@@ -39,7 +39,7 @@ export default async function SiteIssueLogPage({
 
   if (!site) return notFound();
 
-  const issues = await prisma.inventoryIssue.findMany({
+  const rawIssues = await prisma.inventoryIssue.findMany({
     where: {
       inventorySiteId: siteId,
       AND: [
@@ -62,7 +62,10 @@ export default async function SiteIssueLogPage({
                 },
                 {
                   inventoryItem: {
-                    serialNumber: { contains: q, mode: "insensitive" },
+                    // ✅ Updated search to look into the new instances relation
+                    instances: {
+                      some: { serialNumber: { contains: q, mode: "insensitive" } }
+                    }
                   },
                 },
               ],
@@ -96,12 +99,24 @@ export default async function SiteIssueLogPage({
           id: true,
           name: true,
           stockNumber: true,
-          serialNumber: true,
           unit: true,
+          // ✅ serialNumber is removed from item, fetching instances instead
+          instances: {
+            select: { serialNumber: true }
+          }
         },
       },
     },
   });
+
+  // ✅ Map issues to flatten serialNumbers for your existing Client UI table
+  const issues = rawIssues.map(issue => ({
+    ...issue,
+    inventoryItem: {
+      ...issue.inventoryItem,
+      serialNumber: issue.inventoryItem.instances.map(i => i.serialNumber).join(", ") || "-"
+    }
+  }));
 
   const [issuedCount, returnedCount, materialCount, equipmentCount] =
     await Promise.all([
@@ -173,7 +188,7 @@ export default async function SiteIssueLogPage({
         materialCount,
         equipmentCount,
       }}
-      issues={issues}
+      issues={issues as any}
       exportRows={exportRows}
       exportCols={exportCols}
     />

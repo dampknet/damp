@@ -38,7 +38,7 @@ type ValidRow = {
     | "OUT_OF_STOCK"
     | "CHECKED_OUT"
     | "INACTIVE";
-  condition: "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null;
+  condition: "NEW" | "OLD" | "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null; // ✅ Added NEW and OLD
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -223,7 +223,7 @@ export default function UploadInventoryExcelClient({
           className={
             dark
               ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
-              : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
+              : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-sm"
           }
         >
           <div
@@ -252,7 +252,7 @@ export default function UploadInventoryExcelClient({
                   className={
                     dark
                       ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-300"
-                      : "inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700"
+                      : "inline-flex w-fit items-center gap-2 rounded-full border border-[#dcecdf] bg-[#f7fcf8] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700"
                   }
                 >
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -311,9 +311,9 @@ export default function UploadInventoryExcelClient({
                 }
               >
                 <div className="font-semibold">Expected columns</div>
-                <div className="mt-2 leading-6">
+                <div className="mt-2 leading-6 italic">
                   itemType, name, description, stockNumber, manufacturer, model,
-                  serialNumber, quantity, unit, reorderLevel, targetStockLevel,
+                  quantity, unit, reorderLevel, targetStockLevel,
                   status, condition
                 </div>
               </div>
@@ -321,49 +321,25 @@ export default function UploadInventoryExcelClient({
           </div>
 
           {serverError ? (
-            <div
-              className={
-                dark
-                  ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-                  : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-              }
-            >
+            <div className={dark ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300" : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"}>
               {serverError}
             </div>
           ) : null}
 
           {clientFileError ? (
-            <div
-              className={
-                dark
-                  ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-                  : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-              }
-            >
+            <div className={dark ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300" : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"}>
               {clientFileError}
             </div>
           ) : null}
 
           {previewError ? (
-            <div
-              className={
-                dark
-                  ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-                  : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-              }
-            >
+            <div className={dark ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300" : "mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"}>
               {previewError}
             </div>
           ) : null}
 
           {serverSuccess ? (
-            <div
-              className={
-                dark
-                  ? "mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
-                  : "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-              }
-            >
+            <div className={dark ? "mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300" : "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"}>
               {serverSuccess}
             </div>
           ) : null}
@@ -373,7 +349,7 @@ export default function UploadInventoryExcelClient({
             className={
               dark
                 ? "mt-6 rounded-3xl border border-white/10 bg-white/5 p-5"
-                : "mt-6 rounded-3xl border border-[#e0dbd2] bg-white p-5 shadow-[0_12px_34px_rgba(26,24,20,0.055)]"
+                : "mt-6 rounded-3xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
             }
           >
             <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
@@ -394,6 +370,7 @@ export default function UploadInventoryExcelClient({
                   name="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
+                  title="Choose file"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-100"
@@ -408,7 +385,7 @@ export default function UploadInventoryExcelClient({
                 disabled={!!clientFileError || previewLoading}
                 className={
                   dark
-                    ? "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#10b981,#34d399)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    ? "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                     : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
                 }
               >
@@ -430,42 +407,19 @@ export default function UploadInventoryExcelClient({
               className={
                 dark
                   ? "mt-4 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5"
-                  : "mt-4 rounded-3xl border border-emerald-200 bg-emerald-50 p-5"
+                  : "mt-4 rounded-3xl border border-[#d6e9d8] bg-[#f7fcf8] p-5"
               }
             >
-              <input
-                type="hidden"
-                name="previewPayload"
-                value={JSON.stringify(previewRows)}
-              />
-              <input
-                type="hidden"
-                name="validRowsPayload"
-                value={JSON.stringify(validRows)}
-              />
+              <input type="hidden" name="previewPayload" value={JSON.stringify(previewRows)} />
+              <input type="hidden" name="validRowsPayload" value={JSON.stringify(validRows)} />
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div
-                    className={
-                      dark
-                        ? "text-sm font-semibold text-emerald-300"
-                        : "text-sm font-semibold text-emerald-700"
-                    }
-                  >
-                    Preview ready
-                  </div>
-                  <div
-                    className={
-                      dark
-                        ? "mt-1 text-xs text-slate-300"
-                        : "mt-1 text-xs text-[#5b564d]"
-                    }
-                  >
-                    {validCount} valid row(s) will be imported. {invalidCount} row(s) will be skipped.
+                  <div className={dark ? "text-sm font-semibold text-emerald-300" : "text-sm font-semibold text-emerald-700"}>Preview ready</div>
+                  <div className={dark ? "mt-1 text-xs text-slate-300" : "mt-1 text-xs text-[#5b564d]"}>
+                    {validCount} row(s) valid. {invalidCount} row(s) invalid.
                   </div>
                 </div>
-
                 <ConfirmSubmitButton dark={dark} />
               </div>
             </form>
@@ -480,107 +434,26 @@ export default function UploadInventoryExcelClient({
               <StatCard dark={dark} label="Invalid / Skipped" value={String(invalidCount)} />
             </div>
 
-            <section
-              className={
-                dark
-                  ? "mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl"
-                  : "mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-[0_12px_34px_rgba(26,24,20,0.055)]"
-              }
-            >
-              <div
-                className={
-                  dark
-                    ? "h-1 w-full bg-[linear-gradient(90deg,#10b981,#34d399,#3b82f6)] opacity-80"
-                    : "h-1 w-full bg-[linear-gradient(90deg,#10b981,#34d399,#1d5fa8)]"
-                }
-              />
-
-              <div className="flex items-center justify-between px-5 py-4">
-                <div
-                  className={
-                    dark
-                      ? "text-sm font-semibold text-slate-100"
-                      : "text-sm font-semibold text-[#1a1814]"
-                  }
-                >
-                  Import Preview
-                </div>
-                <div
-                  className={
-                    dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"
-                  }
-                >
-                  Review imported and skipped rows
-                </div>
-              </div>
-
-              <div className={dark ? "h-px bg-white/8" : "h-px bg-[#eee7dd]"} />
-
+            <section className={dark ? "mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5" : "mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"}>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead
-                    className={
-                      dark
-                        ? "bg-[#101720] text-left text-slate-400"
-                        : "bg-[#f8f4ee] text-left text-[#5b564d]"
-                    }
-                  >
+                <table className="w-full text-sm text-left">
+                  <thead className={dark ? "bg-white/5 text-slate-400" : "bg-slate-50 text-slate-600"}>
                     <tr>
                       <th className="px-5 py-3 font-medium">Row</th>
                       <th className="px-5 py-3 font-medium">Type</th>
                       <th className="px-5 py-3 font-medium">Name</th>
-                      <th className="px-5 py-3 font-medium">Stock No</th>
-                      <th className="px-5 py-3 font-medium">Serial</th>
                       <th className="px-5 py-3 font-medium">Qty</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
-                      <th className="px-5 py-3 font-medium">Error</th>
+                      <th className="px-5 py-3 font-medium text-right">Status</th>
                     </tr>
                   </thead>
-
-                  <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
+                  <tbody className="divide-y divide-slate-500/10">
                     {previewRows.map((row) => (
-                      <tr
-                        key={row.rowNumber}
-                        className={
-                          row.error
-                            ? dark
-                              ? "bg-red-500/5"
-                              : "bg-red-50/60"
-                            : ""
-                        }
-                      >
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                          {row.rowNumber}
-                        </td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                          {row.itemType || "-"}
-                        </td>
-                        <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
-                          {row.name || "-"}
-                        </td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                          {row.stockNumber || "-"}
-                        </td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                          {row.serialNumber || "-"}
-                        </td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                          {row.quantity || "0"} {row.unit}
-                        </td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                          {row.status || "-"}
-                        </td>
-                        <td
-                          className={
-                            row.error
-                              ? dark
-                                ? "px-5 py-3 text-red-300"
-                                : "px-5 py-3 text-red-700"
-                              : dark
-                              ? "px-5 py-3 text-emerald-300"
-                              : "px-5 py-3 text-emerald-700"
-                          }
-                        >
+                      <tr key={row.rowNumber} className={row.error ? (dark ? "bg-red-500/5" : "bg-red-50") : ""}>
+                        <td className="px-5 py-3 opacity-60">{row.rowNumber}</td>
+                        <td className="px-5 py-3">{row.itemType || "-"}</td>
+                        <td className="px-5 py-3 font-bold">{row.name || "-"}</td>
+                        <td className="px-5 py-3 text-center">{row.quantity || "0"} {row.unit}</td>
+                        <td className={`px-5 py-3 text-right font-semibold ${row.error ? "text-red-500" : "text-emerald-500"}`}>
                           {row.error ?? "OK"}
                         </td>
                       </tr>
@@ -596,69 +469,19 @@ export default function UploadInventoryExcelClient({
   );
 }
 
-function Chip({
-  dark,
-  label,
-  value,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-}) {
+function Chip({ dark, label, value }: { dark: boolean; label: string; value: string }) {
   return (
-    <span
-      className={
-        dark
-          ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
-          : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"
-      }
-    >
-      {label}:{" "}
-      <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>
-        {value}
-      </span>
+    <span className={dark ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300" : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"}>
+      {label}: <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>{value}</span>
     </span>
   );
 }
 
-function StatCard({
-  dark,
-  label,
-  value,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-}) {
+function StatCard({ dark, label, value }: { dark: boolean; label: string; value: string }) {
   return (
-    <div
-      className={
-        dark
-          ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5"
-          : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-[0_10px_25px_rgba(26,24,20,0.045)]"
-      }
-    >
-      <div className="h-1 bg-[linear-gradient(90deg,#10b981,#34d399,#1d5fa8)]" />
-      <div className="p-4">
-        <div
-          className={
-            dark
-              ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
-              : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"
-          }
-        >
-          {label}
-        </div>
-        <div
-          className={
-            dark
-              ? "mt-2 text-2xl font-semibold text-slate-100"
-              : "mt-2 text-2xl font-semibold text-[#1a1814]"
-          }
-        >
-          {value}
-        </div>
-      </div>
+    <div className={dark ? "rounded-2xl border border-white/10 bg-white/5 p-4" : "rounded-2xl border border-[#e6ddd1] bg-white shadow-sm"}>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</div>
+      <div className="text-2xl font-black">{value}</div>
     </div>
   );
 }

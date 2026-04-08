@@ -30,7 +30,7 @@ export default async function RestockInventoryItemPage({
   if (!site) return notFound();
   const safeSite = site;
 
-  const items = await prisma.inventoryItem.findMany({
+  const rawItems = await prisma.inventoryItem.findMany({
     where: {
       inventorySiteId: siteId,
       status: { not: "INACTIVE" },
@@ -43,12 +43,21 @@ export default async function RestockInventoryItemPage({
       quantity: true,
       unit: true,
       stockNumber: true,
-      serialNumber: true,
       reorderLevel: true,
       targetStockLevel: true,
       status: true,
+      // ✅ serialNumber column is gone, fetching via instances instead
+      instances: {
+        select: { serialNumber: true }
+      }
     },
   });
+
+  // ✅ Flatten the serial numbers for the client component display
+  const items = rawItems.map(item => ({
+    ...item,
+    serialNumber: item.instances.map(i => i.serialNumber).join(", ") || "-",
+  }));
 
   async function restockItem(formData: FormData) {
     "use server";
@@ -98,6 +107,7 @@ export default async function RestockInventoryItemPage({
         reorderLevel: true,
         targetStockLevel: true,
         status: true,
+        condition: true,
       },
     });
 
@@ -116,6 +126,7 @@ export default async function RestockInventoryItemPage({
 
     try {
       const result = await prisma.$transaction(async (tx) => {
+        // 1. Create the restock log entry
         const restock = await tx.inventoryRestock.create({
           data: {
             inventoryItemId: safeItem.id,
@@ -129,6 +140,7 @@ export default async function RestockInventoryItemPage({
           },
         });
 
+        // 2. Update the master item quantity and status
         const updatedItem = await tx.inventoryItem.update({
           where: { id: safeItem.id },
           data: {
@@ -137,13 +149,23 @@ export default async function RestockInventoryItemPage({
           },
         });
 
+        // 3. Create "Pending" device slots for the new stock
+        await tx.assetInstance.createMany({
+          data: Array.from({ length: Math.trunc(quantityAdded) }).map((_, i) => ({
+            inventoryItemId: safeItem.id,
+            serialNumber: `RESTOCK-${restock.id.slice(-4)}-${i + 1}`, // Unique temporary tag
+            status: "AVAILABLE",
+            condition: safeItem.condition || "GOOD",
+          }))
+        });
+
         return { restock, updatedItem };
       });
 
       await logActivity({
         type: "INVENTORY_RESTOCK_ADDED",
         title: `Restock added: ${result.updatedItem.name}`,
-        details: `Added ${Math.trunc(quantityAdded)}${result.updatedItem.unit ? ` ${result.updatedItem.unit}` : ""} at ${safeSite.name}. Received by: ${receivedBy || "-"}. Supplier: ${supplier || "-"}. New qty: ${result.updatedItem.quantity}${result.updatedItem.unit ? ` ${result.updatedItem.unit}` : ""}.`,
+        details: `Added ${Math.trunc(quantityAdded)}${result.updatedItem.unit ? ` ${result.updatedItem.unit}` : ""} at ${safeSite.name}. New qty: ${result.updatedItem.quantity}.`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
         entityId: result.updatedItem.id,
@@ -162,7 +184,7 @@ export default async function RestockInventoryItemPage({
   return (
     <RestockInventoryItemClient
       site={safeSite}
-      items={items}
+      items={items as any}
       action={restockItem}
     />
   );

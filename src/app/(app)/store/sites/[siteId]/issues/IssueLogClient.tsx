@@ -249,6 +249,7 @@ export default function IssueLogClient({
                 name="q"
                 defaultValue={q}
                 placeholder="Search requester, item, purpose..."
+                title="Search issues"
                 className={
                   dark
                     ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 md:col-span-2"
@@ -377,9 +378,7 @@ export default function IssueLogClient({
             </div>
             <div
               className={
-                dark
-                  ? "text-xs text-slate-500"
-                  : "text-xs text-[#8b857c]"
+                dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"
               }
             >
               {issues.length} shown

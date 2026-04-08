@@ -34,7 +34,7 @@ export default async function SiteRestockLogPage({
 
   if (!site) return notFound();
 
-  const restocks = await prisma.inventoryRestock.findMany({
+  const rawRestocks = await prisma.inventoryRestock.findMany({
     where: {
       inventorySiteId: siteId,
       ...(q
@@ -53,6 +53,14 @@ export default async function SiteRestockLogPage({
                   stockNumber: { contains: q, mode: "insensitive" },
                 },
               },
+              // ✅ Updated: Search through individual unit serials
+              {
+                inventoryItem: {
+                  instances: {
+                    some: { serialNumber: { contains: q, mode: "insensitive" } }
+                  }
+                }
+              }
             ],
           }
         : {}),
@@ -72,12 +80,24 @@ export default async function SiteRestockLogPage({
           name: true,
           itemType: true,
           stockNumber: true,
-          serialNumber: true,
           unit: true,
+          // ✅ Updated: Fetch unit instances to replace old column
+          instances: {
+            select: { serialNumber: true }
+          }
         },
       },
     },
   });
+
+  // ✅ Mapping to keep your existing Client UI logic working perfectly
+  const restocks = rawRestocks.map(row => ({
+    ...row,
+    inventoryItem: {
+      ...row.inventoryItem,
+      serialNumber: row.inventoryItem.instances.map(i => i.serialNumber).join(", ") || "-"
+    }
+  }));
 
   const totalRestocks = await prisma.inventoryRestock.count({
     where: { inventorySiteId: siteId },
@@ -122,7 +142,7 @@ export default async function SiteRestockLogPage({
       q={q}
       totalRestocks={totalRestocks}
       totalQuantityAdded={totalQuantityAdded}
-      restocks={restocks}
+      restocks={restocks as any}
       exportRows={exportRows}
       exportCols={exportCols}
     />

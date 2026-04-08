@@ -215,7 +215,6 @@ export default function IssueInventoryItemClient({
                   <input
                     name="requesterName"
                     placeholder="Enter full name"
-                    aria-label="Requester name"
                     title="Requester name"
                     className={
                       dark
@@ -230,7 +229,6 @@ export default function IssueInventoryItemClient({
                   <input
                     name="requesterContact"
                     placeholder="Phone number or contact"
-                    aria-label="Requester contact"
                     title="Requester contact"
                     className={
                       dark
@@ -247,7 +245,6 @@ export default function IssueInventoryItemClient({
                   <input
                     name="department"
                     placeholder="Department or team"
-                    aria-label="Department"
                     title="Department"
                     className={
                       dark
@@ -275,7 +272,6 @@ export default function IssueInventoryItemClient({
                   <input
                     name="authorizedBy"
                     placeholder="Name of approving officer"
-                    aria-label="Authorized by"
                     title="Authorized by"
                     className={
                       dark
@@ -293,7 +289,6 @@ export default function IssueInventoryItemClient({
                     name="purpose"
                     rows={4}
                     placeholder="Why is this item being issued?"
-                    aria-label="Purpose"
                     title="Purpose"
                     className={
                       dark
@@ -323,7 +318,6 @@ export default function IssueInventoryItemClient({
                     <input
                       name="expectedReturnDate"
                       type="datetime-local"
-                      aria-label="Expected return date"
                       title="Expected return date"
                       className={
                         dark
@@ -337,7 +331,6 @@ export default function IssueInventoryItemClient({
                     <select
                       name="conditionAtIssue"
                       defaultValue={selectedItem?.condition ?? "GOOD"}
-                      aria-label="Condition at issue"
                       title="Condition at issue"
                       className={
                         dark

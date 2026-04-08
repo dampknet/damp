@@ -15,21 +15,15 @@ export default async function InventorySitePage({
   const canEdit = role === "ADMIN" || role === "EDITOR";
 
   const site = await prisma.inventorySite.findFirst({
-    where: {
-      id: siteId,
-      isDeleted: false,
-    },
+    where: { id: siteId, isDeleted: false },
     select: {
       id: true,
       name: true,
       location: true,
       description: true,
-      createdAt: true,
       items: {
-        where: {
-          isDeleted: false,
-        },
-        orderBy: { createdAt: "desc" },
+        where: { isDeleted: false },
+        orderBy: { name: "asc" },
         select: {
           id: true,
           name: true,
@@ -41,20 +35,9 @@ export default async function InventorySitePage({
           quantity: true,
           unit: true,
           reorderLevel: true,
-          targetStockLevel: true,
           status: true,
-          createdAt: true,
-          updatedAt: true,
-          // FETCH THE INDIVIDUAL SERIALS
           instances: {
-            select: {
-              id: true,
-              serialNumber: true,
-              model: true,
-              manufacturer: true,
-              status: true,
-              condition: true,
-            }
+            select: { id: true, serialNumber: true, status: true, condition: true }
           }
         },
       },
@@ -63,32 +46,21 @@ export default async function InventorySitePage({
 
   if (!site) return notFound();
 
-  const totalItems = site.items.length;
-  const materialCount = site.items.filter((item) => item.itemType === "MATERIAL").length;
-  const equipmentCount = site.items.filter((item) => item.itemType === "EQUIPMENT").length;
-  const lowStockCount = site.items.filter(
-    (item) => item.status === "LOW_STOCK" || item.status === "OUT_OF_STOCK"
-  ).length;
-  const checkedOutCount = site.items.filter((item) => item.status === "CHECKED_OUT").length;
+  const summary = {
+    totalItems: site.items.length,
+    materialCount: site.items.filter((i) => i.itemType === "MATERIAL").length,
+    equipmentCount: site.items.filter((i) => i.itemType === "EQUIPMENT").length,
+    lowStockCount: site.items.filter((i) => i.status === "LOW_STOCK" || i.status === "OUT_OF_STOCK").length,
+    checkedOutCount: site.items.filter((i) => i.status === "CHECKED_OUT").length,
+  };
 
   return (
     <InventorySiteClient
       role={role}
       canEdit={canEdit}
-      site={{
-        id: site.id,
-        name: site.name,
-        location: site.location,
-        description: site.description,
-      }}
-      summary={{
-        totalItems,
-        materialCount,
-        equipmentCount,
-        lowStockCount,
-        checkedOutCount,
-      }}
-      items={site.items}
+      site={site}
+      summary={summary}
+      items={site.items as any}
     />
   );
 }

@@ -25,18 +25,18 @@ export default async function GlobalIssueLogPage({
   const issues = await prisma.inventoryIssue.findMany({
     where: {
       AND: [
-        q
-          ? {
-              OR: [
-                { requesterName: { contains: q, mode: "insensitive" } },
-                { requesterContact: { contains: q, mode: "insensitive" } },
-                { purpose: { contains: q, mode: "insensitive" } },
-                { authorizedBy: { contains: q, mode: "insensitive" } },
-                { inventorySite: { name: { contains: q, mode: "insensitive" } } },
-                { inventoryItem: { name: { contains: q, mode: "insensitive" } } },
-              ],
-            }
-          : {},
+        q ? {
+          OR: [
+            { requesterName: { contains: q, mode: "insensitive" } },
+            { requesterContact: { contains: q, mode: "insensitive" } },
+            { purpose: { contains: q, mode: "insensitive" } },
+            { authorizedBy: { contains: q, mode: "insensitive" } },
+            { inventorySite: { name: { contains: q, mode: "insensitive" } } },
+            { inventoryItem: { name: { contains: q, mode: "insensitive" } } },
+            // ✅ Search by serial inside the issue details (if you link individual units)
+            { details: { contains: q, mode: "insensitive" } }, 
+          ],
+        } : {},
         status !== "ALL" ? { status } : {},
         type !== "ALL" ? { itemType: type } : {},
       ],
@@ -59,6 +59,8 @@ export default async function GlobalIssueLogPage({
           id: true,
           name: true,
           unit: true,
+          // ✅ Fetch serials linked to this item
+          instances: { select: { serialNumber: true } }
         },
       },
       inventorySite: {
@@ -95,19 +97,12 @@ export default async function GlobalIssueLogPage({
   }));
 
   const exportCols = [
-    { key: "No", label: "No" },
-    { key: "Site", label: "Site" },
-    { key: "Item", label: "Item" },
-    { key: "Type", label: "Type" },
-    { key: "Quantity", label: "Quantity" },
-    { key: "Requester", label: "Requester" },
-    { key: "Contact", label: "Contact" },
-    { key: "Purpose", label: "Purpose" },
-    { key: "Authorized By", label: "Authorized By" },
-    { key: "Issued At", label: "Issued At" },
-    { key: "Expected Return", label: "Expected Return" },
-    { key: "Returned At", label: "Returned At" },
-    { key: "Status", label: "Status" },
+    { key: "No", label: "No" }, { key: "Site", label: "Site" }, { key: "Item", label: "Item" },
+    { key: "Type", label: "Type" }, { key: "Quantity", label: "Quantity" },
+    { key: "Requester", label: "Requester" }, { key: "Contact", label: "Contact" },
+    { key: "Purpose", label: "Purpose" }, { key: "Authorized By", label: "Authorized By" },
+    { key: "Issued At", label: "Issued At" }, { key: "Expected Return", label: "Expected Return" },
+    { key: "Returned At", label: "Returned At" }, { key: "Status", label: "Status" },
   ];
 
   return (
@@ -117,13 +112,8 @@ export default async function GlobalIssueLogPage({
       q={q}
       status={status}
       type={type}
-      summary={{
-        issuedCount,
-        returnedCount,
-        materialCount,
-        equipmentCount,
-      }}
-      issues={issues}
+      summary={{ issuedCount, returnedCount, materialCount, equipmentCount }}
+      issues={issues as any}
       exportRows={exportRows}
       exportCols={exportCols}
     />

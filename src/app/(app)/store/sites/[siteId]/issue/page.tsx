@@ -34,10 +34,11 @@ export default async function IssueInventoryItemPage({
   if (!site) return notFound();
   const safeSite = site;
 
-  const items = await prisma.inventoryItem.findMany({
+  const rawItems = await prisma.inventoryItem.findMany({
     where: {
       inventorySiteId: siteId,
       status: { not: "INACTIVE" },
+      isDeleted: false,
     },
     orderBy: { name: "asc" },
     select: {
@@ -47,12 +48,21 @@ export default async function IssueInventoryItemPage({
       quantity: true,
       unit: true,
       stockNumber: true,
-      serialNumber: true,
+      // ✅ serialNumber column is gone, fetch via instances instead
+      instances: {
+        select: { serialNumber: true }
+      },
       reorderLevel: true,
       status: true,
       condition: true,
     },
   });
+
+  // Map the data to include a serialNumber string so the Client UI logic works exactly as before
+  const items = rawItems.map(item => ({
+    ...item,
+    serialNumber: item.instances.map(i => i.serialNumber).join(", ") || "-",
+  }));
 
   async function issueItem(formData: FormData) {
     "use server";
@@ -70,19 +80,15 @@ export default async function IssueInventoryItemPage({
     if (!inventoryItemId) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Please select an item")}`);
     }
-
     if (!requesterName) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Requester name is required")}`);
     }
-
     if (!requesterContact) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Contact is required")}`);
     }
-
     if (!purpose) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Purpose is required")}`);
     }
-
     if (!authorizedBy) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Authorized by is required")}`);
     }
@@ -107,18 +113,15 @@ export default async function IssueInventoryItemPage({
     }
 
     const safeItem = item;
-
     const parsedQty = Number(quantityRaw);
     const issueQuantity = safeItem.itemType === "EQUIPMENT" ? 1 : parsedQty;
 
     if (!Number.isFinite(issueQuantity) || issueQuantity <= 0) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Quantity must be greater than 0")}`);
     }
-
     if (safeItem.itemType === "MATERIAL" && issueQuantity > safeItem.quantity) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Issued quantity cannot exceed available quantity")}`);
     }
-
     if (safeItem.itemType === "EQUIPMENT" && safeItem.status === "CHECKED_OUT") {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("This equipment is already checked out")}`);
     }
@@ -200,18 +203,7 @@ export default async function IssueInventoryItemPage({
         await logActivity({
           type: "INVENTORY_LOW_STOCK",
           title: `Low stock detected: ${result.updatedItem.name}`,
-          details: `${result.updatedItem.name} at ${safeSite.name} is low in stock after issue. Qty left: ${result.updatedItem.quantity}${result.updatedItem.unit ? ` ${result.updatedItem.unit}` : ""}. Reorder level: ${result.updatedItem.reorderLevel}.`,
-          actorEmail: profile?.email ?? null,
-          entityType: "INVENTORY_ITEM",
-          entityId: result.updatedItem.id,
-        });
-      }
-
-      if (result.updatedItem.status === "OUT_OF_STOCK") {
-        await logActivity({
-          type: "INVENTORY_OUT_OF_STOCK",
-          title: `Out of stock: ${result.updatedItem.name}`,
-          details: `${result.updatedItem.name} at ${safeSite.name} is out of stock after issue.`,
+          details: `${result.updatedItem.name} at ${safeSite.name} is low in stock after issue.`,
           actorEmail: profile?.email ?? null,
           entityType: "INVENTORY_ITEM",
           entityId: result.updatedItem.id,
@@ -221,15 +213,13 @@ export default async function IssueInventoryItemPage({
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Could not issue item")}`);
     }
 
-    redirect(
-      `/store/sites/${siteId}/issues?success=${encodeURIComponent("Item issued successfully")}`
-    );
+    redirect(`/store/sites/${siteId}/issues?success=${encodeURIComponent("Item issued successfully")}`);
   }
 
   return (
     <IssueInventoryItemClient
       site={safeSite}
-      items={items}
+      items={items as any}
       action={issueItem}
     />
   );

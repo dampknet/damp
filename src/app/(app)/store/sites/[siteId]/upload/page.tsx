@@ -16,7 +16,6 @@ async function buildInventoryTemplateDataUrl() {
       "stockNumber",
       "manufacturer",
       "model",
-      "serialNumber",
       "quantity",
       "unit",
       "reorderLevel",
@@ -31,13 +30,12 @@ async function buildInventoryTemplateDataUrl() {
       "MAT-001",
       "Belden",
       "RG6",
-      "",
       10,
       "rolls",
       2,
       15,
       "AVAILABLE",
-      "",
+      "NEW", // ✅ Added NEW to template
     ],
     [
       "EQUIPMENT",
@@ -46,7 +44,6 @@ async function buildInventoryTemplateDataUrl() {
       "EQ-001",
       "Rohde & Schwarz",
       "SMB100A",
-      "SG-2026-001",
       1,
       "pcs",
       0,
@@ -106,6 +103,7 @@ export default async function UploadInventoryExcelPage({
   });
 
   if (!site) return notFound();
+  const safeSite = site; // ✅ Defined to fix "site is possibly null" errors
 
   async function confirmInventoryExcelImport(formData: FormData) {
     "use server";
@@ -115,11 +113,7 @@ export default async function UploadInventoryExcelPage({
     const freshCanEdit = freshRole === "ADMIN" || freshRole === "EDITOR";
 
     if (!freshCanEdit) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
-          "You are not allowed to import inventory files"
-        )}`
-      );
+      redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("Permission denied")}`);
     }
 
     const previewPayload = normalizeText(formData.get("previewPayload"));
@@ -129,98 +123,94 @@ export default async function UploadInventoryExcelPage({
     const validRows = decodeJson<ValidRow[]>(validRowsPayload) ?? [];
 
     if (validRows.length === 0) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
-          "No valid rows available to import"
-        )}`
-      );
-    }
-
-    const existingSite = await prisma.inventorySite.findFirst({
-      where: { id: siteId, isDeleted: false },
-      select: { id: true, name: true },
-    });
-
-    if (!existingSite) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
-          "Inventory site not found"
-        )}`
-      );
+      redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("No valid rows to import")}`);
     }
 
     const stockNumbers = validRows
       .map((row) => normalizeUpper(row.stockNumber))
       .filter(Boolean);
 
-    const serialNumbers = validRows
-      .map((row) => normalizeUpper(row.serialNumber))
-      .filter(Boolean);
-
-    const duplicateWhere =
-      stockNumbers.length > 0 || serialNumbers.length > 0
-        ? {
-            OR: [
-              ...(stockNumbers.length > 0
-                ? [{ stockNumber: { in: stockNumbers } } as const]
-                : []),
-              ...(serialNumbers.length > 0
-                ? [{ serialNumber: { in: serialNumbers } } as const]
-                : []),
-            ],
-          }
-        : undefined;
-
-    const existingItems = duplicateWhere
+    const existingItems = stockNumbers.length > 0 
       ? await prisma.inventoryItem.findMany({
           where: {
             inventorySiteId: siteId,
             isDeleted: false,
-            ...duplicateWhere,
+            stockNumber: { in: stockNumbers },
           },
-          select: {
-            stockNumber: true,
-            serialNumber: true,
-          },
+          select: { stockNumber: true },
         })
       : [];
 
     if (existingItems.length > 0) {
-      redirect(
-        `/store/sites/${siteId}/upload?error=${encodeURIComponent(
-          "Some rows can no longer be imported because matching stock or serial numbers now exist. Please preview the file again."
-        )}`
-      );
+      redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("Duplicate stock numbers detected.")}`);
     }
 
-    const created = await prisma.inventoryItem.createMany({
-      data: validRows.map((row) => ({
-        inventorySiteId: siteId,
-        ...row,
-      })),
-    });
+    try {
+      let importedCount = 0;
 
-    await logActivity({
-      type: "INVENTORY_IMPORT",
-      title: `Inventory Excel import completed for ${existingSite.name}`,
-      details: `Imported ${created.count} valid row(s) into ${existingSite.name}. Total rows read: ${preview.length}. Invalid/skipped rows: ${preview.filter((row) => !!row.error).length}.`,
-      actorEmail: freshProfile?.email ?? null,
-      entityType: "INVENTORY_SITE",
-      entityId: existingSite.id,
-    });
+      await prisma.$transaction(async (tx) => {
+        for (const row of validRows) {
+          // Normalize condition to include NEW and OLD
+          const condition = (["NEW", "OLD", "GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR"].includes(normalizeUpper(row.condition))
+            ? normalizeUpper(row.condition)
+            : "GOOD") as any;
 
-    redirect(
-      `/store/sites/${siteId}/upload?success=${encodeURIComponent(
-        `${created.count} row(s) imported successfully`
-      )}`
-    );
+          // 1. Create Master Item
+          const item = await tx.inventoryItem.create({
+            data: {
+              inventorySiteId: siteId,
+              itemType: row.itemType,
+              name: row.name,
+              description: row.description,
+              stockNumber: row.stockNumber,
+              manufacturer: row.manufacturer,
+              model: row.model,
+              quantity: Math.trunc(row.quantity),
+              unit: row.unit,
+              reorderLevel: Math.trunc(row.reorderLevel),
+              targetStockLevel: row.targetStockLevel,
+              status: row.status,
+              condition: condition,
+            },
+          });
+
+          // 2. Create Instance Slots
+          if (row.quantity > 0) {
+            await tx.assetInstance.createMany({
+              data: Array.from({ length: Math.trunc(row.quantity) }).map((_, i) => ({
+                inventoryItemId: item.id,
+                serialNumber: `IMPORT-${item.id.slice(-4)}-${i + 1}`,
+                status: row.status === "AVAILABLE" ? "AVAILABLE" : "INACTIVE",
+                condition: condition,
+              })),
+            });
+          }
+          importedCount++;
+        }
+      });
+
+      await logActivity({
+        type: "INVENTORY_IMPORT",
+        title: `Excel import completed: ${importedCount} items`,
+        details: `Imported into ${safeSite.name}.`,
+        actorEmail: freshProfile?.email ?? null,
+        entityType: "INVENTORY_SITE",
+        entityId: safeSite.id,
+      });
+
+    } catch (e) {
+      console.error(e);
+      redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("Import failed during database write")}`);
+    }
+
+    redirect(`/store/sites/${siteId}/upload?success=${encodeURIComponent(`${validRows.length} items imported successfully`)}`);
   }
 
   const templateHref = await buildInventoryTemplateDataUrl();
 
   return (
     <UploadInventoryExcelClient
-      site={site}
+      site={safeSite}
       confirmAction={confirmInventoryExcelImport}
       templateHref={templateHref}
       templateFileName="inventory-import-template.xlsx"

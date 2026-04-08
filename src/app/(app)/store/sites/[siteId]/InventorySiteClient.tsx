@@ -7,17 +7,6 @@ import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import DeleteInventoryItemsDialog from "@/components/DeleteInventoryItemsDialog";
 
-// 1. Matches your new AssetInstance Model
-type AssetInstance = {
-  id: string;
-  serialNumber: string;
-  model: string | null;
-  manufacturer: string | null;
-  status: string;
-  condition: string;
-};
-
-// 2. Matches your InventoryItem Model + Relation
 type InventoryItemRow = {
   id: string;
   name: string;
@@ -28,252 +17,120 @@ type InventoryItemRow = {
   model: string | null;
   quantity: number;
   unit: string | null;
-  reorderLevel: number;
-  targetStockLevel: number | null;
-  status: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
-  createdAt: Date;
-  updatedAt: Date;
-  instances: AssetInstance[]; // This must match your prisma select!
-};
-
-type Summary = {
-  totalItems: number;
-  materialCount: number;
-  equipmentCount: number;
-  lowStockCount: number;
-  checkedOutCount: number;
+  status: string;
 };
 
 function SummaryCard({ dark, label, value, sub, accent }: { dark: boolean; label: string; value: string; sub: string; accent: string }) {
   return (
-    <div className={dark ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl" : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm"}>
-      <div className={`h-1 ${accent}`} />
-      <div className="p-4">
-        <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500" : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"}>{label}</div>
-        <div className={dark ? "mt-2 text-2xl font-semibold tracking-tight text-slate-100" : "mt-2 text-2xl font-semibold tracking-tight text-[#1a1814]"}>{value}</div>
-        <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>{sub}</div>
-      </div>
+    <div className={dark ? "rounded-2xl border border-white/10 bg-white/5 p-4" : "rounded-2xl border border-[#e6ddd1] bg-white p-4 shadow-sm"}>
+      <div className={`h-1 w-8 mb-3 rounded-full ${accent}`} />
+      <div className={dark ? "text-[10px] font-bold uppercase text-slate-500" : "text-[10px] font-bold uppercase text-[#9c9890]"}>{label}</div>
+      <div className="mt-1 text-2xl font-bold">{value}</div>
+      <div className="text-xs opacity-60">{sub}</div>
     </div>
   );
 }
 
-function Chip({ dark, label, value }: { dark: boolean; label: string; value: string }) {
-  return (
-    <span className={dark ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300" : "rounded-full border border-[#e7dfd4] bg-[#fffdf9] px-3 py-1.5 text-xs font-medium text-[#5b564d]"}>
-      {label}: <span className={dark ? "font-semibold text-slate-100" : "font-semibold text-[#1a1814]"}>{value}</span>
-    </span>
-  );
-}
-
 function statusBadge(status: string, dark: boolean) {
-  const base = "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold";
-  if (status === "AVAILABLE") return dark ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300` : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
-  if (status === "LOW_STOCK") return dark ? `${base} border-amber-500/30 bg-amber-500/10 text-amber-300` : `${base} border-amber-200 bg-amber-50 text-amber-700`;
-  if (status === "OUT_OF_STOCK") return dark ? `${base} border-red-500/30 bg-red-500/10 text-red-300` : `${base} border-red-200 bg-red-50 text-red-700`;
-  if (status === "CHECKED_OUT") return dark ? `${base} border-sky-500/30 bg-sky-500/10 text-sky-300` : `${base} border-sky-200 bg-sky-50 text-sky-700`;
-  return dark ? `${base} border-white/10 bg-white/5 text-slate-300` : `${base} border-[#ddd5c9] bg-[#f5f2ed] text-[#5b564d]`;
+  const base = "inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold border";
+  if (status === "AVAILABLE") return `${base} border-emerald-500/20 bg-emerald-500/10 text-emerald-500`;
+  if (status === "LOW_STOCK") return `${base} border-orange-500/20 bg-orange-500/10 text-orange-500`;
+  if (status === "OUT_OF_STOCK") return `${base} border-red-500/20 bg-red-500/10 text-red-500`;
+  return `${base} border-slate-500/20 bg-slate-500/10 text-slate-500`;
 }
 
-export default function InventorySiteClient({
-  role, canEdit, site, summary, items,
-}: {
-  role: string; canEdit: boolean; site: any; summary: Summary; items: InventoryItemRow[];
-}) {
+export default function InventorySiteClient({ role, canEdit, site, summary, items }: any) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
   const router = useRouter();
-
-  const [typeFilter, setTypeFilter] = useState<"ALL" | "MATERIAL" | "EQUIPMENT">("ALL");
-  const [statusFilter, setStatusFilter] = useState<any>("ALL");
   const [q, setQ] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteReason, setDeleteReason] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filteredItems = useMemo(() => {
-    const search = q.trim().toLowerCase();
-    return items.filter((item) => {
-      if (typeFilter !== "ALL" && item.itemType !== typeFilter) return false;
-      if (statusFilter !== "ALL" && item.status !== statusFilter) return false;
-      if (!search) return true;
-      const haystack = [item.name, item.description, item.stockNumber, item.manufacturer, item.model].join(" ").toLowerCase();
-      return haystack.includes(search);
-    });
-  }, [items, q, typeFilter, statusFilter]);
+    return items.filter((item: any) => 
+      item.name.toLowerCase().includes(q.toLowerCase()) || 
+      (item.stockNumber?.toLowerCase().includes(q.toLowerCase()))
+    );
+  }, [items, q]);
 
-  const selectedItems = filteredItems.filter((item) => selectedItemIds.includes(item.id));
-  const allVisibleSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedItemIds.includes(item.id));
-
-  // --- 3. The logic to handle dropdown changes inside the drawer ---
-  async function updateInstance(instanceId: string, field: "status" | "condition", value: string) {
-    try {
-      const res = await fetch(`/inventory/api/instances/update`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instanceId, [field]: value }),
-      });
-      if (res.ok) router.refresh();
-    } catch (e) {
-      alert("Failed to update unit");
-    }
-  }
-
-  const exportRows = filteredItems.map((item, index) => ({
-    No: index + 1, Item: item.name, Type: item.itemType, "Stock No": item.stockNumber ?? "",
-    Quantity: `${item.quantity}${item.unit ? ` ${item.unit}` : ""}`, Status: item.status,
+  const exportRows = filteredItems.map((item: any, index: number) => ({
+    No: index + 1, Item: item.name, Type: item.itemType, "Stock No": item.stockNumber ?? "", Qty: item.quantity, Status: item.status
   }));
 
-  const exportCols = [
-    { key: "No", label: "No" }, { key: "Item", label: "Item" }, { key: "Type", label: "Type" },
-    { key: "Stock No", label: "Stock No" }, { key: "Quantity", label: "Quantity" }, { key: "Status", label: "Status" },
-  ];
-
-  function toggleItemSelection(itemId: string) {
-    setSelectedItemIds((prev) => prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]);
-  }
-
-  function toggleSelectAllVisible() {
-    if (allVisibleSelected) {
-      setSelectedItemIds((prev) => prev.filter((id) => !filteredItems.some((item) => item.id === id)));
-    } else {
-      setSelectedItemIds((prev) => Array.from(new Set([...prev, ...filteredItems.map((item) => item.id)])));
-    }
-  }
-
-  async function handleDeleteSelected() {
-    if (selectedItems.length === 0) return;
-    setDeleting(true);
-    try {
-      await Promise.all(selectedItems.map((item) => fetch("/store/api/inventory-item-delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, reason: deleteReason.trim() || null }),
-      })));
-      setSelectedItemIds([]);
-      setShowDeleteDialog(false);
-      router.refresh();
-    } catch { alert("Failed to delete items"); } finally { setDeleting(false); }
-  }
-
   return (
-    <>
-      <DeleteInventoryItemsDialog
-        open={showDeleteDialog} dark={dark} items={selectedItems.map((item) => ({ id: item.id, name: item.name, stockNumber: item.stockNumber, itemType: item.itemType }))}
-        deleting={deleting} reason={deleteReason} onReasonChange={setDeleteReason} onClose={() => { if (!deleting) setShowDeleteDialog(false); }} onConfirm={handleDeleteSelected}
-      />
-
-      <div className={dark ? "min-h-screen bg-[#0d1117] text-slate-200" : "min-h-screen bg-[#fbf8f3]"}>
-        <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-          <section className={dark ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl" : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white p-6 shadow-sm"}>
-            <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <Link href="/store" className="text-sm font-medium text-slate-400 hover:underline mb-3 inline-block">← Back to Store</Link>
-                <h1 className="text-3xl font-bold tracking-tight">{site.name} Inventory</h1>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Chip dark={dark} label="Site" value={site.name} />
-                  <Chip dark={dark} label="Role" value={role} />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {canEdit && <Link href={`/store/sites/${site.id}/new`} className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500">+ Add Item</Link>}
-                <PrintExportButton title={`${site.name} Inventory`} rows={exportRows} columns={exportCols} />
-              </div>
-            </div>
-          </section>
-
-          {/* Stats Grid */}
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <SummaryCard dark={dark} label="Total Items" value={String(summary.totalItems)} sub="tracked records" accent="bg-sky-500" />
-            <SummaryCard dark={dark} label="Materials" value={String(summary.materialCount)} sub="consumables" accent="bg-emerald-500" />
-            <SummaryCard dark={dark} label="Equipment" value={String(summary.equipmentCount)} sub="units" accent="bg-amber-500" />
-            <SummaryCard dark={dark} label="Low Stock" value={String(summary.lowStockCount)} sub="needs restock" accent="bg-orange-500" />
-            <SummaryCard dark={dark} label="Checked Out" value={String(summary.checkedOutCount)} sub="unavailable" accent="bg-red-500" />
+    <div className={dark ? "min-h-screen bg-[#0d1117] text-slate-200" : "min-h-screen bg-[#fbf8f3]"}>
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        {/* Header Section */}
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <Link href="/store" className="text-sm text-slate-500 hover:underline">← Store Dashboard</Link>
+            <h1 className="text-4xl font-black mt-2 tracking-tight">{site.name}</h1>
+            <p className="text-sm opacity-60 mt-1">{site.location || "No location set"}</p>
           </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-4 no-print">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item name, stock no..." className={dark ? "flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm outline-none" : "flex-1 rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm outline-none"} title="Search inventory" />
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} title="Filter Type" className={dark ? "rounded-xl border border-white/10 bg-[#101720] px-4 py-2 text-sm" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-2 text-sm"}>
-              <option value="ALL">All Types</option>
-              <option value="MATERIAL">Material</option>
-              <option value="EQUIPMENT">Equipment</option>
-            </select>
-          </div>
-
-          <div className={dark ? "mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5" : "mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white"}>
-            <table className="w-full text-left text-sm">
-              <thead className={dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-[#5b564d]"}>
-                <tr>
-                  <th className="w-16 px-5 py-4 font-medium">No</th>
-                  <th className="w-10 px-2 py-4 no-print"><input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} title="Select visible" /></th>
-                  <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider">Item</th>
-                  <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider">Type</th>
-                  <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider text-center">In Stock</th>
-                  <th className="px-5 py-4 font-bold uppercase text-[11px] tracking-wider text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
-                {filteredItems.map((item, index) => (
-                  <React.Fragment key={item.id}>
-                    <tr className={`group cursor-pointer transition-colors ${expandedId === item.id ? (dark ? 'bg-sky-500/10' : 'bg-sky-50') : (dark ? 'hover:bg-white/5' : 'hover:bg-[#fcfaf7]')}`} onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
-                      <td className="px-5 py-4 font-medium opacity-50">{index + 1}</td>
-                      <td className="px-2 py-4 no-print" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={() => toggleItemSelection(item.id)} title="Select row" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-bold text-base">{item.name}</div>
-                        {item.stockNumber && <div className="text-[10px] opacity-60 font-mono">SN: {item.stockNumber}</div>}
-                      </td>
-                      <td className="px-5 py-4 text-[10px] font-black uppercase opacity-40">{item.itemType}</td>
-                      <td className="px-5 py-4 text-center font-bold text-sky-500">{item.quantity} {item.unit || "pcs"}</td>
-                      <td className="px-5 py-4 text-right">
-                        <span className={statusBadge(item.status, dark)}>{item.status}</span>
-                        <div className="text-[9px] mt-1 font-bold text-sky-600 uppercase">{expandedId === item.id ? "▲ Close" : "▼ Details"}</div>
-                      </td>
-                    </tr>
-
-                    {expandedId === item.id && (
-                      <tr>
-                        <td colSpan={6} className={dark ? "bg-black/40 px-10 py-6" : "bg-[#f9f7f4] px-10 py-6"}>
-                          <div className="flex flex-col gap-4 border-l-4 border-sky-500 pl-6">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-sky-600">Unit Tracking ({item.instances?.length || 0})</h3>
-                            <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-xl">
-                              <table className="w-full text-xs text-left">
-                                <thead className={dark ? "bg-white/5 opacity-60" : "bg-gray-100"}>
-                                  <tr className="font-black"><th className="px-4 py-3">Serial</th><th className="px-4 py-3">Condition</th><th className="px-4 py-3">Status</th></tr>
-                                </thead>
-                                <tbody>
-                                  {item.instances?.length > 0 ? item.instances.map((ins) => (
-                                    <tr key={ins.id} className="border-t border-black/5 dark:border-white/5">
-                                      <td className="px-4 py-3 font-mono font-bold text-sky-500">{ins.serialNumber}</td>
-                                      <td className="px-4 py-3">
-                                        <select value={ins.condition} title="Condition" onChange={(e) => updateInstance(ins.id, 'condition', e.target.value)} className="bg-transparent border-none outline-none font-bold text-orange-500">
-                                          <option value="NEW">NEW</option><option value="OLD">OLD</option><option value="GOOD">GOOD</option><option value="FAULTY">FAULTY</option>
-                                        </select>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <select value={ins.status} title="Status" onChange={(e) => updateInstance(ins.id, 'status', e.target.value)} className="bg-transparent border-none outline-none font-bold text-emerald-500">
-                                          <option value="AVAILABLE">AVAILABLE</option><option value="CHECKED_OUT">CHECKED_OUT</option>
-                                        </select>
-                                      </td>
-                                    </tr>
-                                  )) : <tr><td colSpan={3} className="py-6 text-center italic opacity-50">No serials found.</td></tr>}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex gap-2">
+            {canEdit && <Link href={`/store/sites/${site.id}/new`} className="bg-sky-600 px-5 py-2 rounded-xl text-sm font-bold text-white shadow-lg shadow-sky-600/20">+ New Item</Link>}
+            <PrintExportButton title={site.name} rows={exportRows} columns={[]} />
           </div>
         </div>
+
+        {/* Stats Grid */}
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-5 mb-8">
+          <SummaryCard dark={dark} label="Total Items" value={summary.totalItems} sub="Records" accent="bg-sky-500" />
+          <SummaryCard dark={dark} label="Materials" value={summary.materialCount} sub="Consumables" accent="bg-emerald-500" />
+          <SummaryCard dark={dark} label="Equipment" value={summary.equipmentCount} sub="Units" accent="bg-amber-500" />
+          <SummaryCard dark={dark} label="Low Stock" value={summary.lowStockCount} sub="Alerts" accent="bg-red-500" />
+          <SummaryCard dark={dark} label="Checked Out" value={summary.checkedOutCount} sub="In Field" accent="bg-indigo-500" />
+        </div>
+
+        {/* Table Controls */}
+        <div className="flex gap-4 mb-6">
+          <input 
+            value={q} 
+            onChange={(e) => setQ(e.target.value)} 
+            placeholder="Search items..." 
+            className={dark ? "flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none focus:border-sky-500" : "flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-sky-500"} 
+          />
+        </div>
+
+        {/* The Main Table */}
+        <div className={dark ? "rounded-3xl border border-white/10 bg-white/5 overflow-hidden" : "rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm"}>
+          <table className="w-full text-left text-sm">
+            <thead className={dark ? "bg-white/5" : "bg-slate-50 text-slate-500"}>
+              <tr className="text-[11px] font-black uppercase tracking-widest">
+                <th className="px-6 py-4">No</th>
+                <th className="px-6 py-4">Item & Description</th>
+                <th className="px-6 py-4">Stock Number</th>
+                <th className="px-6 py-4 text-center">Quantity</th>
+                <th className="px-6 py-4 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-500/10">
+              {filteredItems.map((item: any, index: number) => (
+                <tr 
+                  key={item.id} 
+                  className="hover:bg-sky-500/5 cursor-pointer group transition-colors"
+                  onClick={() => router.push(`/store/sites/${site.id}/items/${item.id}/devices`)}
+                >
+                  <td className="px-6 py-5 opacity-40">{index + 1}</td>
+                  <td className="px-6 py-5">
+                    <div className="font-bold text-base group-hover:text-sky-500 transition-colors">{item.name}</div>
+                    <div className="text-xs opacity-50 truncate max-w-xs">{item.description || "No description"}</div>
+                  </td>
+                  <td className="px-6 py-5 font-mono text-xs font-bold text-slate-500">{item.stockNumber || "—"}</td>
+                  <td className="px-6 py-5 text-center">
+                    <div className="font-black text-sky-500">{item.quantity}</div>
+                    <div className="text-[10px] opacity-40 uppercase">{item.unit || "units"}</div>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <span className={statusBadge(item.status, dark)}>{item.status}</span>
+                    <div className="text-[9px] mt-1 font-bold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">View Devices →</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

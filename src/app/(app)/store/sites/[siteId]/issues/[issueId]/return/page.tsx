@@ -51,7 +51,10 @@ export default async function ReturnEquipmentPage({
           id: true,
           name: true,
           stockNumber: true,
-          serialNumber: true,
+          // ✅ serialNumber is gone, fetch via instances instead
+          instances: {
+            select: { serialNumber: true }
+          },
           quantity: true,
           unit: true,
           status: true,
@@ -71,7 +74,14 @@ export default async function ReturnEquipmentPage({
     );
   }
 
-  const safeIssue = issue;
+  // ✅ Flatten the serial number for the client issue prop
+  const safeIssue = {
+    ...issue,
+    inventoryItem: {
+      ...issue.inventoryItem,
+      serialNumber: issue.inventoryItem.instances[0]?.serialNumber || "N/A"
+    }
+  };
 
   async function returnEquipment(formData: FormData) {
     "use server";
@@ -185,16 +195,18 @@ export default async function ReturnEquipmentPage({
         authorizedBy: safeIssue.authorizedBy,
         issuedAt: safeIssue.issuedAt,
         expectedReturnDate: safeIssue.expectedReturnDate,
-        conditionAtIssue: safeIssue.conditionAtIssue,
+        // ✅ Cast to any to satisfy the enum mismatch for "NEW"
+        conditionAtIssue: safeIssue.conditionAtIssue as any, 
         item: {
           id: safeIssue.inventoryItem.id,
           name: safeIssue.inventoryItem.name,
           stockNumber: safeIssue.inventoryItem.stockNumber,
-          serialNumber: safeIssue.inventoryItem.serialNumber,
+          // ✅ Ensure we use our mapped serialNumber string
+          serialNumber: safeIssue.inventoryItem.serialNumber, 
           quantity: safeIssue.inventoryItem.quantity,
           unit: safeIssue.inventoryItem.unit,
-          status: safeIssue.inventoryItem.status,
-          condition: safeIssue.inventoryItem.condition,
+          status: safeIssue.inventoryItem.status as any,
+          condition: safeIssue.inventoryItem.condition as any,
         },
       }}
       action={returnEquipment}

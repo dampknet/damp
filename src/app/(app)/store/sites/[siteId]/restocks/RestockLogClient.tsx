@@ -232,6 +232,7 @@ export default function RestockLogClient({
                 name="q"
                 defaultValue={q}
                 placeholder="Search item, supplier, received by..."
+                title="Search restock log"
                 className={
                   dark
                     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500"
@@ -324,7 +325,7 @@ export default function RestockLogClient({
                   <th className="px-5 py-3 font-medium">No</th>
                   <th className="px-5 py-3 font-medium">Item</th>
                   <th className="px-5 py-3 font-medium">Type</th>
-                  <th className="px-5 py-3 font-medium">Qty Added</th>
+                  <th className="px-5 py-3 font-medium text-center">Qty Added</th>
                   <th className="px-5 py-3 font-medium">Date Bought</th>
                   <th className="px-5 py-3 font-medium">Date Received</th>
                   <th className="px-5 py-3 font-medium">Supplier</th>
@@ -369,17 +370,17 @@ export default function RestockLogClient({
                         {row.inventoryItem.itemType}
                       </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
+                      <td className={dark ? "px-5 py-3 text-slate-300 text-center" : "px-5 py-3 text-[#5d584f] text-center"}>
                         {row.quantityAdded}
                         {row.inventoryItem.unit ? ` ${row.inventoryItem.unit}` : ""}
                       </td>
 
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {row.dateBought ? new Date(row.dateBought).toLocaleString() : "-"}
+                        {row.dateBought ? new Date(row.dateBought).toLocaleDateString() : "-"}
                       </td>
 
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {new Date(row.dateReceived).toLocaleString()}
+                        {new Date(row.dateReceived).toLocaleDateString()}
                       </td>
 
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>

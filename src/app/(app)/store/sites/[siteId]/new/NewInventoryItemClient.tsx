@@ -145,6 +145,7 @@ export default function NewInventoryItemClient({
                 <input
                   name="name"
                   placeholder="e.g. RF Cable, Generator, Toolkit"
+                  title="Item Name"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -160,6 +161,7 @@ export default function NewInventoryItemClient({
                 name="description"
                 rows={4}
                 placeholder="Enter item description..."
+                title="Description"
                 className={
                   dark
                     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -173,6 +175,7 @@ export default function NewInventoryItemClient({
                 <input
                   name="stockNumber"
                   placeholder="optional"
+                  title="Stock Number"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -185,6 +188,7 @@ export default function NewInventoryItemClient({
                 <input
                   name="manufacturer"
                   placeholder="optional"
+                  title="Manufacturer"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -197,6 +201,7 @@ export default function NewInventoryItemClient({
                 <input
                   name="model"
                   placeholder="optional"
+                  title="Model"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -206,19 +211,7 @@ export default function NewInventoryItemClient({
               </Field>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Field label="Serial Number" dark={dark}>
-                <input
-                  name="serialNumber"
-                  placeholder="optional"
-                  className={
-                    dark
-                      ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
-                      : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-400"
-                  }
-                />
-              </Field>
-
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
               <Field label="Quantity" dark={dark}>
                 <input
                   name="quantity"
@@ -240,6 +233,7 @@ export default function NewInventoryItemClient({
                 <input
                   name="unit"
                   placeholder="e.g. pcs, rolls, litres"
+                  title="Unit"
                   className={
                     dark
                       ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
@@ -303,7 +297,6 @@ export default function NewInventoryItemClient({
               </Field>
             </div>
 
-            {/* Condition dropdown is now ALWAYS visible regardless of type */}
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Condition" dark={dark}>
                 <select
@@ -330,7 +323,7 @@ export default function NewInventoryItemClient({
                 type="submit"
                 className={
                   dark
-                    ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95"
+                    ? "rounded-xl bg-[linear-gradient(135deg,#10b981,#34d399)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95"
                     : "rounded-xl bg-[#1a1814] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#2d2924]"
                 }
               >

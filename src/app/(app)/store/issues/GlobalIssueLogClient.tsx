@@ -11,6 +11,7 @@ type IssueRow = {
   quantity: number;
   requesterName: string;
   requesterContact: string | null;
+  department: string | null;
   purpose: string;
   authorizedBy: string;
   issuedAt: Date;
@@ -21,6 +22,7 @@ type IssueRow = {
     id: string;
     name: string;
     unit: string | null;
+    instances: { serialNumber: string }[];
   };
   inventorySite: {
     id: string;
@@ -209,7 +211,6 @@ export default function GlobalIssueLogClient({
               >
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Role: {role}
-                {!canEdit ? " • view only" : ""}
               </div>
             </div>
 
@@ -234,8 +235,8 @@ export default function GlobalIssueLogClient({
                 placeholder="Search requester, site, item..."
                 className={
                   dark
-                    ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 md:col-span-2"
-                    : "rounded-xl border border-[#ddd5c9] bg-white px-3 py-2 text-sm outline-none md:col-span-2"
+                    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 md:col-span-2"
+                    : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2 text-sm outline-none md:col-span-2"
                 }
               />
               <select
@@ -403,7 +404,7 @@ export default function GlobalIssueLogClient({
                   issues.map((row, index) => (
                     <tr
                       key={row.id}
-                     onClick={() => router.push(`/store/sites/${row.inventorySite.id}/issues`)}
+                      onClick={() => router.push(`/store/sites/${row.inventorySite.id}/issues`)}
                       className={
                         dark
                           ? "cursor-pointer hover:bg-white/5"
@@ -417,7 +418,10 @@ export default function GlobalIssueLogClient({
                         {row.inventorySite.name}
                       </td>
                       <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
-                        {row.inventoryItem.name}
+                        <div className="font-medium">{row.inventoryItem.name}</div>
+                        <div className="text-[10px] text-sky-500 font-mono">
+                          {row.inventoryItem.instances?.map(i => i.serialNumber).join(", ") || "No serial linked"}
+                        </div>
                       </td>
                       <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
                         {row.requesterName}

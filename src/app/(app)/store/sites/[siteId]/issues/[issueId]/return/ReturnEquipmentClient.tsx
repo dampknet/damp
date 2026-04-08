@@ -14,26 +14,27 @@ export default function ReturnEquipmentClient({
     name: string;
     location: string | null;
   };
-  issue: {
+
+issue: {
+  id: string;
+  requesterName: string;
+  requesterContact: string | null;
+  purpose: string;
+  authorizedBy: string;
+  issuedAt: Date;
+  expectedReturnDate: Date | null;
+  conditionAtIssue: "NEW" | "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null; // ✅ Added "NEW"
+  item: {
     id: string;
-    requesterName: string;
-    requesterContact: string | null;
-    purpose: string;
-    authorizedBy: string;
-    issuedAt: Date;
-    expectedReturnDate: Date | null;
-    conditionAtIssue: "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null;
-    item: {
-      id: string;
-      name: string;
-      stockNumber: string | null;
-      serialNumber: string | null;
-      quantity: number;
-      unit: string | null;
-      status: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
-      condition: "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null;
-    };
+    name: string;
+    stockNumber: string | null;
+    serialNumber: string | null;
+    quantity: number;
+    unit: string | null;
+    status: string;
+    condition: "NEW" | "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null; // ✅ Added "NEW"
   };
+};
   action: (formData: FormData) => void;
 }) {
   const { mode } = useThemeMode();
