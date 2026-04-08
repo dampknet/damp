@@ -17,7 +17,7 @@ export default async function GlobalCheckedOutEquipmentPage({
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
-  const items = await prisma.inventoryIssue.findMany({
+  const rawItems = await prisma.inventoryIssue.findMany({
     where: {
       itemType: "EQUIPMENT",
       status: "ISSUED",
@@ -29,6 +29,13 @@ export default async function GlobalCheckedOutEquipmentPage({
               { inventorySite: { name: { contains: q, mode: "insensitive" } } },
               { inventoryItem: { name: { contains: q, mode: "insensitive" } } },
               { authorizedBy: { contains: q, mode: "insensitive" } },
+              {
+                inventoryItem: {
+                  instances: {
+                    some: { serialNumber: { contains: q, mode: "insensitive" } },
+                  },
+                },
+              },
             ],
           }
         : {}),
@@ -45,8 +52,13 @@ export default async function GlobalCheckedOutEquipmentPage({
       inventoryItem: {
         select: {
           name: true,
-          serialNumber: true,
           stockNumber: true,
+          // ✅ serialNumber is gone, we fetch instances instead
+          instances: {
+            select: {
+              serialNumber: true,
+            },
+          },
         },
       },
       inventorySite: {
@@ -58,11 +70,23 @@ export default async function GlobalCheckedOutEquipmentPage({
     },
   });
 
+  // Map the data to include a serialNumber string for the client
+  const items = rawItems.map((row) => {
+    const serial = row.inventoryItem.instances[0]?.serialNumber || "N/A";
+    return {
+      ...row,
+      inventoryItem: {
+        ...row.inventoryItem,
+        serialNumber: serial,
+      },
+    };
+  });
+
   const exportRows = items.map((row, index) => ({
     No: index + 1,
     Site: row.inventorySite.name,
     Item: row.inventoryItem.name,
-    Serial: row.inventoryItem.serialNumber ?? "",
+    Serial: row.inventoryItem.serialNumber,
     "Stock No": row.inventoryItem.stockNumber ?? "",
     Requester: row.requesterName,
     Contact: row.requesterContact ?? "",

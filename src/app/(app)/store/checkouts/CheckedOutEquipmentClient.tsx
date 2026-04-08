@@ -14,7 +14,7 @@ type Row = {
   expectedReturnDate: Date | null;
   inventoryItem: {
     name: string;
-    serialNumber: string | null;
+    serialNumber: string | null; // This now receives the string from our server map
     stockNumber: string | null;
   };
   inventorySite: {
@@ -53,7 +53,7 @@ export default function CheckedOutEquipmentClient({
           className={
             dark
               ? "no-print relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
-              : "no-print relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
+              : "no-print relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-sm"
           }
         >
           <div
@@ -140,6 +140,7 @@ export default function CheckedOutEquipmentClient({
                 name="q"
                 defaultValue={q}
                 placeholder="Search site, item, requester..."
+                title="Search Checked Out Equipment"
                 className={
                   dark
                     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500"
@@ -176,7 +177,7 @@ export default function CheckedOutEquipmentClient({
           className={
             dark
               ? "print-area mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl"
-              : "print-area mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-[0_12px_34px_rgba(26,24,20,0.055)]"
+              : "print-area mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-sm"
           }
         >
           <div className="print-only px-5 py-4">
@@ -208,7 +209,7 @@ export default function CheckedOutEquipmentClient({
                   <th className="px-5 py-3 font-medium">Requester</th>
                   <th className="px-5 py-3 font-medium">Authorized By</th>
                   <th className="px-5 py-3 font-medium">Issued At</th>
-                  <th className="px-5 py-3 font-medium">Expected Return</th>
+                  <th className="px-5 py-3 font-medium text-right">Expected Return</th>
                 </tr>
               </thead>
 
@@ -221,33 +222,37 @@ export default function CheckedOutEquipmentClient({
                   </tr>
                 ) : (
                   items.map((row, index) => (
-                    <tr key={row.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}>
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{index + 1}</td>
-                      <td className="px-5 py-3">
+                    <tr key={row.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7] transition-colors"}>
+                      <td className={dark ? "px-5 py-4 text-slate-300" : "px-5 py-4 text-[#5d584f]"}>{index + 1}</td>
+                      <td className="px-5 py-4">
                         <Link
                           href={`/store/sites/${row.inventorySite.id}/issues`}
-                          className={dark ? "text-slate-100 hover:underline" : "text-[#1a1814] hover:underline"}
+                          className={dark ? "text-slate-100 font-bold hover:underline" : "text-[#1a1814] font-bold hover:underline"}
                         >
                           {row.inventorySite.name}
                         </Link>
                       </td>
-                      <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
-                        <div className="font-medium">{row.inventoryItem.name}</div>
-                        <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
-                          {row.inventoryItem.stockNumber ?? "-"}
-                          {row.inventoryItem.serialNumber ? ` • ${row.inventoryItem.serialNumber}` : ""}
+                      <td className="px-5 py-4">
+                        <div className={dark ? "text-slate-100 font-bold" : "text-[#1a1814] font-bold"}>{row.inventoryItem.name}</div>
+                        <div className="flex flex-col mt-1">
+                          {row.inventoryItem.stockNumber && <span className="text-[10px] opacity-60 font-mono">STOCK: {row.inventoryItem.stockNumber}</span>}
+                          {row.inventoryItem.serialNumber && row.inventoryItem.serialNumber !== "N/A" && (
+                            <span className="text-[10px] text-sky-500 font-mono italic">Unit: {row.inventoryItem.serialNumber}</span>
+                          )}
                         </div>
                       </td>
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        <div>{row.requesterName}</div>
-                        <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
+                      <td className="px-5 py-4">
+                        <div className={dark ? "text-slate-300 font-semibold" : "text-[#5d584f] font-semibold"}>{row.requesterName}</div>
+                        <div className={dark ? "text-[10px] text-slate-500" : "text-[10px] text-[#8b857c]"}>
                           {row.requesterContact ?? "-"}
                         </div>
                       </td>
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{row.authorizedBy}</td>
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{new Date(row.issuedAt).toLocaleString()}</td>
-                      <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                        {row.expectedReturnDate ? new Date(row.expectedReturnDate).toLocaleString() : "-"}
+                      <td className={dark ? "px-5 py-4 text-slate-300" : "px-5 py-4 text-[#5d584f]"}>{row.authorizedBy}</td>
+                      <td className={dark ? "px-5 py-4 text-slate-300" : "px-5 py-4 text-[#5d584f]"}>{new Date(row.issuedAt).toLocaleDateString()}</td>
+                      <td className="px-5 py-4 text-right">
+                        <span className={dark ? "text-slate-300" : "text-[#5d584f]"}>
+                          {row.expectedReturnDate ? new Date(row.expectedReturnDate).toLocaleDateString() : "-"}
+                        </span>
                       </td>
                     </tr>
                   ))
