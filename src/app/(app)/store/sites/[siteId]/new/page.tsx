@@ -68,12 +68,13 @@ export default async function NewInventoryItemPage({
       preferredStatus,
     });
 
-    const condition = (["GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR"].includes(conditionRaw) 
+    const condition = (["GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR", "NEW", "OLD"].includes(conditionRaw) 
       ? conditionRaw 
       : "GOOD") as EquipmentCondition;
 
     try {
       await prisma.$transaction(async (tx) => {
+        // 1. Create the Master Item
         const createdItem = await tx.inventoryItem.create({
           data: {
             inventorySiteId: siteId,
@@ -88,18 +89,18 @@ export default async function NewInventoryItemPage({
             reorderLevel: Math.trunc(reorderLevel),
             targetStockLevel: targetStockLevel === null ? null : Math.trunc(targetStockLevel),
             status: finalStatus,
-            condition,
+            // ❌ REMOVED: condition (this was the line 91 error)
           },
         });
 
+        // 2. Create individual slots for the quantity provided
         if (quantity > 0) {
           await tx.assetInstance.createMany({
             data: Array.from({ length: Math.trunc(quantity) }).map((_, i) => ({
               inventoryItemId: createdItem.id,
               serialNumber: `PENDING-${createdItem.id.slice(0,4)}-${i+1}`,
-              // ✅ FIX: Use "AVAILABLE" or "INACTIVE" to match InventoryItemStatus enum
               status: finalStatus === "AVAILABLE" ? "AVAILABLE" : "INACTIVE", 
-              condition: condition,
+              condition: condition, // ✅ Condition is correctly saved here on the units
             }))
           });
         }
@@ -107,7 +108,7 @@ export default async function NewInventoryItemPage({
         await logActivity({
           type: "INVENTORY_ITEM_CREATED",
           title: `Inventory item created: ${createdItem.name}`,
-          details: `Created ${createdItem.itemType} item at ${safeSite.name}. Qty: ${createdItem.quantity}.`,
+          details: `Created ${createdItem.itemType} item at ${safeSite.name}. Qty: ${createdItem.quantity}. Initial Condition: ${condition}.`,
           actorEmail: profile?.email ?? null,
           entityType: "INVENTORY_ITEM",
           entityId: createdItem.id,
