@@ -89,7 +89,7 @@ export async function parseInventoryFile({
   if (rows.length > MAX_ROWS)
     throw new Error(`Too many rows. Maximum allowed is ${MAX_ROWS}`);
 
-  /* ===== Fetch existing once (performance boost) ===== */
+  /* ===== Fetch existing data to check for duplicates ===== */
   const existingItems = await prisma.inventoryItem.findMany({
     where: {
       inventorySiteId: siteId,
@@ -97,8 +97,16 @@ export async function parseInventoryFile({
     },
     select: {
       stockNumber: true,
-      serialNumber: true,
+      // ✅ REMOVED: serialNumber (was line 100 error)
     },
+  });
+
+  // ✅ NEW: Fetch serial numbers from the instances table for validation
+  const existingInstances = await prisma.assetInstance.findMany({
+    where: {
+      inventoryItem: { inventorySiteId: siteId }
+    },
+    select: { serialNumber: true }
   });
 
   const existingStockNumbers = new Set(
@@ -106,7 +114,7 @@ export async function parseInventoryFile({
   );
 
   const existingSerialNumbers = new Set(
-    existingItems.map((x) => normalizeUpper(x.serialNumber)).filter(Boolean)
+    existingInstances.map((x) => normalizeUpper(x.serialNumber)).filter(Boolean)
   );
 
   const seenUploadStockNumbers = new Set<string>();
@@ -181,13 +189,11 @@ export async function parseInventoryFile({
       preferredStatus: statusRaw as InventoryItemStatus,
     });
 
+    // ✅ FIXED: Added NEW and OLD support
     let condition: EquipmentCondition | null = null;
     if (itemType === "EQUIPMENT") {
       condition =
-        conditionRaw === "GOOD" ||
-        conditionRaw === "FAULTY" ||
-        conditionRaw === "DAMAGED" ||
-        conditionRaw === "UNDER_REPAIR"
+        ["NEW", "OLD", "GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR"].includes(conditionRaw)
           ? (conditionRaw as EquipmentCondition)
           : "GOOD";
     }
