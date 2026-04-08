@@ -46,7 +46,10 @@ export default async function DeletedItemsPage() {
         name: true,
         itemType: true,
         stockNumber: true,
-        serialNumber: true,
+        // ✅ serialNumber is removed. We use instances instead.
+        instances: {
+          select: { id: true }
+        },
         deletedAt: true,
         deletedByEmail: true,
         deleteReason: true,
@@ -92,17 +95,23 @@ export default async function DeletedItemsPage() {
         deleteReason: x.deleteReason ?? null,
         entityType: "ASSET" as const,
       }))}
-      inventoryItems={inventoryItems.map((x) => ({
-        id: x.id,
-        label: x.name,
-        subLabel: `${x.itemType} • ${x.inventorySite.name}${
-          x.stockNumber ? ` • ${x.stockNumber}` : x.serialNumber ? ` • ${x.serialNumber}` : ""
-        }`,
-        deletedAt: x.deletedAt?.toISOString() ?? null,
-        deletedByEmail: x.deletedByEmail ?? null,
-        deleteReason: x.deleteReason ?? null,
-        entityType: "INVENTORY_ITEM" as const,
-      }))}
+      inventoryItems={inventoryItems.map((x) => {
+        // Construct a subLabel that shows how many units were tracked
+        const unitCount = x.instances?.length || 0;
+        const trackingInfo = unitCount > 0 ? ` • ${unitCount} units` : "";
+        
+        return {
+          id: x.id,
+          label: x.name,
+          subLabel: `${x.itemType} • ${x.inventorySite.name}${
+            x.stockNumber ? ` • ${x.stockNumber}` : trackingInfo
+          }`,
+          deletedAt: x.deletedAt?.toISOString() ?? null,
+          deletedByEmail: x.deletedByEmail ?? null,
+          deleteReason: x.deleteReason ?? null,
+          entityType: "INVENTORY_ITEM" as const,
+        };
+      })}
       storeItems={storeItems.map((x) => ({
         id: x.id,
         label: `Item #${x.itemNo}`,
