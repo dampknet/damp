@@ -148,6 +148,7 @@ export default async function UploadInventoryExcelPage({
     try {
       let importedCount = 0;
 
+      // Setting a longer timeout (30s) for the transaction to handle large material counts
       await prisma.$transaction(async (tx) => {
         for (const row of validRows) {
           const condition = (["NEW", "OLD", "GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR"].includes(normalizeUpper(row.condition))
@@ -169,29 +170,34 @@ export default async function UploadInventoryExcelPage({
               reorderLevel: Math.trunc(row.reorderLevel),
               targetStockLevel: row.targetStockLevel,
               status: row.status,
-              // ❌ REMOVED: condition (Line 173 fix)
             },
           });
 
-          // 2. Create Instance Slots
-          if (row.quantity > 0) {
+          // 2. Create Instance Slots ONLY for EQUIPMENT
+          // This allows 2000 MATERIAL items to import instantly without creating 2000 rows.
+          if (row.itemType === "EQUIPMENT" && row.quantity > 0) {
+            // Safety cap: limit to 500 instances per item to prevent accidental database bloat
+            const instancesToCreate = Math.min(Math.trunc(row.quantity), 500);
+            
             await tx.assetInstance.createMany({
-              data: Array.from({ length: Math.trunc(row.quantity) }).map((_, i) => ({
+              data: Array.from({ length: instancesToCreate }).map((_, i) => ({
                 inventoryItemId: item.id,
                 serialNumber: `IMPORT-${item.id.slice(-4)}-${i + 1}`,
                 status: row.status === "AVAILABLE" ? "AVAILABLE" : "INACTIVE",
-                condition: condition, // ✅ Condition is correctly saved to the unit slots
+                condition: condition,
               })),
             });
           }
           importedCount++;
         }
+      }, {
+        timeout: 30000 // 30 seconds timeout
       });
 
       await logActivity({
         type: "INVENTORY_IMPORT",
         title: `Excel import completed: ${importedCount} items`,
-        details: `Imported into ${safeSite.name}.`,
+        details: `Imported into ${safeSite.name}. Bulk quantities applied for Materials; unit slots generated for Equipment.`,
         actorEmail: freshProfile?.email ?? null,
         entityType: "INVENTORY_SITE",
         entityId: safeSite.id,
@@ -199,7 +205,7 @@ export default async function UploadInventoryExcelPage({
 
     } catch (e) {
       console.error(e);
-      redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("Import failed during database write")}`);
+      redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("Import failed: The file is too large or contains too many individual units.")}`);
     }
 
     redirect(`/store/sites/${siteId}/upload?success=${encodeURIComponent(`${validRows.length} items imported successfully`)}`);
