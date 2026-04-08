@@ -35,7 +35,7 @@ async function buildInventoryTemplateDataUrl() {
       2,
       15,
       "AVAILABLE",
-      "NEW", // ✅ Added NEW to template
+      "NEW", 
     ],
     [
       "EQUIPMENT",
@@ -103,7 +103,7 @@ export default async function UploadInventoryExcelPage({
   });
 
   if (!site) return notFound();
-  const safeSite = site; // ✅ Defined to fix "site is possibly null" errors
+  const safeSite = site;
 
   async function confirmInventoryExcelImport(formData: FormData) {
     "use server";
@@ -150,7 +150,6 @@ export default async function UploadInventoryExcelPage({
 
       await prisma.$transaction(async (tx) => {
         for (const row of validRows) {
-          // Normalize condition to include NEW and OLD
           const condition = (["NEW", "OLD", "GOOD", "FAULTY", "DAMAGED", "UNDER_REPAIR"].includes(normalizeUpper(row.condition))
             ? normalizeUpper(row.condition)
             : "GOOD") as any;
@@ -170,7 +169,7 @@ export default async function UploadInventoryExcelPage({
               reorderLevel: Math.trunc(row.reorderLevel),
               targetStockLevel: row.targetStockLevel,
               status: row.status,
-              condition: condition,
+              // ❌ REMOVED: condition (Line 173 fix)
             },
           });
 
@@ -181,7 +180,7 @@ export default async function UploadInventoryExcelPage({
                 inventoryItemId: item.id,
                 serialNumber: `IMPORT-${item.id.slice(-4)}-${i + 1}`,
                 status: row.status === "AVAILABLE" ? "AVAILABLE" : "INACTIVE",
-                condition: condition,
+                condition: condition, // ✅ Condition is correctly saved to the unit slots
               })),
             });
           }
