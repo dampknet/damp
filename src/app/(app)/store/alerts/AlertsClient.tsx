@@ -14,7 +14,7 @@ type AlertRow = {
   targetStockLevel: number | null;
   status: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
   stockNumber: string | null;
-  serialNumber: string | null;
+  serialNumber: string | null; // This will now receive the combined serials string from the server
   inventorySite: {
     id: string;
     name: string;
@@ -192,12 +192,13 @@ export default function AlertsClient({
               <input
                 name="q"
                 defaultValue={q}
-                placeholder="Search site, item, stock number..."
+                placeholder="Search site, item, serial..."
                 className={
                   dark
                     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500"
                     : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2 text-sm outline-none"
                 }
+                title="Search Alerts"
               />
               <button
                 type="submit"
@@ -276,18 +277,17 @@ export default function AlertsClient({
                   <th className="px-5 py-3 font-medium">Site</th>
                   <th className="px-5 py-3 font-medium">Item</th>
                   <th className="px-5 py-3 font-medium">Type</th>
-                  <th className="px-5 py-3 font-medium">Qty</th>
-                  <th className="px-5 py-3 font-medium">Reorder Level</th>
-                  <th className="px-5 py-3 font-medium">Target</th>
-                  <th className="px-5 py-3 font-medium">Restock Needed</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium text-center">Qty</th>
+                  <th className="px-5 py-3 font-medium text-center">Reorder</th>
+                  <th className="px-5 py-3 font-medium text-center">Restock Needed</th>
+                  <th className="px-5 py-3 font-medium text-right">Status</th>
                 </tr>
               </thead>
 
               <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className={dark ? "px-5 py-10 text-center text-slate-500" : "px-5 py-10 text-center text-gray-600"}>
+                    <td colSpan={8} className={dark ? "px-5 py-10 text-center text-slate-500" : "px-5 py-10 text-center text-gray-600"}>
                       No alert items found.
                     </td>
                   </tr>
@@ -299,29 +299,35 @@ export default function AlertsClient({
                         : "-";
 
                     return (
-                      <tr key={row.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{index + 1}</td>
-                        <td className="px-5 py-3">
+                      <tr key={row.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7] transition-colors"}>
+                        <td className={dark ? "px-5 py-4 text-slate-300" : "px-5 py-4 text-[#5d584f]"}>{index + 1}</td>
+                        <td className="px-5 py-4">
                           <Link
                             href={`/store/sites/${row.inventorySite.id}`}
-                            className={dark ? "text-slate-100 hover:underline" : "text-[#1a1814] hover:underline"}
+                            className={dark ? "text-slate-100 font-bold hover:underline" : "text-[#1a1814] font-bold hover:underline"}
                           >
                             {row.inventorySite.name}
                           </Link>
                         </td>
-                        <td className={dark ? "px-5 py-3 text-slate-100" : "px-5 py-3 text-[#1a1814]"}>
-                          <div className="font-medium">{row.name}</div>
-                          <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>
-                            {row.stockNumber ?? "-"}
-                            {row.serialNumber ? ` • ${row.serialNumber}` : ""}
+                        <td className="px-5 py-4">
+                          <div className={dark ? "text-slate-100 font-bold" : "text-[#1a1814] font-bold"}>{row.name}</div>
+                          <div className="flex flex-col mt-1">
+                             {row.stockNumber && <span className="text-[10px] opacity-60 font-mono">STOCK: {row.stockNumber}</span>}
+                             {row.serialNumber && row.serialNumber !== "-" && (
+                               <span className="text-[10px] text-sky-500 font-mono italic">Serials: {row.serialNumber}</span>
+                             )}
                           </div>
                         </td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{row.itemType}</td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{row.quantity}{row.unit ? ` ${row.unit}` : ""}</td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{row.reorderLevel}</td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{row.targetStockLevel ?? "-"}</td>
-                        <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>{needed}</td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-4">
+                           <span className="text-[10px] font-black uppercase opacity-40">{row.itemType}</span>
+                        </td>
+                        <td className={dark ? "px-5 py-4 text-center text-slate-300" : "px-5 py-4 text-center text-[#5d584f]"}>
+                          <span className="font-bold">{row.quantity}</span>
+                          <span className="text-[10px] ml-1 opacity-50">{row.unit || ""}</span>
+                        </td>
+                        <td className="px-5 py-4 text-center opacity-60">{row.reorderLevel}</td>
+                        <td className="px-5 py-4 text-center font-bold text-amber-600">{needed}</td>
+                        <td className="px-5 py-4 text-right">
                           <span className={statusBadge(row.status, dark)}>{row.status}</span>
                         </td>
                       </tr>

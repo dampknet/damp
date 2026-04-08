@@ -17,8 +17,10 @@ export default async function StoreAlertsPage({
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
 
-  const items = await prisma.inventoryItem.findMany({
+  // 1. Fetch data from DB (Matching the new schema)
+  const rawItems = await prisma.inventoryItem.findMany({
     where: {
+      isDeleted: false,
       OR: [{ status: "LOW_STOCK" }, { status: "OUT_OF_STOCK" }],
       ...(q
         ? {
@@ -27,13 +29,12 @@ export default async function StoreAlertsPage({
                 OR: [
                   { name: { contains: q, mode: "insensitive" } },
                   { stockNumber: { contains: q, mode: "insensitive" } },
-                  // ✅ Check individual unit serial numbers instead
-                  { 
-                    instances: { 
-                      some: { 
-                        serialNumber: { contains: q, mode: "insensitive" } 
-                      } 
-                    } 
+                  {
+                    instances: {
+                      some: {
+                        serialNumber: { contains: q, mode: "insensitive" },
+                      },
+                    },
                   },
                   { inventorySite: { name: { contains: q, mode: "insensitive" } } },
                 ],
@@ -53,7 +54,12 @@ export default async function StoreAlertsPage({
       targetStockLevel: true,
       status: true,
       stockNumber: true,
-      serialNumber: true,
+      // serialNumber is removed from DB, so we fetch instances instead
+      instances: {
+        select: {
+          serialNumber: true,
+        },
+      },
       inventorySite: {
         select: {
           id: true,
@@ -64,13 +70,34 @@ export default async function StoreAlertsPage({
   });
 
   const lowStockCount = await prisma.inventoryItem.count({
-    where: { status: "LOW_STOCK" },
+    where: { status: "LOW_STOCK", isDeleted: false },
   });
 
   const outOfStockCount = await prisma.inventoryItem.count({
-    where: { status: "OUT_OF_STOCK" },
+    where: { status: "OUT_OF_STOCK", isDeleted: false },
   });
 
+  // 2. Map data to match the AlertRow type exactly
+  const items = rawItems.map((row) => {
+    const combinedSerials = row.instances.map((i) => i.serialNumber).join(", ");
+    
+    return {
+      id: row.id,
+      name: row.name,
+      itemType: row.itemType,
+      quantity: row.quantity,
+      unit: row.unit,
+      reorderLevel: row.reorderLevel,
+      targetStockLevel: row.targetStockLevel,
+      status: row.status,
+      stockNumber: row.stockNumber,
+      // We pass the string version to the client component
+      serialNumber: combinedSerials || "-",
+      inventorySite: row.inventorySite,
+    };
+  });
+
+  // 3. Prepare exports
   const exportRows = items.map((row, index) => ({
     No: index + 1,
     Site: row.inventorySite.name,
@@ -81,7 +108,7 @@ export default async function StoreAlertsPage({
     "Target Stock Level": row.targetStockLevel ?? "",
     Status: row.status,
     "Stock No": row.stockNumber ?? "",
-    Serial: row.serialNumber ?? "",
+    Serial: row.serialNumber,
     "Restock Needed":
       row.targetStockLevel !== null ? Math.max(0, row.targetStockLevel - row.quantity) : "",
   }));
