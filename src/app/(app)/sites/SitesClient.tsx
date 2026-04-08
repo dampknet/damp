@@ -933,9 +933,9 @@ function SitesSection({
 
                   <td className="px-2 py-3">
                     <div className="grid grid-cols-3 gap-0 text-center border border-white/5 rounded-md overflow-hidden">
-                      {/* MUX 1: Constant 530 */}
+                      {/* MUX 1: Constant 28/530 */}
                       <div className={`py-1 text-[11px] border-r border-white/5 ${dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-gray-600"}`}>
-                        530
+                        28/530
                       </div>
                       
                       {/* MUX 2: Dynamic from DB */}
@@ -943,9 +943,9 @@ function SitesSection({
                         {s.regMFreq ?? "-"}
                       </div>
                       
-                      {/* MUX 3: Constant 474 */}
+                      {/* MUX 3: Constant 21/474 */}
                       <div className={`py-1 text-[11px] ${dark ? "bg-white/5 text-slate-400" : "bg-gray-50 text-gray-600"}`}>
-                        474
+                        21/474
                       </div>
                     </div>
                   </td>
