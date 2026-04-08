@@ -48,8 +48,7 @@ export default async function EditInventoryItemPage({
       reorderLevel: true,
       targetStockLevel: true,
       status: true,
-      // ✅ Note: condition is fetched for the client form, but stored on instances in the DB
-      condition: true, 
+      // ❌ REMOVED condition: true from here because it doesn't exist in the DB for this table
       instances: {
         select: { serialNumber: true }
       }
@@ -59,9 +58,10 @@ export default async function EditInventoryItemPage({
   if (!item) return notFound();
 
   const safeSite = site;
-  // ✅ Flatten serialNumber for the Client component
+  // ✅ Map data for the client component. Providing a default "GOOD" condition.
   const safeItem = {
     ...item,
+    condition: "GOOD",
     serialNumber: item.instances.map(i => i.serialNumber).join(", ") || null
   };
 
@@ -138,7 +138,9 @@ export default async function EditInventoryItemPage({
         conditionRaw === "GOOD" ||
         conditionRaw === "FAULTY" ||
         conditionRaw === "DAMAGED" ||
-        conditionRaw === "UNDER_REPAIR"
+        conditionRaw === "UNDER_REPAIR" ||
+        conditionRaw === "NEW" ||
+        conditionRaw === "OLD"
     ) {
         condition = conditionRaw as EquipmentCondition;
     } else {
@@ -163,13 +165,11 @@ export default async function EditInventoryItemPage({
           targetStockLevel:
             targetStockLevel === null ? null : Math.trunc(targetStockLevel),
           status: finalStatus,
-          // ✅ If condition exists on the main model, it updates here. 
-          // If it was removed from schema, this line can be removed.
-          condition, 
+          // ❌ REMOVED condition from update data as it's not in the main model
         },
       });
 
-      // ✅ FIX: Use local 'condition' variable instead of updatedItem.condition to avoid TS error
+      // ✅ FIX: Use local 'condition' variable for logging
       const afterSummary = `After → Name: ${updatedItem.name}, Type: ${updatedItem.itemType}, Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}, Status: ${updatedItem.status}, Condition: ${condition}`;
 
       await logActivity({
@@ -185,24 +185,14 @@ export default async function EditInventoryItemPage({
         await logActivity({
           type: "INVENTORY_LOW_STOCK",
           title: `Low stock detected: ${updatedItem.name}`,
-          details: `${updatedItem.name} at ${safeSite.name} is low in stock. Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}. Reorder level: ${updatedItem.reorderLevel}.`,
+          details: `${updatedItem.name} at ${safeSite.name} is low in stock.`,
           actorEmail: profile?.email ?? null,
           entityType: "INVENTORY_ITEM",
           entityId: updatedItem.id,
         });
       }
-
-      if (updatedItem.status === "OUT_OF_STOCK") {
-        await logActivity({
-          type: "INVENTORY_OUT_OF_STOCK",
-          title: `Out of stock: ${updatedItem.name}`,
-          details: `${updatedItem.name} at ${safeSite.name} is out of stock.`,
-          actorEmail: profile?.email ?? null,
-          entityType: "INVENTORY_ITEM",
-          entityId: updatedItem.id,
-        });
-      }
-    } catch {
+    } catch (e) {
+      console.error(e);
       redirect(
         `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(
           "Could not update inventory item"
