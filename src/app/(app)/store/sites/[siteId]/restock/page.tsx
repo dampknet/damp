@@ -46,14 +46,12 @@ export default async function RestockInventoryItemPage({
       reorderLevel: true,
       targetStockLevel: true,
       status: true,
-      // ✅ serialNumber column is gone, fetching via instances instead
       instances: {
         select: { serialNumber: true }
       }
     },
   });
 
-  // ✅ Flatten the serial numbers for the client component display
   const items = rawItems.map(item => ({
     ...item,
     serialNumber: item.instances.map(i => i.serialNumber).join(", ") || "-",
@@ -107,7 +105,7 @@ export default async function RestockInventoryItemPage({
         reorderLevel: true,
         targetStockLevel: true,
         status: true,
-        condition: true,
+        // ❌ REMOVED: condition: true (Line 110 fix)
       },
     });
 
@@ -126,7 +124,6 @@ export default async function RestockInventoryItemPage({
 
     try {
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Create the restock log entry
         const restock = await tx.inventoryRestock.create({
           data: {
             inventoryItemId: safeItem.id,
@@ -140,7 +137,6 @@ export default async function RestockInventoryItemPage({
           },
         });
 
-        // 2. Update the master item quantity and status
         const updatedItem = await tx.inventoryItem.update({
           where: { id: safeItem.id },
           data: {
@@ -149,13 +145,12 @@ export default async function RestockInventoryItemPage({
           },
         });
 
-        // 3. Create "Pending" device slots for the new stock
         await tx.assetInstance.createMany({
           data: Array.from({ length: Math.trunc(quantityAdded) }).map((_, i) => ({
             inventoryItemId: safeItem.id,
-            serialNumber: `RESTOCK-${restock.id.slice(-4)}-${i + 1}`, // Unique temporary tag
+            serialNumber: `RESTOCK-${restock.id.slice(-4)}-${i + 1}`,
             status: "AVAILABLE",
-            condition: safeItem.condition || "GOOD",
+            condition: "GOOD", // ✅ Fallback to GOOD since master condition is gone
           }))
         });
 
