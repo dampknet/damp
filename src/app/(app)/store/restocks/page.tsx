@@ -18,26 +18,28 @@ export default async function GlobalRestockLogPage({
   const role = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
 
-  const restocks = await prisma.inventoryRestock.findMany({
-    where: q
-      ? {
-          OR: [
-            { supplier: { contains: q, mode: "insensitive" } },
-            { receivedBy: { contains: q, mode: "insensitive" } },
-            { note: { contains: q, mode: "insensitive" } },
-            {
-              inventoryItem: {
-                name: { contains: q, mode: "insensitive" },
+  const rawRestocks = await prisma.inventoryRestock.findMany({
+    where: {
+      ...(q
+        ? {
+            OR: [
+              { supplier: { contains: q, mode: "insensitive" } },
+              { receivedBy: { contains: q, mode: "insensitive" } },
+              { note: { contains: q, mode: "insensitive" } },
+              { inventoryItem: { name: { contains: q, mode: "insensitive" } } },
+              { inventoryItem: { stockNumber: { contains: q, mode: "insensitive" } } },
+              // ✅ Correct way to search by serial number through the relation
+              { 
+                inventoryItem: { 
+                  instances: { 
+                    some: { serialNumber: { contains: q, mode: "insensitive" } } 
+                  } 
+                } 
               },
-            },
-            {
-              inventorySite: {
-                name: { contains: q, mode: "insensitive" },
-              },
-            },
-          ],
-        }
-      : {},
+            ],
+          }
+        : {}),
+    },
     orderBy: { dateReceived: "desc" },
     select: {
       id: true,
@@ -49,11 +51,15 @@ export default async function GlobalRestockLogPage({
       note: true,
       inventoryItem: {
         select: {
+          id: true,
           name: true,
           itemType: true,
           stockNumber: true,
-          serialNumber: true,
           unit: true,
+          // ✅ FIXED: Fetch instances instead of deleted serialNumber column
+          instances: {
+            select: { serialNumber: true }
+          }
         },
       },
       inventorySite: {
@@ -64,6 +70,15 @@ export default async function GlobalRestockLogPage({
       },
     },
   });
+
+  // ✅ Flatten the serial numbers into a string for the Client UI
+  const restocks = rawRestocks.map(row => ({
+    ...row,
+    inventoryItem: {
+      ...row.inventoryItem,
+      serialNumber: row.inventoryItem.instances.map(i => i.serialNumber).join(", ") || "-"
+    }
+  }));
 
   const totalRestocks = await prisma.inventoryRestock.count();
   const totalQuantityAdded = restocks.reduce((sum, row) => sum + row.quantityAdded, 0);
@@ -79,7 +94,6 @@ export default async function GlobalRestockLogPage({
     "Date Received": row.dateReceived.toISOString(),
     Supplier: row.supplier ?? "",
     "Received By": row.receivedBy ?? "",
-    Note: row.note ?? "",
   }));
 
   const exportCols = [
@@ -93,7 +107,6 @@ export default async function GlobalRestockLogPage({
     { key: "Date Received", label: "Date Received" },
     { key: "Supplier", label: "Supplier" },
     { key: "Received By", label: "Received By" },
-    { key: "Note", label: "Note" },
   ];
 
   return (
@@ -103,7 +116,7 @@ export default async function GlobalRestockLogPage({
       q={q}
       totalRestocks={totalRestocks}
       totalQuantityAdded={totalQuantityAdded}
-      restocks={restocks}
+      restocks={restocks as any}
       exportRows={exportRows}
       exportCols={exportCols}
     />
