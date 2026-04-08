@@ -27,7 +27,14 @@ export default async function StoreAlertsPage({
                 OR: [
                   { name: { contains: q, mode: "insensitive" } },
                   { stockNumber: { contains: q, mode: "insensitive" } },
-                  { serialNumber: { contains: q, mode: "insensitive" } },
+                  // ✅ Check individual unit serial numbers instead
+                  { 
+                    instances: { 
+                      some: { 
+                        serialNumber: { contains: q, mode: "insensitive" } 
+                      } 
+                    } 
+                  },
                   { inventorySite: { name: { contains: q, mode: "insensitive" } } },
                 ],
               },

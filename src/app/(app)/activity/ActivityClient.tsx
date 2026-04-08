@@ -28,7 +28,8 @@ type ActivityItem = {
       | "LOW STOCK"
       | "OUT"
       | "DELETED"
-      | "CREATED";
+      | "CREATED"
+      | "UNIT"; // ✅ Added UNIT label here
   };
   href: string | null;
   entityLabel: string;
@@ -145,6 +146,7 @@ export default function ActivityClient({
                     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-white/20"
                     : "w-full rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm outline-none focus:border-[#1a1814]"
                 }
+                title="Search logs"
               />
 
               <select
@@ -154,7 +156,7 @@ export default function ActivityClient({
                 title="Filter by action"
                 className={
                   dark
-                    ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+                    ? "rounded-xl border border-white/10 bg-[#101720] px-3 py-2 text-sm text-slate-100"
                     : "rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
                 }
               >
@@ -173,7 +175,7 @@ export default function ActivityClient({
                 title="Filter by period"
                 className={
                   dark
-                    ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+                    ? "rounded-xl border border-white/10 bg-[#101720] px-3 py-2 text-sm text-slate-100"
                     : "rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
                 }
               >
@@ -255,7 +257,7 @@ export default function ActivityClient({
                   <th className="px-5 py-3 font-semibold">Action</th>
                   <th className="px-5 py-3 font-semibold">Reason</th>
                   <th className="px-5 py-3 font-semibold">By</th>
-                  <th className="px-5 py-3 font-semibold">Entity</th>
+                  <th className="px-5 py-3 font-semibold text-right">Entity</th>
                 </tr>
               </thead>
 
@@ -277,33 +279,33 @@ export default function ActivityClient({
                   activities.map((a) => (
                     <tr
                       key={a.id}
-                      className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}
+                      className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7] transition-colors"}
                     >
-                      <td className={dark ? "px-5 py-3 font-medium text-slate-500" : "px-5 py-3 font-medium text-[#6b655d]"}>
+                      <td className={dark ? "px-5 py-4 font-medium text-slate-500" : "px-5 py-4 font-medium text-[#6b655d]"}>
                         {a.no}
                       </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                      <td className={dark ? "px-5 py-4 text-slate-400 font-mono text-[12px]" : "px-5 py-4 text-[#5d584f] font-mono text-[12px]"}>
                         {a.timeLabel}
                       </td>
 
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-4">
                         <span
                           className={
                             dark
-                              ? "inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300"
-                              : "inline-flex rounded-full border border-[#e0dbd2] bg-[#f8f4ee] px-2.5 py-1 text-[11px] font-semibold text-[#5b564d]"
+                              ? "inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight text-slate-300"
+                              : "inline-flex rounded-full border border-[#e0dbd2] bg-[#f8f4ee] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight text-[#5b564d]"
                           }
                         >
                           {a.typeLabel}
                         </span>
                       </td>
 
-                      <td className={dark ? "px-5 py-3 font-semibold text-slate-100" : "px-5 py-3 font-semibold text-[#1a1814]"}>
+                      <td className={dark ? "px-5 py-4 font-semibold text-slate-100" : "px-5 py-4 font-semibold text-[#1a1814]"}>
                         <div className="flex items-start gap-2">
-                          <span className={`mt-1 h-2.5 w-2.5 rounded-full ${a.indicator.color}`} />
+                          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${a.indicator.color}`} />
                           <div>
-                            <div>{a.reason}</div>
+                            <div className="text-sm">{a.reason}</div>
                             {a.details ? (
                               <div className={dark ? "mt-1 text-xs font-normal text-slate-500" : "mt-1 text-xs font-normal text-[#8b857c]"}>
                                 {a.details}
@@ -313,24 +315,24 @@ export default function ActivityClient({
                         </div>
                       </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                      <td className={dark ? "px-5 py-4 text-slate-400 text-xs" : "px-5 py-4 text-[#5d584f] text-xs"}>
                         {a.actorEmail}
                       </td>
 
-                      <td className={dark ? "px-5 py-3 text-slate-400" : "px-5 py-3 text-[#5d584f]"}>
+                      <td className="px-5 py-4 text-right">
                         {a.href ? (
                           <Link
                             href={a.href}
                             className={
                               dark
-                                ? "font-medium text-[#60a5fa] hover:underline"
-                                : "font-medium text-[#c8611a] hover:underline"
+                                ? "font-bold text-sky-400 text-xs hover:underline"
+                                : "font-bold text-blue-700 text-xs hover:underline"
                             }
                           >
                             {a.entityLabel}
                           </Link>
                         ) : (
-                          a.entityLabel
+                          <span className="text-xs opacity-50">{a.entityLabel}</span>
                         )}
                       </td>
                     </tr>
