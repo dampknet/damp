@@ -33,8 +33,13 @@ export default async function GlobalIssueLogPage({
             { authorizedBy: { contains: q, mode: "insensitive" } },
             { inventorySite: { name: { contains: q, mode: "insensitive" } } },
             { inventoryItem: { name: { contains: q, mode: "insensitive" } } },
-            // ✅ Search by serial inside the issue details (if you link individual units)
-            { details: { contains: q, mode: "insensitive" } }, 
+            { 
+              inventoryItem: { 
+                instances: { 
+                  some: { serialNumber: { contains: q, mode: "insensitive" } } 
+                } 
+              } 
+            },
           ],
         } : {},
         status !== "ALL" ? { status } : {},
