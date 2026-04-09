@@ -1018,16 +1018,18 @@ function SitesSection({
                           </a>
                         ) : null}
 
-                        {/* This component handles the "Edit" button. 
-                          The coordinates will ONLY show inside the input field 
-                          once the user clicks 'Edit'.
-                        */}
-                        <SiteGpsInlineEdit
-                          siteId={s.id}
-                          initialGps={s.gps ?? null}
-                          canEdit={canEdit}
-                          showCoords={false} // You might need to pass this prop if you want to hide the text in the sub-component
-                        />
+                        {/* ✅ ROLE RESTRICTED EDITING */}
+                        {canEdit ? (
+                          <SiteGpsInlineEdit
+                            siteId={s.id}
+                            initialGps={s.gps ?? null}
+                            canEdit={canEdit}
+                            showCoords={false}
+                          />
+                        ) : (
+                          /* If user cannot edit, just show the GPS text/link if there's no location name */
+                          !s.locationName && <GpsLink gps={s.gps ?? null} dark={dark} />
+                        )}
                       </div>
                     )}
                   </td>
