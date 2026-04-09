@@ -49,17 +49,7 @@ export async function middleware(req: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL("/auth/login", req.url));
     }
-
-    /* CRITICAL CHANGE: 
-      Instead of checking a hardcoded WHITELISTED_EMAILS file, 
-      we rely on the fact that your 'addUser' action already 
-      created a row in the 'userProfile' table.
-      
-      If you want an extra layer of security here, you would fetch 
-      the profile from Prisma, but since Middleware runs on every 
-      request, it's faster to trust the Supabase Auth + your 
-      'requireCurrentProfile' check inside the layouts.
-    */
+      res.headers.set("x-user-id", user.id);
   }
 
   return res;
