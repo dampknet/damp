@@ -36,7 +36,7 @@ export default async function InventorySitePage({
           unit: true,
           reorderLevel: true,
           status: true,
-          condition: true, // ✅ Logic: Fetching actual condition from DB
+          // ❌ REMOVED: condition: true (This was the line 39 error)
           instances: {
             select: { id: true, serialNumber: true, status: true, condition: true }
           }
@@ -46,6 +46,13 @@ export default async function InventorySitePage({
   });
 
   if (!site) return notFound();
+
+  // ✅ Logic: Since the master item doesn't have a condition, we look at the first instance
+  // or default to "GOOD" to show in your table column.
+  const itemsWithCondition = site.items.map(item => ({
+    ...item,
+    condition: item.instances[0]?.condition || "GOOD"
+  }));
 
   const summary = {
     totalItems: site.items.length,
@@ -61,7 +68,7 @@ export default async function InventorySitePage({
       canEdit={canEdit}
       site={site}
       summary={summary}
-      items={site.items as any}
+      items={itemsWithCondition as any}
     />
   );
 }
