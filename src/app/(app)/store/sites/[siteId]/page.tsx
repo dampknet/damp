@@ -36,6 +36,7 @@ export default async function InventorySitePage({
           unit: true,
           reorderLevel: true,
           status: true,
+          condition: true, // ✅ Logic: Fetching actual condition from DB
           instances: {
             select: { id: true, serialNumber: true, status: true, condition: true }
           }

@@ -48,9 +48,10 @@ function SummaryCard({
 
 function conditionBadge(condition: string, dark: boolean) {
   const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold border";
-  if (condition === "NEW" || condition === "GOOD") 
+  const val = condition || "GOOD";
+  if (val === "NEW" || val === "GOOD") 
     return dark ? `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300` : `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
-  if (condition === "FAULTY" || condition === "DAMAGED")
+  if (val === "FAULTY" || val === "DAMAGED")
     return dark ? `${base} border-red-500/30 bg-red-500/10 text-red-300` : `${base} border-red-200 bg-red-50 text-red-700`;
   return dark ? `${base} border-orange-500/30 bg-orange-500/10 text-orange-300` : `${base} border-orange-200 bg-orange-50 text-orange-700`;
 }
@@ -210,22 +211,30 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                     <td className="px-4 py-3">
                       <Link 
                         href={`/store/sites/${site.id}/items/${item.id}/edit`}
-                        className={dark ? "font-semibold text-slate-100 hover:text-sky-400 hover:underline" : "font-semibold text-[#1a1814] hover:text-blue-700 hover:underline"}
+                        className={dark ? "font-bold text-slate-100 hover:text-sky-400 hover:underline" : "font-bold text-[#1a1814] hover:text-blue-700 hover:underline"}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {item.name}
                       </Link>
-                      <div className="text-[11px] opacity-50 truncate max-w-xs">{item.description || "No description"}</div>
+                      {/* ✅ Logic: Description darker, only shows if it exists */}
+                      {item.description && (
+                        <div className={dark ? "text-[11px] text-slate-300 mt-1" : "text-[11px] text-[#423f3a] mt-1"}>
+                          {item.description}
+                        </div>
+                      )}
                     </td>
                     <td className={dark ? "px-4 py-3 font-mono text-xs text-slate-400" : "px-4 py-3 font-mono text-xs text-[#5d584f]"}>
                       {item.stockNumber || "—"}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={dark ? "font-bold text-slate-200" : "font-bold text-[#1a1814]"}>{item.quantity}</span>
-                      <span className="ml-1 text-[10px] opacity-40 uppercase">{item.unit || "pcs"}</span>
+                      {/* ✅ Logic: Unit text darker */}
+                      <span className={dark ? "ml-1 text-[10px] font-black text-slate-400 uppercase" : "ml-1 text-[10px] font-black text-[#5d584f] uppercase"}>
+                        {item.unit || "pcs"}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={conditionBadge(item.condition || "GOOD", dark)}>
+                      <span className={conditionBadge(item.condition, dark)}>
                         {item.condition || "GOOD"}
                       </span>
                     </td>
