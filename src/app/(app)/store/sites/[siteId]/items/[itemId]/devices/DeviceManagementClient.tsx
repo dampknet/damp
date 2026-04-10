@@ -78,11 +78,19 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
   async function updateUnit(instanceId: string, updates: any) {
     setLoadingId(instanceId);
+    
+    // ✅ Logic: If the user cleared the input, we send a placeholder back
+    // so the DB doesn't fail unique constraints on empty strings.
+    const payload = { ...updates };
+    if (payload.serialNumber === "") {
+      payload.serialNumber = `PENDING-${instanceId.slice(-5)}`;
+    }
+
     try {
       const res = await fetch(`/store/instances/${instanceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok) router.refresh();
@@ -95,7 +103,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     <div className={dark ? "min-h-screen bg-[#0d1117] text-slate-200" : "min-h-screen bg-[#fbf8f3]"}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         
-        {/* SCANNER MODAL */}
         {scanningId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10" : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"}>
@@ -106,7 +113,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           </div>
         )}
 
-        {/* BREADCRUMB & HEADER */}
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <Link href={`/store/sites/${item.inventorySiteId}`} className="inline-flex items-center gap-2 text-sm font-bold opacity-60 hover:opacity-100 hover:text-sky-500 transition-all mb-4">
@@ -121,15 +127,13 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           </div>
         </div>
 
-        {/* THE TABLE FRAMEWORK */}
         <div className={dark ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5" : "overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-xl"}>
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className={dark ? "bg-white/5 text-[11px] font-black uppercase tracking-widest text-slate-400" : "bg-slate-100 text-[11px] font-black uppercase tracking-widest text-slate-600"}>
                 <th className="px-6 py-4 w-16">No.</th>
                 <th className="px-6 py-4">Asset Identification (Serial Number)</th>
-                <th className="px-6 py-4 w-48">Condition</th>
-                <th className="px-6 py-4 w-20 text-center">Status</th>
+                <th className="px-6 py-4 w-48 text-right">Condition</th>
               </tr>
             </thead>
             <tbody className={dark ? "divide-y divide-white/5" : "divide-y divide-slate-200"}>
@@ -138,14 +142,12 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
                 return (
                   <tr key={unit.id} className={dark ? "hover:bg-white/2 transition-colors" : "hover:bg-slate-50 transition-colors"}>
-                    {/* INDEX */}
                     <td className="px-6 py-4">
                       <span className={dark ? "text-slate-500 font-mono font-bold" : "text-slate-400 font-mono font-bold"}>
                         {String(index + 1).padStart(2, '0')}
                       </span>
                     </td>
 
-                    {/* SERIAL INPUT SECTION */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="relative flex-1">
@@ -157,9 +159,8 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                               setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: val } : u)));
                             }}
                             onBlur={(e) => {
-                              if (e.target.value !== item.instances[index].serialNumber) {
-                                updateUnit(unit.id, { serialNumber: e.target.value });
-                              }
+                              // Send the update. If empty, our updateUnit function handles it.
+                              updateUnit(unit.id, { serialNumber: e.target.value });
                             }}
                             placeholder="Awaiting Scan or Entry..."
                             className={dark 
@@ -185,27 +186,21 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                       </div>
                     </td>
 
-                    {/* CONDITION DROPDOWN */}
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-right">
                       <select 
                         value={unit.condition} 
-                        title="Set physical condition"
+                        title="Set condition"
                         aria-label={`Condition for unit ${index + 1}`}
                         onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} 
                         className={dark 
-                          ? "w-full bg-slate-800 border border-white/20 rounded-xl px-3 py-2 text-xs font-black text-white outline-none focus:ring-2 ring-sky-500/50" 
-                          : "w-full bg-white border border-slate-400 rounded-xl px-3 py-2 text-xs font-black text-slate-900 outline-none focus:ring-2 ring-sky-600/20"}
+                          ? "w-32 bg-slate-800 border border-white/20 rounded-xl px-3 py-2 text-xs font-black text-white outline-none focus:ring-2 ring-sky-500/50" 
+                          : "w-32 bg-white border border-slate-400 rounded-xl px-3 py-2 text-xs font-black text-slate-900 outline-none focus:ring-2 ring-sky-600/20"}
                       >
-                        <option value="NEW">NEW / SEALED</option>
-                        <option value="GOOD">GOOD / WORKING</option>
-                        <option value="FAULTY">FAULTY / TESTING</option>
-                        <option value="DAMAGED">DAMAGED / SCRAP</option>
+                        <option value="NEW">NEW</option>
+                        <option value="GOOD">GOOD</option>
+                        <option value="FAULTY">FAULTY</option>
+                        <option value="DAMAGED">DAMAGED</option>
                       </select>
-                    </td>
-
-                    {/* STATUS INDICATOR */}
-                    <td className="px-6 py-4 text-center">
-                       <div className={`h-3 w-3 rounded-full mx-auto ${unit.status === 'AVAILABLE' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-orange-500'}`} title={unit.status} />
                     </td>
                   </tr>
                 );
@@ -213,12 +208,11 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
             </tbody>
           </table>
 
-          {/* DYNAMIC ADDITION FOOTER */}
           <div className={dark ? "bg-white/3 p-4 border-t border-white/10" : "bg-slate-50 p-4 border-t border-slate-200"}>
              <button 
               onClick={() => setScanningId("NEW_SLOT")}
               disabled={isAddingNew}
-              title="Add a new physical unit to this item"
+              title="Add a new physical unit"
               aria-label="Create new asset instance"
               className={dark
                 ? "flex items-center justify-center gap-3 w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-black text-sm uppercase tracking-widest text-slate-400 hover:border-sky-500 hover:text-sky-500 transition-all"
