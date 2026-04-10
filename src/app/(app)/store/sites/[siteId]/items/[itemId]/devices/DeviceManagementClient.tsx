@@ -76,7 +76,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     }
 
     try {
-      const res = await fetch(`/api/store/instances/${instanceId}`, {
+      const res = await fetch(`/store/instances/${instanceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
