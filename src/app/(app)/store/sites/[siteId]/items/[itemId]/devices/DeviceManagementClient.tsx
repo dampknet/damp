@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import { QrCode, X, Loader2, CheckCircle2 } from "lucide-react";
+import { QrCode, X, Loader2, CheckCircle2, PlusCircle } from "lucide-react";
 
 export default function DeviceManagementClient({ item, canEdit }: any) {
   const { mode } = useThemeMode();
@@ -15,6 +15,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   const [localUnits, setLocalUnits] = useState(item.instances);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [scanningId, setScanningId] = useState<string | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
 
   useEffect(() => {
     setLocalUnits(item.instances);
@@ -22,6 +23,20 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
   const isPlaceholder = (sn: string) => {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
+  };
+
+  // ✅ SMART PARSER: Extracts data even from messy strings
+  const parseSmartScan = (text: string) => {
+    const data: any = {};
+    const snMatch = text.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
+    const modelMatch = text.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
+    const mfgMatch = text.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
+
+    data.serialNumber = snMatch ? snMatch[1] : text.split(' ')[0];
+    if (modelMatch) data.model = modelMatch[1];
+    if (mfgMatch) data.manufacturer = mfgMatch[1];
+
+    return data;
   };
 
   useEffect(() => {
@@ -33,69 +48,50 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
       );
 
       const onScanSuccess = async (decodedText: string) => {
-        let cleanSerial = "";
-        let extraData: any = {};
-
-        // CHECK: Handle JSON data or plain text with prefix
-        try {
-          const parsed = JSON.parse(decodedText);
-          cleanSerial = parsed.serialNumber || parsed.sn || decodedText;
-          extraData.manufacturer = parsed.manufacturer || parsed.make;
-          extraData.model = parsed.model;
-        } catch (e) {
-          // Logic: Strip "serial number: " if it exists in the raw text
-          cleanSerial = decodedText.replace(/serial number:\s*/i, "").trim();
-        }
+        const smartData = parseSmartScan(decodedText);
+        await scanner.clear();
         
-        await scanner.clear(); 
+        if (scanningId === "NEW_SLOT") {
+          await addNewInstance(smartData);
+        } else {
+          await updateUnit(scanningId, smartData);
+        }
         setScanningId(null);
-
-        // Logic: Send cleaned serial and hidden manufacturer/model info
-        await updateUnit(scanningId, { 
-          serialNumber: cleanSerial,
-          ...extraData 
-        });
       };
 
       scanner.render(onScanSuccess, () => {});
-
-      return () => {
-        scanner.clear().catch(e => console.error("Scanner clear error", e));
-      };
+      return () => { scanner.clear().catch(() => {}); };
     }
   }, [scanningId]);
 
+  // ✅ POST to your specific route: src/app/(app)/store/instances/new/route.ts
+  async function addNewInstance(data: any) {
+    setIsAddingNew(true);
+    try {
+      const res = await fetch(`/store/instances/new`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, ...data }),
+      });
+      if (res.ok) router.refresh();
+      else alert("Could not add new stock.");
+    } catch (e) { alert("Network error."); }
+    finally { setIsAddingNew(false); }
+  }
+
   async function updateUnit(instanceId: string, updates: any) {
     setLoadingId(instanceId);
-    
-    // Optimistic UI Update
-    if (updates.serialNumber) {
-      setLocalUnits((prev: any) =>
-        prev.map((u: any) => (u.id === instanceId ? { ...u, serialNumber: updates.serialNumber } : u))
-      );
-    }
-
     try {
       const res = await fetch(`/store/instances/${instanceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-
       const data = await res.json();
-
-      if (res.ok) {
-        router.refresh();
-      } else {
-        // Logic: Show why it failed (e.g. Duplicate Serial)
-        alert(data.message || "Server failed to save. Please try again.");
-        router.refresh(); 
-      }
-    } catch (e) {
-      alert("Network error.");
-    } finally {
-      setLoadingId(null);
-    }
+      if (res.ok) router.refresh();
+      else alert(data.message || "Save failed.");
+    } catch (e) { alert("Network error."); }
+    finally { setLoadingId(null); }
   }
 
   return (
@@ -104,7 +100,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         
         {scanningId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10" : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"}>
+            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative" : "bg-white w-full max-w-md rounded-3xl p-6 relative"}>
               <button 
                 onClick={() => setScanningId(null)} 
                 title="Close Scanner"
@@ -113,15 +109,21 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
               >
                 <X size={24} />
               </button>
-              <h2 className="text-xl font-bold mb-4 text-center">Scanning...</h2>
+              <h2 className="text-xl font-bold mb-4 text-center">Smart Scan Active</h2>
               <div id="qr-reader" className="overflow-hidden rounded-2xl border-2 border-dashed border-slate-500/30" />
             </div>
           </div>
         )}
 
-        <div className="mb-8">
-          <Link href={`/store/sites/${item.inventorySiteId}`} className="text-sm opacity-50 hover:underline">← Back</Link>
-          <h1 className="text-3xl font-black mt-2">{item.name}</h1>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <Link href={`/store/sites/${item.inventorySiteId}`} className="text-sm opacity-50 hover:underline">← Back</Link>
+            <h1 className="text-3xl font-black mt-2">{item.name}</h1>
+          </div>
+          <div className={dark ? "bg-white/10 px-4 py-2 rounded-2xl border border-white/10" : "bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm"}>
+             <span className="text-xs font-bold uppercase opacity-50 block">Quantity</span>
+             <span className="text-xl font-black">{item.quantity} {item.unit || "pcs"}</span>
+          </div>
         </div>
 
         <div className="grid gap-4">
@@ -131,39 +133,28 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
             return (
               <div key={unit.id} className={dark ? "bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4" : "bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"}>
                 <div className="flex items-center gap-4 flex-1">
-                  <div className={dark ? "h-10 w-10 rounded-xl bg-sky-500/20 text-sky-500 flex items-center justify-center font-black" : "h-10 w-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-black"}>
-                    {index + 1}
-                  </div>
-                  
+                  <div className={dark ? "h-10 w-10 rounded-xl bg-sky-500/20 text-sky-500 flex items-center justify-center font-black" : "h-10 w-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-black"}>{index + 1}</div>
                   <div className="flex-1">
                     <div className="text-[10px] font-bold uppercase opacity-50">Serial Number</div>
                     <div className="flex items-center gap-2">
                       <input 
                         value={hasRealSerial ? unit.serialNumber : ""}
-                        title={`Serial number for item ${index + 1}`}
+                        title={`Serial number for unit ${index + 1}`}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setLocalUnits((prev: any) =>
-                            prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: val } : u))
-                          );
+                          setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: val } : u)));
                         }}
-                        onBlur={(e) => {
-                          if (e.target.value !== item.instances[index].serialNumber) {
-                            updateUnit(unit.id, { serialNumber: e.target.value });
-                          }
-                        }}
+                        onBlur={(e) => updateUnit(unit.id, { serialNumber: e.target.value })}
                         placeholder="Waiting for scan..."
-                        disabled={!canEdit || loadingId === unit.id}
-                        className={dark ? "bg-transparent border-b border-white/10 outline-none font-mono text-lg w-full md:w-64 text-slate-100" : "bg-transparent border-b border-slate-300 outline-none font-mono text-lg w-full md:w-64 text-[#1a1814]"}
+                        className="bg-transparent border-b border-white/10 outline-none font-mono text-lg w-full md:w-64 text-slate-100"
                       />
-                      
                       {loadingId === unit.id ? (
                         <Loader2 className="animate-spin opacity-50" size={18} />
                       ) : hasRealSerial ? (
                         <CheckCircle2 className="text-emerald-500" size={18} />
                       ) : (
-                        <button
-                          onClick={() => setScanningId(unit.id)}
+                        <button 
+                          onClick={() => setScanningId(unit.id)} 
                           title="Scan with Camera"
                           aria-label={`Scan barcode for unit ${index + 1}`}
                           className={dark ? "p-2 rounded-lg bg-white/5 text-sky-400" : "p-2 rounded-lg bg-slate-100 text-sky-600"}
@@ -174,24 +165,35 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                     </div>
                   </div>
                 </div>
-
-                <div className="flex gap-3">
-                  <select 
-                    value={unit.condition} 
-                    title="Select condition"
-                    aria-label={`Condition for unit ${index + 1}`}
-                    onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} 
-                    className={dark ? "bg-white/5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200" : "bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-[#5b564d]"}
-                  >
-                    <option value="NEW">NEW</option>
-                    <option value="GOOD">GOOD</option>
-                    <option value="FAULTY">FAULTY</option>
-                    <option value="DAMAGED">DAMAGED</option>
-                  </select>
-                </div>
+                <select 
+                  value={unit.condition} 
+                  title="Select condition"
+                  aria-label={`Condition for unit ${index + 1}`}
+                  onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} 
+                  className={dark ? "bg-white/5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200" : "bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-[#5b564d]"}
+                >
+                  <option value="NEW">NEW</option>
+                  <option value="GOOD">GOOD</option>
+                  <option value="FAULTY">FAULTY</option>
+                  <option value="DAMAGED">DAMAGED</option>
+                </select>
               </div>
             );
           })}
+
+          {/* ✅ THE DYNAMIC SLOT: Add extra stock via scanner */}
+          <div className={dark ? "border-2 border-dashed border-white/10 rounded-2xl p-6 flex items-center justify-center bg-white/5 group" : "border-2 border-dashed border-slate-200 rounded-2xl p-6 flex items-center justify-center bg-slate-50 group"}>
+             <button 
+              onClick={() => setScanningId("NEW_SLOT")}
+              disabled={isAddingNew}
+              title="Add extra stock"
+              aria-label="Add extra stock by scanning"
+              className="flex items-center gap-3 text-sm font-bold opacity-60 group-hover:opacity-100"
+             >
+               {isAddingNew ? <Loader2 className="animate-spin" /> : <PlusCircle className="text-sky-500" />}
+               Click or Scan here to add EXTRA STOCK
+             </button>
+          </div>
         </div>
       </div>
     </div>
