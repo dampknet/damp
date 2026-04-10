@@ -12,29 +12,46 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   const dark = mode === "dark";
   const router = useRouter();
   
-  const [localUnits, setLocalUnits] = useState(item.instances);
+  // ✅ FIX: Reverse the order so the most recent (or bottom of DB) shows at the top if desired, 
+  // but usually, we want to see the latest additions first.
+  const [localUnits, setLocalUnits] = useState([...item.instances].reverse());
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
 
   useEffect(() => {
-    setLocalUnits(item.instances);
+    setLocalUnits([...item.instances].reverse());
   }, [item.instances]);
 
   const isPlaceholder = (sn: string) => {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
+  /** * ✅ SUPER SMART PARSER 
+   * Specifically tuned for: <Rohde & Schwarz><2501.7406.06-101793-dZ>
+   */
   const parseSmartScan = (text: string) => {
     const data: any = { serialNumber: "", model: "", manufacturer: "" };
     const brackets = text.match(/<([^>]+)>/g);
+
     if (brackets && brackets.length >= 2) {
+      // 1. Manufacturer is the first bracket
       data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
+
+      // 2. Middle bracket contains Model and Serial
       const midPart = brackets[1].replace(/[<>]/g, "").trim();
       const parts = midPart.split("-");
-      data.model = parts[0];
-      data.serialNumber = parts[parts.length - 1];
+
+      if (parts.length >= 2) {
+        data.model = parts[0]; // 2501.7406.06
+        // Logic: The serial is usually the numeric part (101793). 
+        // We look for the part that is purely or mostly digits.
+        data.serialNumber = parts.find(p => /^\d+$/.test(p)) || parts[1];
+      } else {
+        data.serialNumber = midPart;
+      }
     } else {
+      // Fallback for standard formats
       const snMatch = text.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
       const modelMatch = text.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
       const mfgMatch = text.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
@@ -127,9 +144,9 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => window.print()} 
-              title="Print Current Inventory"
-              aria-label="Print Current Inventory"
-              className={dark ? "flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-white/10" : "flex items-center gap-2 bg-white border border-slate-300 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50"}
+              title="Print Labels"
+              aria-label="Print Labels"
+              className={dark ? "flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm" : "flex items-center gap-2 bg-white border border-slate-300 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm"}
             >
               <Printer size={18} /> Print Labels
             </button>
@@ -161,7 +178,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
                   return (
                     <tr key={unit.id} className="hover:bg-sky-500/2">
-                      <td className="px-6 py-5 text-center font-mono text-xs opacity-40">{index + 1}</td>
+                      <td className="px-6 py-5 text-center font-mono text-xs opacity-40">{localUnits.length - index}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-2">
                           <input 
@@ -177,7 +194,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                             <button 
                               onClick={() => setScanningId(unit.id)} 
                               title="Scan Serial with Camera"
-                              aria-label={`Scan Serial for unit ${index + 1}`}
+                              aria-label={`Scan Serial for instance ${index + 1}`}
                               className="text-sky-500 hover:scale-110"
                             >
                               <QrCode size={18} />
