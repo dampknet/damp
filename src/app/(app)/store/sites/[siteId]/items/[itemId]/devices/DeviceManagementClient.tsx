@@ -33,10 +33,28 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
       );
 
       const onScanSuccess = async (decodedText: string) => {
-        const cleanSerial = decodedText.replace(/serial number:\s*/i, "").trim();
+        let cleanSerial = "";
+        let extraData: any = {};
+
+        // CHECK: Handle JSON data or plain text with prefix
+        try {
+          const parsed = JSON.parse(decodedText);
+          cleanSerial = parsed.serialNumber || parsed.sn || decodedText;
+          extraData.manufacturer = parsed.manufacturer || parsed.make;
+          extraData.model = parsed.model;
+        } catch (e) {
+          // Logic: Strip "serial number: " if it exists in the raw text
+          cleanSerial = decodedText.replace(/serial number:\s*/i, "").trim();
+        }
+        
         await scanner.clear(); 
         setScanningId(null);
-        await updateUnit(scanningId, { serialNumber: cleanSerial });
+
+        // Logic: Send cleaned serial and hidden manufacturer/model info
+        await updateUnit(scanningId, { 
+          serialNumber: cleanSerial,
+          ...extraData 
+        });
       };
 
       scanner.render(onScanSuccess, () => {});
@@ -50,6 +68,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   async function updateUnit(instanceId: string, updates: any) {
     setLoadingId(instanceId);
     
+    // Optimistic UI Update
     if (updates.serialNumber) {
       setLocalUnits((prev: any) =>
         prev.map((u: any) => (u.id === instanceId ? { ...u, serialNumber: updates.serialNumber } : u))
@@ -63,10 +82,14 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         body: JSON.stringify(updates),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         router.refresh();
       } else {
-        alert("Server failed to save. Please try again.");
+        // Logic: Show why it failed (e.g. Duplicate Serial)
+        alert(data.message || "Server failed to save. Please try again.");
+        router.refresh(); 
       }
     } catch (e) {
       alert("Network error.");
@@ -81,7 +104,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         
         {scanningId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative" : "bg-white w-full max-w-md rounded-3xl p-6 relative"}>
+            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10" : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"}>
               <button 
                 onClick={() => setScanningId(null)} 
                 title="Close Scanner"
@@ -131,7 +154,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                         }}
                         placeholder="Waiting for scan..."
                         disabled={!canEdit || loadingId === unit.id}
-                        className={dark ? "bg-transparent border-b border-white/10 outline-none font-mono text-lg w-full md:w-64" : "bg-transparent border-b border-slate-300 outline-none font-mono text-lg w-full md:w-64"}
+                        className={dark ? "bg-transparent border-b border-white/10 outline-none font-mono text-lg w-full md:w-64 text-slate-100" : "bg-transparent border-b border-slate-300 outline-none font-mono text-lg w-full md:w-64 text-[#1a1814]"}
                       />
                       
                       {loadingId === unit.id ? (
@@ -158,7 +181,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                     title="Select condition"
                     aria-label={`Condition for unit ${index + 1}`}
                     onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} 
-                    className={dark ? "bg-white/5 rounded-lg px-3 py-1.5 text-xs" : "bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs"}
+                    className={dark ? "bg-white/5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200" : "bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-[#5b564d]"}
                   >
                     <option value="NEW">NEW</option>
                     <option value="GOOD">GOOD</option>
