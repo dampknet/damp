@@ -25,7 +25,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
-  // ✅ SMART PARSER: Extracts data even from messy strings
   const parseSmartScan = (text: string) => {
     const data: any = {};
     const snMatch = text.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
@@ -64,7 +63,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     }
   }, [scanningId]);
 
-  // ✅ POST to your specific route: src/app/(app)/store/instances/new/route.ts
   async function addNewInstance(data: any) {
     setIsAddingNew(true);
     try {
@@ -100,7 +98,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         
         {scanningId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative" : "bg-white w-full max-w-md rounded-3xl p-6 relative"}>
+            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10" : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"}>
               <button 
                 onClick={() => setScanningId(null)} 
                 title="Close Scanner"
@@ -146,7 +144,9 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                         }}
                         onBlur={(e) => updateUnit(unit.id, { serialNumber: e.target.value })}
                         placeholder="Waiting for scan..."
-                        className="bg-transparent border-b border-white/10 outline-none font-mono text-lg w-full md:w-64 text-slate-100"
+                        className={dark 
+                          ? "bg-transparent border-b border-white/20 outline-none font-mono text-lg w-full md:w-64 text-white placeholder:text-slate-500" 
+                          : "bg-transparent border-b border-slate-400 outline-none font-mono text-lg w-full md:w-64 text-slate-900 placeholder:text-slate-400"}
                       />
                       {loadingId === unit.id ? (
                         <Loader2 className="animate-spin opacity-50" size={18} />
@@ -170,7 +170,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                   title="Select condition"
                   aria-label={`Condition for unit ${index + 1}`}
                   onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} 
-                  className={dark ? "bg-white/5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-200" : "bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-[#5b564d]"}
+                  className={dark ? "bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-white" : "bg-white border border-slate-400 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900"}
                 >
                   <option value="NEW">NEW</option>
                   <option value="GOOD">GOOD</option>
@@ -181,14 +181,13 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
             );
           })}
 
-          {/* ✅ THE DYNAMIC SLOT: Add extra stock via scanner */}
-          <div className={dark ? "border-2 border-dashed border-white/10 rounded-2xl p-6 flex items-center justify-center bg-white/5 group" : "border-2 border-dashed border-slate-200 rounded-2xl p-6 flex items-center justify-center bg-slate-50 group"}>
+          <div className={dark ? "border-2 border-dashed border-white/20 rounded-2xl p-6 flex items-center justify-center bg-white/5 group" : "border-2 border-dashed border-slate-400 rounded-2xl p-6 flex items-center justify-center bg-slate-50 group"}>
              <button 
               onClick={() => setScanningId("NEW_SLOT")}
               disabled={isAddingNew}
               title="Add extra stock"
               aria-label="Add extra stock by scanning"
-              className="flex items-center gap-3 text-sm font-bold opacity-60 group-hover:opacity-100"
+              className="flex items-center gap-3 text-sm font-bold opacity-80 group-hover:opacity-100"
              >
                {isAddingNew ? <Loader2 className="animate-spin" /> : <PlusCircle className="text-sky-500" />}
                Click or Scan here to add EXTRA STOCK
