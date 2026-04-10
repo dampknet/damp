@@ -17,6 +17,9 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
 
+  // ✅ ROLE RESTRICTION: Double check canEdit before allowing any action
+  const hasPermission = canEdit === true;
+
   useEffect(() => {
     setLocalUnits(item.instances);
   }, [item.instances]);
@@ -50,7 +53,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   };
 
   useEffect(() => {
-    if (scanningId) {
+    if (scanningId && hasPermission) {
       const scanner = new Html5QrcodeScanner("qr-reader", { fps: 15, qrbox: { width: 250, height: 150 } }, false);
       const onScanSuccess = async (decodedText: string) => {
         const smartData = parseSmartScan(decodedText);
@@ -62,9 +65,10 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
       scanner.render(onScanSuccess, () => {});
       return () => { scanner.clear().catch(() => {}); };
     }
-  }, [scanningId]);
+  }, [scanningId, hasPermission]);
 
   async function addNewInstance(data: any) {
+    if (!hasPermission) return;
     setIsAddingNew(true);
     try {
       const res = await fetch(`/store/instances/new`, {
@@ -78,6 +82,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   }
 
   async function updateUnit(instanceId: string, updates: any) {
+    if (!hasPermission) return;
     setLoadingId(instanceId);
     const payload = { ...updates };
     if (payload.serialNumber === "") {
@@ -92,7 +97,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        // ✅ Fixed: Explicitly typed 'u' to resolve the TS7006 error
         const updatedItem = { ...localUnits.find((u: any) => u.id === instanceId), ...payload };
         const filtered = localUnits.filter((u: any) => u.id !== instanceId);
         setLocalUnits([updatedItem, ...filtered]);
@@ -107,10 +111,22 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
   return (
     <div className={dark ? "min-h-screen bg-[#0d1117] text-white" : "min-h-screen bg-[#fbf8f3] text-slate-900"}>
+      {/* ✅ CSS INJECTION FOR PROFESSIONAL PRINTING */}
+      <style jsx global>{`
+        @media print {
+          .no-print, button, svg, .qr-btn, .plus-btn, .header-nav, select { display: none !important; }
+          body { background: white !important; color: black !important; }
+          .print-only-text { display: block !important; font-weight: bold; }
+          .table-container { border: 1px solid #ccc !important; border-radius: 0 !important; box-shadow: none !important; }
+          th, td { border-bottom: 1px solid #eee !important; padding: 12px !important; color: black !important; }
+          input { border: none !important; color: black !important; background: transparent !important; }
+        }
+        .print-only-text { display: none; }
+      `}</style>
+
       <div className="mx-auto max-w-7xl px-4 py-8">
-        
-        {scanningId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        {scanningId && hasPermission && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 no-print">
             <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10" : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"}>
               <button onClick={() => setScanningId(null)} title="Close Scanner" aria-label="Close Scanner" className="absolute right-4 top-4 p-2 opacity-50 hover:opacity-100"><X size={24} /></button>
               <h2 className="text-xl font-bold mb-4 text-center">Smart Asset Capture</h2>
@@ -120,15 +136,15 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         )}
 
         <div className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-          <div>
+          <div className="header-nav">
             <Link href={`/store/sites/${item.inventorySiteId}`} className="inline-flex items-center gap-2 text-sm font-bold opacity-60 hover:text-sky-500 mb-4">
               <ArrowLeft size={16} /> Back to Site Inventory
             </Link>
             <h1 className="text-4xl font-black tracking-tight">{item.name}</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 no-print">
             <button onClick={() => window.print()} title="Print Labels" aria-label="Print Labels" className={dark ? "flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm" : "flex items-center gap-2 bg-white border border-slate-300 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm"}>
-              <Printer size={18} /> Print Labels
+              <Printer size={18} /> Print List
             </button>
             <div className={dark ? "bg-white/5 border border-white/10 p-4 rounded-2xl" : "bg-white border border-slate-300 shadow-sm p-4 rounded-2xl"}>
                <span className="text-[10px] font-black uppercase opacity-40 block">Total Stock</span>
@@ -137,7 +153,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           </div>
         </div>
 
-        <div className={dark ? "rounded-2xl border border-white/10 bg-white/5" : "rounded-2xl border border-slate-300 bg-white shadow-xl"}>
+        <div className={`table-container ${dark ? "rounded-2xl border border-white/10 bg-white/5" : "rounded-2xl border border-slate-300 bg-white shadow-xl"}`}>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-200">
               <thead>
@@ -165,58 +181,31 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                             value={hasRealSerial ? unit.serialNumber : ""}
                             title={`Serial Number for instance ${index + 1}`}
                             aria-label={`Serial Number for instance ${index + 1}`}
+                            disabled={!hasPermission}
                             onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: e.target.value } : u)))}
                             onBlur={(e) => updateUnit(unit.id, { serialNumber: e.target.value })}
                             placeholder="Scan/Type SN..."
                             className={inputClass}
                           />
-                          {loadingId === unit.id ? <Loader2 className="animate-spin text-sky-500" size={16} /> : hasRealSerial ? <CheckCircle2 className="text-emerald-500" size={16} /> : (
-                            <button 
-                              onClick={() => setScanningId(unit.id)} 
-                              title="Scan Serial with Camera"
-                              aria-label={`Scan Serial for unit ${index + 1}`}
-                              className="text-sky-500 hover:scale-110"
-                            >
-                              <QrCode size={18} />
-                            </button>
-                          )}
+                          <span className="print-only-text">{hasRealSerial ? unit.serialNumber : "N/A"}</span>
+                          {hasPermission && (loadingId === unit.id ? <Loader2 className="animate-spin text-sky-500" size={16} /> : hasRealSerial ? <CheckCircle2 className="text-emerald-500 no-print" size={16} /> : (
+                            <button onClick={() => setScanningId(unit.id)} title="Scan Serial" aria-label={`Scan unit ${index + 1}`} className="text-sky-500 hover:scale-110 no-print"><QrCode size={18} /></button>
+                          ))}
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <input 
-                          value={unit.model || ""}
-                          title={`Model for instance ${index + 1}`}
-                          aria-label={`Model for instance ${index + 1}`}
-                          onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, model: e.target.value } : u)))}
-                          onBlur={(e) => updateUnit(unit.id, { model: e.target.value })}
-                          placeholder="—"
-                          className={inputClass}
-                        />
+                        <input value={unit.model || ""} title={`Model ${index + 1}`} aria-label={`Model ${index + 1}`} disabled={!hasPermission} onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, model: e.target.value } : u)))} onBlur={(e) => updateUnit(unit.id, { model: e.target.value })} placeholder="—" className={inputClass} />
+                        <span className="print-only-text">{unit.model || "—"}</span>
                       </td>
                       <td className="px-6 py-5">
-                        <input 
-                          value={unit.manufacturer || ""}
-                          title={`Manufacturer for instance ${index + 1}`}
-                          aria-label={`Manufacturer for instance ${index + 1}`}
-                          onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, manufacturer: e.target.value } : u)))}
-                          onBlur={(e) => updateUnit(unit.id, { manufacturer: e.target.value })}
-                          placeholder="—"
-                          className={inputClass}
-                        />
+                        <input value={unit.manufacturer || ""} title={`Mfg ${index + 1}`} aria-label={`Mfg ${index + 1}`} disabled={!hasPermission} onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, manufacturer: e.target.value } : u)))} onBlur={(e) => updateUnit(unit.id, { manufacturer: e.target.value })} placeholder="—" className={inputClass} />
+                        <span className="print-only-text">{unit.manufacturer || "—"}</span>
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <select 
-                          value={unit.condition} 
-                          title={`Condition for unit ${index + 1}`}
-                          aria-label={`Condition for unit ${index + 1}`}
-                          onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} 
-                          className={dark ? "bg-slate-800 border border-white/20 rounded-lg px-2 py-1 text-xs font-bold text-white" : "bg-white border border-slate-400 rounded-lg px-2 py-1 text-xs font-bold text-slate-900"}
-                        >
-                          <option value="NEW">NEW</option>
-                          <option value="GOOD">GOOD</option>
-                          <option value="FAULTY">FAULTY</option>
-                          <option value="DAMAGED">DAMAGED</option>
+                        <select value={unit.condition} title={`Condition ${index + 1}`} aria-label={`Condition ${index + 1}`} disabled={!hasPermission} onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} className={`${dark ? "bg-slate-800 border-white/20 text-white" : "bg-white border-slate-400 text-slate-900"} no-print rounded-lg px-2 py-1 text-xs font-bold`}>
+                          <option value="NEW">NEW</option><option value="GOOD">GOOD</option><option value="FAULTY">FAULTY</option><option value="DAMAGED">DAMAGED</option>
                         </select>
+                        <span className="print-only-text">{unit.condition}</span>
                       </td>
                     </tr>
                   );
@@ -224,12 +213,13 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
               </tbody>
             </table>
           </div>
-          <div className="p-4 bg-sky-500/2">
-             <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Register New Extra Stock" aria-label="Register New Extra Stock" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500 hover:text-sky-500" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600 hover:text-sky-600"}>
-               {isAddingNew ? <Loader2 className="animate-spin inline mr-2" /> : <PlusCircle className="inline mr-2" size={16} />}
-               Register Extra Stock (Scan/Click)
-             </button>
-          </div>
+          {hasPermission && (
+            <div className="p-4 bg-sky-500/2 no-print">
+               <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Register Extra Stock" aria-label="Register Extra Stock" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600"}>
+                 {isAddingNew ? <Loader2 className="animate-spin inline mr-2" /> : <PlusCircle className="inline mr-2" size={16} />} Register Extra Stock
+               </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
