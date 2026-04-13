@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import { QrCode, X, Loader2, CheckCircle2, PlusCircle, ArrowLeft, Printer } from "lucide-react";
+import { QrCode, X, Loader2, CheckCircle2, PlusCircle, ArrowLeft, Printer, Trash2 } from "lucide-react";
 
 export default function DeviceManagementClient({ item, canEdit }: any) {
   const { mode } = useThemeMode();
@@ -16,9 +16,9 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const hasPermission = canEdit === true;
-
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
@@ -30,9 +30,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
-  /** ✅ SMART PARSER FIX
-   * Correctly segregates <Rhode & Schwarz><2501.7406.06-101793-dZ>
-   */
   const parseSmartScan = (text: string) => {
     const data: any = { serialNumber: "", model: "", manufacturer: "" };
     const cleanText = text.replace(/[\n\r]/g, "").trim();
@@ -42,14 +39,17 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
       data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
       const midPart = brackets[1].replace(/[<>]/g, "").trim();
       const parts = midPart.split("-");
-
-      const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
-      if (serialIdx !== -1) {
-        data.serialNumber = parts[serialIdx];
-        data.model = parts.slice(0, serialIdx).join("-");
+      if (parts.length >= 2) {
+        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
+        if (serialIdx !== -1) {
+          data.serialNumber = parts[serialIdx];
+          data.model = parts.slice(0, serialIdx).join("-");
+        } else {
+          data.model = parts[0];
+          data.serialNumber = parts[1] || midPart;
+        }
       } else {
-        data.model = parts[0];
-        data.serialNumber = parts[1] || midPart;
+        data.serialNumber = midPart;
       }
     } else {
       const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
@@ -62,27 +62,19 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return data;
   };
 
-  /** ✅ GLOBAL BARCODE LISTENER FIX 
-   * Awaits update and handles state immediately
-   */
   useEffect(() => {
     if (!hasPermission) return;
     const handleKeyDown = async (e: KeyboardEvent) => {
       const currentTime = Date.now();
       if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
       lastKeyTime.current = currentTime;
-
       if (e.key === "Enter") {
         if (scanBuffer.current.length > 5) {
           e.preventDefault();
           const smartData = parseSmartScan(scanBuffer.current);
           const emptySlot = localUnits.find((u: any) => isPlaceholder(u.serialNumber));
-          
-          if (emptySlot) {
-            await updateUnit(emptySlot.id, smartData);
-          } else {
-            await addNewInstance(smartData);
-          }
+          if (emptySlot) await updateUnit(emptySlot.id, smartData);
+          else await addNewInstance(smartData);
           scanBuffer.current = "";
         }
       } else if (e.key.length === 1) {
@@ -93,7 +85,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [localUnits, hasPermission]);
 
-  // CAMERA SCANNER
   useEffect(() => {
     if (scanningId && hasPermission) {
       const scanner = new Html5QrcodeScanner("qr-reader", { fps: 15, qrbox: { width: 250, height: 150 } }, false);
@@ -118,38 +109,61 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         body: JSON.stringify({ itemId: item.id, ...data }),
       });
       if (res.ok) router.refresh();
-    } catch (e) { alert("Error adding stock"); }
+      else {
+        const err = await res.json();
+        alert(err.message || "Duplicate Serial detected in another record.");
+      }
+    } catch (e) { alert("Network error adding stock"); }
     finally { setIsAddingNew(false); }
   }
 
   async function updateUnit(instanceId: string, updates: any) {
     if (!hasPermission) return;
     setLoadingId(instanceId);
-    
-    // ✅ RULE: If Serial is erased, clear Model and Manufacturer too
     const payload = { ...updates };
+    // ✅ RULE: If Serial is erased, clear everything
     if (payload.serialNumber === "") {
       payload.serialNumber = `PENDING-${instanceId.slice(-5)}`;
       payload.model = "";
       payload.manufacturer = "";
     }
-
     try {
       const res = await fetch(`/store/instances/${instanceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      
       if (res.ok) {
-        setLocalUnits((prev: any) => 
-          prev.map((u: any) => (u.id === instanceId ? { ...u, ...payload } : u))
-        );
+        setLocalUnits((prev: any) => prev.map((u: any) => (u.id === instanceId ? { ...u, ...payload } : u)));
+        router.refresh();
+      } else {
+        const err = await res.json();
+        alert(err.message || "This serial number is already assigned to another item.");
         router.refresh();
       }
     } catch (e) { alert("Error updating unit"); }
     finally { setLoadingId(null); }
   }
+
+  // ✅ BULK DELETE LOGIC
+  const deleteSelected = async () => {
+    if (!confirm(`Delete ${selectedIds.length} units? This will decrease total quantity.`)) return;
+    try {
+      const res = await fetch(`/store/instances/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds, itemId: item.id }),
+      });
+      if (res.ok) {
+        setSelectedIds([]);
+        router.refresh();
+      }
+    } catch (e) { alert("Delete failed."); }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
 
   return (
     <div className={dark ? "min-h-screen bg-[#0d1117] text-white" : "min-h-screen bg-[#fbf8f3] text-slate-900"}>
@@ -180,6 +194,11 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
             <h1 className="text-4xl font-black tracking-tight">{item.name}</h1>
           </div>
           <div className="flex items-center gap-3 no-print">
+            {selectedIds.length > 0 && (
+              <button onClick={deleteSelected} className="bg-rose-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+                <Trash2 size={16}/> Delete ({selectedIds.length})
+              </button>
+            )}
             <button onClick={() => window.print()} title="Print Labels" aria-label="Print Labels" className={dark ? "flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm" : "flex items-center gap-2 bg-white border border-slate-300 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm"}>
               <Printer size={18} /> Print List
             </button>
@@ -205,13 +224,18 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
               <tbody className={dark ? "divide-y divide-white/5" : "divide-y divide-slate-200"}>
                 {localUnits.map((unit: any, index: number) => {
                   const hasRealSerial = !isPlaceholder(unit.serialNumber);
+                  const isSelected = selectedIds.includes(unit.id);
                   const inputClass = dark 
                     ? "w-full bg-transparent border-b border-white/10 focus:border-sky-500 outline-none font-mono text-sm py-1 text-white placeholder:text-slate-700" 
                     : "w-full bg-transparent border-b border-slate-400 focus:border-sky-600 outline-none font-mono text-sm py-1 text-slate-900 placeholder:text-slate-400";
 
                   return (
-                    <tr key={unit.id} className={loadingId === unit.id ? "bg-sky-500/5 animate-pulse" : "hover:bg-sky-500/2"}>
-                      <td className="px-6 py-5 text-center font-mono text-xs opacity-40">{index + 1}</td>
+                    <tr key={unit.id} className={`${isSelected ? 'bg-sky-500/10' : ''} ${loadingId === unit.id ? "bg-sky-500/5 animate-pulse" : "hover:bg-sky-500/2"} transition-colors`}>
+                      <td className="px-6 py-5 text-center font-mono text-xs cursor-pointer" onClick={() => toggleSelect(unit.id)}>
+                        <div className={`w-6 h-6 rounded flex items-center justify-center border ${isSelected ? 'bg-sky-500 border-sky-500 text-white' : 'border-slate-500/30 text-slate-500'}`}>
+                          {isSelected ? index + 1 : index + 1}
+                        </div>
+                      </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-2">
                           <input value={hasRealSerial ? unit.serialNumber : ""} title={`Serial ${index + 1}`} aria-label={`Serial ${index + 1}`} disabled={!hasPermission} onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: e.target.value } : u)))} onBlur={(e) => updateUnit(unit.id, { serialNumber: e.target.value })} placeholder="Scan Serial..." className={inputClass} />
