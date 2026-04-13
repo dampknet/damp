@@ -19,7 +19,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   
   const hasPermission = canEdit === true;
 
-  // Syble Buffer
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
@@ -31,7 +30,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
-  /** ✅ THE SMART PARSER FIX
+  /** ✅ SMART PARSER FIX
    * Correctly segregates <Rhode & Schwarz><2501.7406.06-101793-dZ>
    */
   const parseSmartScan = (text: string) => {
@@ -44,7 +43,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
       const midPart = brackets[1].replace(/[<>]/g, "").trim();
       const parts = midPart.split("-");
 
-      // Find the part that is just digits (the 101793)
       const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
       if (serialIdx !== -1) {
         data.serialNumber = parts[serialIdx];
@@ -64,10 +62,12 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return data;
   };
 
-  // ✅ BARCODE SCANNER LISTENER
+  /** ✅ GLOBAL BARCODE LISTENER FIX 
+   * Awaits update and handles state immediately
+   */
   useEffect(() => {
     if (!hasPermission) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       const currentTime = Date.now();
       if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
       lastKeyTime.current = currentTime;
@@ -77,8 +77,12 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           e.preventDefault();
           const smartData = parseSmartScan(scanBuffer.current);
           const emptySlot = localUnits.find((u: any) => isPlaceholder(u.serialNumber));
-          if (emptySlot) updateUnit(emptySlot.id, smartData);
-          else addNewInstance(smartData);
+          
+          if (emptySlot) {
+            await updateUnit(emptySlot.id, smartData);
+          } else {
+            await addNewInstance(smartData);
+          }
           scanBuffer.current = "";
         }
       } else if (e.key.length === 1) {
@@ -89,7 +93,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [localUnits, hasPermission]);
 
-  // ✅ CAMERA SCANNER (REVERTED TO STANDARD POPUP)
+  // CAMERA SCANNER
   useEffect(() => {
     if (scanningId && hasPermission) {
       const scanner = new Html5QrcodeScanner("qr-reader", { fps: 15, qrbox: { width: 250, height: 150 } }, false);
@@ -121,8 +125,14 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   async function updateUnit(instanceId: string, updates: any) {
     if (!hasPermission) return;
     setLoadingId(instanceId);
+    
+    // ✅ RULE: If Serial is erased, clear Model and Manufacturer too
     const payload = { ...updates };
-    if (payload.serialNumber === "") payload.serialNumber = `PENDING-${instanceId.slice(-5)}`;
+    if (payload.serialNumber === "") {
+      payload.serialNumber = `PENDING-${instanceId.slice(-5)}`;
+      payload.model = "";
+      payload.manufacturer = "";
+    }
 
     try {
       const res = await fetch(`/store/instances/${instanceId}`, {
@@ -130,8 +140,11 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      
       if (res.ok) {
-        setLocalUnits((prev: any) => prev.map((u: any) => u.id === instanceId ? { ...u, ...payload } : u));
+        setLocalUnits((prev: any) => 
+          prev.map((u: any) => (u.id === instanceId ? { ...u, ...payload } : u))
+        );
         router.refresh();
       }
     } catch (e) { alert("Error updating unit"); }
