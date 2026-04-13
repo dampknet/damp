@@ -27,24 +27,36 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
+  /** ✅ IMPROVED SMART PARSER
+   * Handles the multi-line/bracketed Rohde & Schwarz format specifically.
+   */
   const parseSmartScan = (text: string) => {
     const data: any = { serialNumber: "", model: "", manufacturer: "" };
-    const brackets = text.match(/<([^>]+)>/g);
+    
+    // Clean up newlines if the scanner adds them
+    const cleanText = text.replace(/[\n\r]/g, "");
+    const brackets = cleanText.match(/<([^>]+)>/g);
+
     if (brackets && brackets.length >= 2) {
+      // Manufacturer: first bracket
       data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
+      
+      // Model & Serial: second bracket
       const midPart = brackets[1].replace(/[<>]/g, "").trim();
       const parts = midPart.split("-");
+      
       if (parts.length >= 2) {
         data.model = parts[0];
-        data.serialNumber = parts.find((p: string) => /^\d+$/.test(p)) || parts[1];
+        // Find the 6-digit numeric serial part
+        data.serialNumber = parts.find((p: string) => /^\d{6}$/.test(p)) || parts[1];
       } else {
         data.serialNumber = midPart;
       }
     } else {
-      const snMatch = text.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
-      const modelMatch = text.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
-      const mfgMatch = text.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
-      data.serialNumber = snMatch ? snMatch[1] : text.split(' ')[0];
+      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
+      const modelMatch = cleanText.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
+      const mfgMatch = cleanText.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
+      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
       if (modelMatch) data.model = modelMatch[1];
       if (mfgMatch) data.manufacturer = mfgMatch[1];
     }
@@ -182,7 +194,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                             disabled={!hasPermission}
                             onChange={(e) => {
                               const val = e.target.value;
-                              // ✅ SYBLE GUN FIX: Detect bracket format in the input field
+                              // ✅ SYBLE GUN FIX: If the input contains brackets, we parse immediately
                               if (val.includes("<") && val.includes(">")) {
                                 const smartData = parseSmartScan(val);
                                 setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, ...smartData } : u)));
@@ -192,7 +204,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                               }
                             }}
                             onBlur={(e) => {
-                              // Only update if it's not a complex string we already handled in onChange
+                              // Only save on blur if we aren't mid-scan (doesn't have brackets)
                               if (!e.target.value.includes("<")) {
                                 updateUnit(unit.id, { serialNumber: e.target.value });
                               }
@@ -215,7 +227,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                         <span className="print-only-text">{unit.manufacturer || "—"}</span>
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <select value={unit.condition} title={`Condition ${index + 1}`} aria-label={`Condition ${index + 1}`} disabled={!hasPermission} onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} className={`${dark ? "bg-slate-800 border border-white/20 text-white" : "bg-white border border-slate-400 text-slate-900"} no-print rounded-lg px-2 py-1 text-xs font-bold outline-none`}>
+                        <select value={unit.condition} title={`Condition ${index + 1}`} aria-label={`Condition ${index + 1}`} disabled={!hasPermission} onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} className={`${dark ? "bg-slate-800 border border-white/20 text-white" : "bg-white border border-slate-400 text-slate-900"} no-print rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer`}>
                           <option value="NEW">NEW</option><option value="GOOD">GOOD</option><option value="FAULTY">FAULTY</option><option value="DAMAGED">DAMAGED</option>
                         </select>
                         <span className="print-only-text">{unit.condition}</span>
@@ -228,7 +240,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           </div>
           {hasPermission && (
             <div className="p-4 bg-sky-500/2 no-print">
-               <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Register Extra Stock" aria-label="Register Extra Stock" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500 hover:text-sky-500" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600 hover:text-sky-600"}>
+               <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Register Extra Stock" aria-label="Register Extra Stock" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500 hover:text-sky-500 transition-all" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600 hover:text-sky-600 transition-all"}>
                  {isAddingNew ? <Loader2 className="animate-spin inline mr-2" /> : <PlusCircle className="inline mr-2" size={16} />} Register Extra Stock
                </button>
             </div>
