@@ -31,22 +31,39 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
+  /** ✅ ULTIMATE SMART PARSER
+   * Specifically handles: <Manufacturer><Model-Serial-Suffix>
+   */
   const parseSmartScan = (text: string) => {
     const data: any = { serialNumber: "", model: "", manufacturer: "" };
     const cleanText = text.replace(/[\n\r]/g, "").trim();
     const brackets = cleanText.match(/<([^>]+)>/g);
 
     if (brackets && brackets.length >= 2) {
+      // 1. Manufacturer: The first bracket
       data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
-      const midPart = brackets[1].replace(/[<>]/g, "").trim();
-      const parts = midPart.split("-");
+
+      // 2. Middle bracket: <2501.7406.06-101793-dZ>
+      const midContent = brackets[1].replace(/[<>]/g, "").trim();
+      const parts = midContent.split("-");
+
       if (parts.length >= 2) {
-        data.model = parts[0];
-        data.serialNumber = parts.find((p: string) => /^\d+$/.test(p)) || parts[1];
+        // Serial is usually the part that is purely numeric (e.g., 101793)
+        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
+        if (serialIdx !== -1) {
+          data.serialNumber = parts[serialIdx];
+          // Model is everything before the serial
+          data.model = parts.slice(0, serialIdx).join("-");
+        } else {
+          // Fallback if no pure numeric part
+          data.model = parts[0];
+          data.serialNumber = parts[1];
+        }
       } else {
-        data.serialNumber = midPart;
+        data.serialNumber = midContent;
       }
     } else {
+      // Fallback for standard labels
       const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
       const modelMatch = cleanText.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
       const mfgMatch = cleanText.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
@@ -57,26 +74,27 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return data;
   };
 
-  // ✅ GLOBAL SCANNER LISTENER
+  // ✅ GLOBAL SCANNER LISTENER (ZERO-CLICK)
   useEffect(() => {
     if (!hasPermission) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const currentTime = new Date().getTime();
       
-      // Scanners type fast (usually < 30ms between keys)
+      // If time between keys is > 100ms, it's a human typing, not a scanner
       if (currentTime - lastKeyTime.current > 100) {
-        scanBuffer.current = ""; // Reset if user is just typing slowly
+        scanBuffer.current = ""; 
       }
 
       lastKeyTime.current = currentTime;
 
       if (e.key === "Enter") {
         if (scanBuffer.current.length > 5) {
+          e.preventDefault();
           processGlobalScan(scanBuffer.current);
           scanBuffer.current = "";
         }
-      } else if (e.key !== "Shift") {
+      } else if (e.key !== "Shift" && e.key !== "Control" && e.key !== "Alt") {
         scanBuffer.current += e.key;
       }
     };
@@ -88,13 +106,12 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   const processGlobalScan = async (rawText: string) => {
     const smartData = parseSmartScan(rawText);
     
-    // 1. Check if there is an empty slot (Placeholder)
+    // Find first available placeholder slot
     const emptySlot = localUnits.find((u: any) => isPlaceholder(u.serialNumber));
 
     if (emptySlot) {
       await updateUnit(emptySlot.id, smartData);
     } else {
-      // 2. No empty slots? Automatically register extra stock
       await addNewInstance(smartData);
     }
   };
@@ -108,31 +125,49 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId: item.id, ...data }),
       });
-      if (res.ok) router.refresh();
-    } catch (e) { alert("Network error."); }
-    finally { setIsAddingNew(false); }
+      if (res.ok) {
+        router.refresh(); // Tells Next.js to fetch fresh data from DB
+      }
+    } catch (e) { 
+      alert("Network error adding extra stock."); 
+    } finally { 
+      setIsAddingNew(false); 
+    }
   }
 
   async function updateUnit(instanceId: string, updates: any) {
     if (!hasPermission) return;
     setLoadingId(instanceId);
+    
     const payload = { ...updates };
     if (payload.serialNumber === "") {
       payload.serialNumber = `PENDING-${instanceId.slice(-5)}`;
       payload.model = "";
       payload.manufacturer = "";
     }
+
     try {
       const res = await fetch(`/store/instances/${instanceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      
       if (res.ok) {
+        // Optimistic local update so UI responds instantly
+        setLocalUnits((prev: any) => 
+          prev.map((u: any) => u.id === instanceId ? { ...u, ...payload } : u)
+        );
         router.refresh();
+      } else {
+        const err = await res.json();
+        alert(err.message || "Save failed.");
       }
-    } catch (e) { alert("Network error."); }
-    finally { setLoadingId(null); }
+    } catch (e) { 
+      alert("Network error updating instance."); 
+    } finally { 
+      setLoadingId(null); 
+    }
   }
 
   return (
