@@ -17,7 +17,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
 
-  // ✅ ROLE RESTRICTION: Double check canEdit before allowing any action
   const hasPermission = canEdit === true;
 
   useEffect(() => {
@@ -111,7 +110,6 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
   return (
     <div className={dark ? "min-h-screen bg-[#0d1117] text-white" : "min-h-screen bg-[#fbf8f3] text-slate-900"}>
-      {/* ✅ CSS INJECTION FOR PROFESSIONAL PRINTING */}
       <style jsx global>{`
         @media print {
           .no-print, button, svg, .qr-btn, .plus-btn, .header-nav, select { display: none !important; }
@@ -182,8 +180,23 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                             title={`Serial Number for instance ${index + 1}`}
                             aria-label={`Serial Number for instance ${index + 1}`}
                             disabled={!hasPermission}
-                            onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: e.target.value } : u)))}
-                            onBlur={(e) => updateUnit(unit.id, { serialNumber: e.target.value })}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // ✅ SYBLE GUN FIX: Detect bracket format in the input field
+                              if (val.includes("<") && val.includes(">")) {
+                                const smartData = parseSmartScan(val);
+                                setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, ...smartData } : u)));
+                                updateUnit(unit.id, smartData);
+                              } else {
+                                setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: val } : u)));
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // Only update if it's not a complex string we already handled in onChange
+                              if (!e.target.value.includes("<")) {
+                                updateUnit(unit.id, { serialNumber: e.target.value });
+                              }
+                            }}
                             placeholder="Scan/Type SN..."
                             className={inputClass}
                           />
@@ -202,7 +215,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                         <span className="print-only-text">{unit.manufacturer || "—"}</span>
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <select value={unit.condition} title={`Condition ${index + 1}`} aria-label={`Condition ${index + 1}`} disabled={!hasPermission} onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} className={`${dark ? "bg-slate-800 border-white/20 text-white" : "bg-white border-slate-400 text-slate-900"} no-print rounded-lg px-2 py-1 text-xs font-bold`}>
+                        <select value={unit.condition} title={`Condition ${index + 1}`} aria-label={`Condition ${index + 1}`} disabled={!hasPermission} onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} className={`${dark ? "bg-slate-800 border border-white/20 text-white" : "bg-white border border-slate-400 text-slate-900"} no-print rounded-lg px-2 py-1 text-xs font-bold outline-none`}>
                           <option value="NEW">NEW</option><option value="GOOD">GOOD</option><option value="FAULTY">FAULTY</option><option value="DAMAGED">DAMAGED</option>
                         </select>
                         <span className="print-only-text">{unit.condition}</span>
@@ -215,7 +228,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
           </div>
           {hasPermission && (
             <div className="p-4 bg-sky-500/2 no-print">
-               <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Register Extra Stock" aria-label="Register Extra Stock" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600"}>
+               <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Register Extra Stock" aria-label="Register Extra Stock" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500 hover:text-sky-500" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600 hover:text-sky-600"}>
                  {isAddingNew ? <Loader2 className="animate-spin inline mr-2" /> : <PlusCircle className="inline mr-2" size={16} />} Register Extra Stock
                </button>
             </div>
