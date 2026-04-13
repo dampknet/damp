@@ -21,7 +21,8 @@ export async function POST(req: Request) {
       prisma.assetInstance.deleteMany({
         where: {
           id: { in: ids },
-          itemId: itemId,
+          // ✅ FIX: Changed itemId to inventoryItemId to match your schema
+          inventoryItemId: itemId, 
         },
       }),
       // 2. Decrement the main item quantity by the number of deleted items
