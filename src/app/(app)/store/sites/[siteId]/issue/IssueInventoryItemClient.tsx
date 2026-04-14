@@ -80,11 +80,13 @@ export default function IssueInventoryItemClient({
  const handleScan = async (fullData: string) => {
     setIsSearching(true);
     try {
-      // ✅ We use POST so the junk symbols and large strings don't break the connection
-      const res = await fetch(`/api/store/instances/scan`, {
+      // ✅ Using absolute-style path to ensure it finds the API
+      const res = await fetch("/api/store/instances/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serial: fullData.trim() }),
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ serial: fullData }),
       });
       
       const data = await res.json();
@@ -97,9 +99,7 @@ export default function IssueInventoryItemClient({
       setBucket((prev) => {
         const existing = prev.find((i) => i.id === data.id);
         if (existing) {
-          // Don't add the same physical serial twice
           if (existing.serials.some((s: any) => s.sn === data.serialNumber)) return prev;
-          
           return prev.map((i) => i.id === data.id ? { 
             ...i, 
             quantity: i.quantity + 1, 
@@ -115,9 +115,10 @@ export default function IssueInventoryItemClient({
           expectedReturnDate: ""
         }];
       });
-    } catch (e) { 
-      // If this still fails, it's a real internet issue, not a data issue.
-      alert("Database is busy. Please scan again in 2 seconds."); 
+    } catch (e: any) { 
+      // ✅ This will tell us the REAL error if it fails
+      console.error("Fetch Error:", e);
+      alert("System Error: " + e.message); 
     } finally { 
       setIsSearching(false); 
     }
