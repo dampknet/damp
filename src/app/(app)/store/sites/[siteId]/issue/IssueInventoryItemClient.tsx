@@ -26,126 +26,104 @@ export default function IssueInventoryItemClient({
   items,
   action,
 }: {
-  site: { id: string; name: string; location: string | null };
+  site: {
+    id: string;
+    name: string;
+    location: string | null;
+  };
   items: ItemRow[];
   action: (formData: FormData) => void;
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+
   const [bucket, setBucket] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ SMART PARSER (Aggressive Extraction)
-  const parseSmartScan = (text: string) => {
-    const data: any = { serialNumber: "" };
-    const cleanText = text.replace(/[\n\r]/g, "").trim();
-    const brackets = cleanText.match(/<([^>]+)>/g);
-
-    if (brackets && brackets.length >= 2) {
-      for (let content of brackets) {
-        const inner = content.replace(/[<>]/g, "").trim();
-        const parts = inner.split(/[-.]/);
-        // Look for the actual serial (numeric, 5+ digits)
-        const found = parts.find(p => /^\d{5,}$/.test(p)); 
-        if (found) {
-          data.serialNumber = found;
-          break;
-        }
-      }
-      if (!data.serialNumber) data.serialNumber = brackets[1].replace(/[<>]/g, "").trim();
-    } else {
-      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
-      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
-    }
-    return data;
-  };
-
-  // ✅ LOCAL MAPPING LOGIC (Fixed variable names)
-  const handleLocalScanMatch = (rawInput: string) => {
+  // ✅ THE ULTIMATE MAPPING LOGIC (Works for Messy Rohde & Schwarz)
+  const handleLocalScanMatch = (rawJunk: string) => {
     setIsSearching(true);
-    const smartData = parseSmartScan(rawInput);
-    const scannedSerial = smartData.serialNumber;
+    let foundInstance = null;
+    let foundParentItem = null;
+    let matchedSerial = "";
 
-    if (!scannedSerial) {
-      alert(`Could not find a valid serial in: ${rawInput}`);
-      setIsSearching(false);
-      return;
-    }
+    const scanInput = rawJunk.toLowerCase();
 
+    // Check if ALREADY in bucket first
     const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn.toLowerCase() === scannedSerial.toLowerCase())
+      item.serials.some((s: any) => s.sn.toLowerCase() === scanInput || scanInput.includes(s.sn.toLowerCase()))
     );
 
     if (isAlreadyScanned) {
-      alert(`Already Scanned: Serial ${scannedSerial} is already in the bucket.`);
+      alert(`Stop! This item is already in your issue bucket.`);
       setIsSearching(false);
       return;
     }
 
-    let found = false;
     for (const item of items) {
-      const match = item.instances?.find(
-        (ins) => ins.serialNumber.toLowerCase() === scannedSerial.toLowerCase()
-      );
+      const match = item.instances?.find((ins) => {
+        const dbSerial = ins.serialNumber.toLowerCase();
+        // Check if the DB serial exists anywhere inside the messy scan string
+        return dbSerial.length > 2 && scanInput.includes(dbSerial);
+      });
 
       if (match) {
-        found = true;
-        setBucket((prev) => {
-          const existing = prev.find((i) => i.id === item.id);
-          if (existing) {
-            return prev.map((i) => i.id === item.id ? { 
-              ...i, 
-              quantity: i.quantity + 1, 
-              serials: [...i.serials, { sn: match.serialNumber, condition: match.condition }] 
-            } : i);
-          }
-          return [...prev, {
-            id: item.id,
-            name: item.name,
-            itemType: item.itemType,
-            quantity: 1,
-            serials: [{ sn: match.serialNumber, condition: match.condition }],
-            expectedReturnDate: ""
-          }];
-        });
+        foundInstance = match;
+        foundParentItem = item;
+        matchedSerial = match.serialNumber;
         break;
       }
     }
 
-    if (!found) alert(`Serial ${scannedSerial} not found in this site's records.`);
+    if (foundInstance && foundParentItem) {
+      setBucket((prev) => {
+        const existing = prev.find((i) => i.id === foundParentItem!.id);
+        if (existing) {
+          return prev.map((i) => i.id === foundParentItem!.id ? { 
+            ...i, 
+            quantity: i.quantity + 1, 
+            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
+          } : i);
+        }
+        return [...prev, {
+          id: foundParentItem!.id,
+          name: foundParentItem!.name,
+          itemType: foundParentItem!.itemType,
+          quantity: 1,
+          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
+          expectedReturnDate: ""
+        }];
+      });
+    } else {
+      alert(`Serial not found! No registered serial number was detected inside this scan.`);
+    }
     setIsSearching(false);
   };
 
-  // ✅ BURST-PROOF GUN LISTENER (The Buffer Fix)
+  // ✅ SYBLE SCANNER LISTENER
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Collect only visible characters
-      if (e.key.length === 1) {
-        scanBuffer.current += e.key;
-      }
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
+      lastKeyTime.current = currentTime;
 
       if (e.key === "Enter") {
-        e.preventDefault();
-        // Wait 150ms to ensure the gun has finished its rapid-fire typing
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          const finalData = scanBuffer.current.trim();
-          if (finalData.length > 3) {
-            scanBuffer.current = ""; 
-            handleLocalScanMatch(finalData);
-          }
-        }, 150); 
+        if (scanBuffer.current.length > 3) {
+          e.preventDefault();
+          handleLocalScanMatch(scanBuffer.current);
+          scanBuffer.current = "";
+        }
+      } else if (e.key.length === 1) {
+        scanBuffer.current += e.key;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      clearTimeout(timeout);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [bucket, items]);
 
   // ✅ CAMERA SCANNER EFFECT
@@ -175,16 +153,20 @@ export default function IssueInventoryItemClient({
           <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
 
           <div className="flex flex-col gap-3">
-            <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
+            <Link href={`/store/sites/${site.id}`} title="Back to site" className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
               <ArrowLeft size={16} /> Back to {site.name} Inventory
             </Link>
             <div className="flex items-center justify-between">
               <div className={dark ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]" : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"}>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Issue Smart Bucket
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Issue Smart Bucket
               </div>
-              <button type="button" onClick={() => setIsCameraActive(!isCameraActive)} className="flex items-center gap-2 bg-sky-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg hover:bg-sky-600 transition-all">
-                <QrCode size={16} /> {isCameraActive ? "Close Camera" : "Use Camera"}
-              </button>
+              <div className="flex items-center gap-3">
+                 {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING...</div>}
+                 <button type="button" title="Use Camera Scanner" onClick={() => setIsCameraActive(!isCameraActive)} className="flex items-center gap-2 bg-sky-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg hover:bg-sky-600 transition-all">
+                    <QrCode size={16} /> {isCameraActive ? "Close Camera" : "Use Camera"}
+                 </button>
+              </div>
             </div>
           </div>
 
@@ -198,6 +180,7 @@ export default function IssueInventoryItemClient({
             </div>
           )}
 
+          {/* BUCKET TABLE */}
           <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-[#e7ded3] bg-white'}`}>
             <table className="w-full text-left">
               <thead>
@@ -211,7 +194,7 @@ export default function IssueInventoryItemClient({
               </thead>
               <tbody className="divide-y divide-slate-500/10">
                 {bucket.length === 0 && (
-                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">Scan item or use camera...</td></tr>
+                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">Point Syble gun or use camera to scan...</td></tr>
                 )}
                 {bucket.map((item) => (
                   <tr key={item.id} className="hover:bg-sky-500/5 transition-colors">
