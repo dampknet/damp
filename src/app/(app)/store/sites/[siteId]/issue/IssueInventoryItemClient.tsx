@@ -77,24 +77,29 @@ export default function IssueInventoryItemClient({
     };
   }, [bucket]);
 
-  const handleScan = async (fullData: string) => {
+ const handleScan = async (fullData: string) => {
     setIsSearching(true);
     try {
-      // Use encodeURIComponent so the messy symbols don't break the internet connection
-      const res = await fetch(`/api/store/instances/scan?serial=${encodeURIComponent(fullData.trim())}`);
+      // ✅ We use POST so the junk symbols and large strings don't break the connection
+      const res = await fetch(`/api/store/instances/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serial: fullData.trim() }),
+      });
       
+      const data = await res.json();
+
       if (!res.ok) {
-        const errData = await res.json();
-        alert(errData.error || "Item not found in database");
+        alert(data.error || "Item not found");
         return;
       }
-
-      const data = await res.json();
       
       setBucket((prev) => {
         const existing = prev.find((i) => i.id === data.id);
         if (existing) {
+          // Don't add the same physical serial twice
           if (existing.serials.some((s: any) => s.sn === data.serialNumber)) return prev;
+          
           return prev.map((i) => i.id === data.id ? { 
             ...i, 
             quantity: i.quantity + 1, 
@@ -110,11 +115,11 @@ export default function IssueInventoryItemClient({
           expectedReturnDate: ""
         }];
       });
-    } catch (e) {
-      // If it still fails, it's likely a network timeout because the string was too long
-      alert("Connection timeout. The scan was too large. Try scanning that specific item again.");
-    } finally {
-      setIsSearching(false);
+    } catch (e) { 
+      // If this still fails, it's a real internet issue, not a data issue.
+      alert("Database is busy. Please scan again in 2 seconds."); 
+    } finally { 
+      setIsSearching(false); 
     }
   };
 

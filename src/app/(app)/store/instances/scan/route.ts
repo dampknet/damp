@@ -1,28 +1,38 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const rawInput = searchParams.get("serial");
+    const { serial: rawInput } = await req.json();
 
     if (!rawInput) return new NextResponse("No data", { status: 400 });
 
-    // 1. Grab all valid serials from the table
+    // 1. Fetch all serials from the AssetInstance table
+    // We do this because the scan is a "junk sandwich" and we need to find the "meat" (the serial)
     const allInstances = await prisma.assetInstance.findMany({
-      include: { inventoryItem: true }
+      include: { 
+        inventoryItem: {
+          select: {
+            id: true,
+            name: true,
+            itemType: true,
+          }
+        } 
+      }
     });
 
-    // 2. See if the messy scan contains ANY of our database serials
+    // 2. The Smart Matcher: Does the junk scan contain any serial from our DB?
     const match = allInstances.find(ins => 
-      rawInput.includes(ins.serialNumber) || 
-      ins.serialNumber.includes(rawInput) // Just in case
+      rawInput.includes(ins.serialNumber)
     );
 
     if (!match) {
-      return NextResponse.json({ error: "No matching serial found in the scanned data." }, { status: 404 });
+      return NextResponse.json({ 
+        error: "Serial not found in the scanned data. Please check if this item is registered." 
+      }, { status: 404 });
     }
 
+    // 3. Success: Return the parent Inventory Item data
     return NextResponse.json({
       id: match.inventoryItem.id,
       name: match.inventoryItem.name,
@@ -32,6 +42,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error) {
-    return new NextResponse("Server Error", { status: 500 });
+    console.error("SCAN_ERROR", error);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
