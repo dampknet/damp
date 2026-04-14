@@ -25,11 +25,7 @@ export default function IssueInventoryItemClient({
   items,
   action,
 }: {
-  site: {
-    id: string;
-    name: string;
-    location: string | null;
-  };
+  site: { id: string; name: string; location: string | null };
   items: ItemRow[];
   action: (formData: FormData) => void;
 }) {
@@ -43,34 +39,19 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ 1. BREAK JUNK INTO SEGMENTS (Works for messy Rohde & Schwarz strings)
-  const getScannedSegments = (text: string) => {
-    // This turns "<Rhode & Schwarz><2501.7406.06-101793-dZ>" 
-    // into ["Rhode", "Schwarz", "2501", "7406", "06", "101793", "dZ"]
-    return text
-      .replace(/[<>]/g, " ")
-      .split(/[\s\-:._]+/)
-      .map(p => p.trim())
-      .filter(p => p.length >= 3);
-  };
-
-  // ✅ LOCAL MAPPING (The "Search-Inside" Strategy)
+  // ✅ THE ULTIMATE MAPPING LOGIC
   const handleLocalScanMatch = (rawJunk: string) => {
     setIsSearching(true);
     let foundInstance = null;
     let foundParentItem = null;
     let matchedSerial = "";
 
-    // Normalize the junk for search
-    const cleanJunk = rawJunk.toLowerCase();
+    const scanInput = rawJunk.toLowerCase();
 
-    // 1. Look through every item in your site inventory
     for (const item of items) {
-      // 2. Check every serial number registered to this item
-      const match = item.instances?.find(ins => {
-        const sn = ins.serialNumber.toLowerCase();
-        // Check if the registered serial is hidden ANYWHERE inside the scanned junk
-        return sn.length > 2 && cleanJunk.includes(sn);
+      const match = item.instances?.find((ins) => {
+        const dbSerial = ins.serialNumber.toLowerCase();
+        return dbSerial.length > 2 && scanInput.includes(dbSerial);
       });
 
       if (match) {
@@ -82,42 +63,45 @@ export default function IssueInventoryItemClient({
     }
 
     if (foundInstance && foundParentItem) {
-      // ✅ 3. DUPLICATE CHECK
-      const isAlreadyScanned = bucket.some(b => b.serials.some((s: any) => s.sn === matchedSerial));
-      
-      if (isAlreadyScanned) {
-        alert(`Already Scanned: Serial ${matchedSerial} is already in the bucket.`);
-        setIsSearching(false);
-        return;
-      }
+      const alreadyInBucket = bucket.some((b) =>
+        b.serials.some((s: any) => s.sn === matchedSerial)
+      );
 
-      // 4. ADD TO BUCKET
-      setBucket((prev) => {
-        const existing = prev.find((i) => i.id === foundParentItem!.id);
-        if (existing) {
-          return prev.map((i) => i.id === foundParentItem!.id ? { 
-            ...i, 
-            quantity: i.quantity + 1, 
-            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
-          } : i);
-        }
-        return [...prev, {
-          id: foundParentItem!.id,
-          name: foundParentItem!.name,
-          itemType: foundParentItem!.itemType,
-          quantity: 1,
-          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
-          expectedReturnDate: ""
-        }];
-      });
+      if (alreadyInBucket) {
+        alert(`Already Scanned: Serial ${matchedSerial} is already in the bucket.`);
+      } else {
+        setBucket((prev) => {
+          const existing = prev.find((i) => i.id === foundParentItem!.id);
+          if (existing) {
+            return prev.map((i) =>
+              i.id === foundParentItem!.id
+                ? {
+                    ...i,
+                    quantity: i.quantity + 1,
+                    serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }],
+                  }
+                : i
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: foundParentItem!.id,
+              name: foundParentItem!.name,
+              itemType: foundParentItem!.itemType,
+              quantity: 1,
+              serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
+              expectedReturnDate: "",
+            },
+          ];
+        });
+      }
     } else {
-      // If we got here, none of the serials in your DB match any part of the scan
-      alert(`Serial not found! No registered serial number was detected inside this scan: \n\n ${rawJunk}`);
+      alert(`System could not find a registered serial number in this scan.`);
     }
     setIsSearching(false);
   };
 
-  // ✅ 4. SCANNER LISTENER
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const currentTime = Date.now();
@@ -151,22 +135,25 @@ export default function IssueInventoryItemClient({
           <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
 
           <div className="flex flex-col gap-3">
-            <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>← Back to {site.name} Inventory</Link>
+            <Link href={`/store/sites/${site.id}`} title="Back to Inventory" className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
+              ← Back to Inventory
+            </Link>
             <div className="flex items-center justify-between">
               <div className={dark ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]" : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"}>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />Issue Smart Bucket
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Multi-Item Bucket
               </div>
               {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING...</div>}
             </div>
           </div>
 
-          <h1 className={dark ? "mt-5 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl" : "mt-5 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"}>Issue Inventory Items</h1>
+          <h1 className={dark ? "mt-5 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl" : "mt-5 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"}>Checkout Items</h1>
 
           <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
             <table className="w-full text-left">
               <thead>
                 <tr className={`text-[10px] font-black uppercase tracking-widest ${dark ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                  <th className="px-6 py-4">Item</th>
+                  <th className="px-6 py-4">Item Name</th>
                   <th className="px-6 py-4">Serials / Condition</th>
                   <th className="px-6 py-4 text-center">Qty</th>
                   <th className="px-6 py-4">Return Date</th>
@@ -175,7 +162,7 @@ export default function IssueInventoryItemClient({
               </thead>
               <tbody className="divide-y divide-slate-500/10">
                 {bucket.length === 0 && (
-                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">Ready for Syble Scan...</td></tr>
+                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase">Point Syble gun at barcode...</td></tr>
                 )}
                 {bucket.map((item) => (
                   <tr key={item.id} className="hover:bg-sky-500/5 transition-colors">
@@ -185,46 +172,31 @@ export default function IssueInventoryItemClient({
                         {item.serials.map((s: any) => (
                           <span key={s.sn} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${getConditionStyle(s.condition)}`}>
                             {s.sn}
-                            <button type="button" aria-label={`Remove ${s.sn}`} title={`Remove ${s.sn}`} className="hover:scale-125 transition-transform" onClick={() => {
+                            <button type="button" title={`Remove serial ${s.sn}`} aria-label={`Remove serial ${s.sn}`} onClick={() => {
                                const filtered = item.serials.filter((x:any) => x.sn !== s.sn);
                                setBucket(prev => filtered.length ? prev.map(i => i.id === item.id ? {...i, serials: filtered, quantity: filtered.length} : i) : prev.filter(i => i.id !== item.id));
                             }}><X size={12} /></button>
                           </span>
                         ))}
-                        {item.itemType === "MATERIAL" && <span className="text-[10px] font-bold opacity-40 uppercase">Material Bulk</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       {item.itemType === "MATERIAL" ? (
-                        <input type="number" min="1" value={item.quantity} title="Quantity" aria-label="Quantity" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, quantity: Number(e.target.value)} : i))} className="w-16 bg-transparent border-b-sky-500 border-b-2 text-center font-bold outline-none" />
+                        <input type="number" min="1" value={item.quantity} title="Material Quantity" aria-label="Material Quantity" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, quantity: Number(e.target.value)} : i))} className="w-16 bg-transparent border-b-2 border-sky-500 text-center font-bold outline-none" />
                       ) : <span className="font-mono font-bold">{item.quantity}</span>}
                     </td>
                     <td className="px-6 py-4">
                       {item.itemType === "EQUIPMENT" && (
-                        <input type="date" title="Return Date" aria-label="Return Date" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, expectedReturnDate: e.target.value} : i))} className="bg-transparent text-xs font-bold outline-none border-b border-slate-500/20" />
+                        <input type="date" title="Expected Return Date" aria-label="Expected Return Date" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, expectedReturnDate: e.target.value} : i))} className="bg-transparent text-xs font-bold outline-none border-b border-slate-500/20" />
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                       <button type="button" aria-label="Remove item" title="Remove item" onClick={() => setBucket(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={18}/></button>
+                       <button type="button" title="Remove item row" aria-label="Remove item row" onClick={() => setBucket(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-rose-500"><Trash2 size={18}/></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-
-          <div className="mt-6 flex flex-col md:flex-row gap-4">
-             <select title="Manual Add" aria-label="Manual Add" className={`flex-1 rounded-xl border px-4 py-3 text-sm font-medium outline-none ${dark ? "border-white/10 bg-white/5 text-slate-100" : "border-[#ddd5c9] bg-white text-slate-900"}`}
-              onChange={(e) => {
-                const itm = items.find((i: any) => i.id === e.target.value);
-                if (itm) setBucket(prev => [...prev, { id: itm.id, name: itm.name, itemType: itm.itemType, quantity: 1, serials: [], expectedReturnDate: "" }]);
-              }}
-             >
-               <option value="">Manual Search & Add (Materials)...</option>
-               {items.filter((i: any) => i.itemType === "MATERIAL").map((i: any) => (
-                 <option key={i.id} value={i.id}>{i.name} ({i.quantity} available)</option>
-               ))}
-             </select>
           </div>
 
           <form action={action} onSubmit={(e) => {
@@ -235,26 +207,32 @@ export default function IssueInventoryItemClient({
             className="mt-10 space-y-8"
           >
             <section className={dark ? "rounded-2xl border border-white/10 bg-white/5 p-5" : "rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-5"}>
-              <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>Requester Details</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Requester Name" dark={dark}><input name="requesterName" required title="Requester Name" placeholder="Full Name" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field>
-                <Field label="Contact" dark={dark}><input name="requesterContact" required title="Contact" placeholder="Phone Number" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field>
+                <Field label="Requester Name" dark={dark}>
+                  <input name="requesterName" required title="Requester Full Name" placeholder="Full Name" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm"} />
+                </Field>
+                <Field label="Contact" dark={dark}>
+                  <input name="requesterContact" required title="Requester Contact Number" placeholder="Phone Number" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm"} />
+                </Field>
               </div>
-              <div className="mt-4"><Field label="Department" dark={dark}><input name="department" title="Department" placeholder="Team/Department" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field></div>
             </section>
 
             <section className={dark ? "rounded-2xl border border-white/10 bg-white/5 p-5" : "rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-5"}>
-              <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>Authorization & Purpose</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Authorized By" dark={dark}><input name="authorizedBy" required title="Authorized By" placeholder="Approving Officer" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field>
+                <Field label="Authorized By" dark={dark}>
+                  <input name="authorizedBy" required title="Authorizing Officer Name" placeholder="Approving Officer" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm"} />
+                </Field>
               </div>
-              <div className="mt-4"><Field label="Purpose" dark={dark}><textarea name="purpose" rows={4} required title="Purpose" placeholder="Reason for issue..." className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field></div>
+              <div className="mt-4">
+                <Field label="Purpose" dark={dark}>
+                  <textarea name="purpose" rows={4} required title="Purpose for Issue" placeholder="Reason for issue..." className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm"} />
+                </Field>
+              </div>
             </section>
 
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button type="submit" title="Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})</button>
-              <Link href={`/store/sites/${site.id}`} className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814]"}>Cancel</Link>
-            </div>
+            <button type="submit" title="Finalize and Process Issue" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>
+                Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})
+            </button>
           </form>
         </section>
       </div>
