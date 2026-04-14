@@ -45,98 +45,119 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ THE ULTIMATE MAPPING LOGIC (Works for Messy Rohde & Schwarz)
-  const handleLocalScanMatch = (rawJunk: string) => {
+  // ✅ THE EXACT PARSER FROM DEVICEMANAGEMENTCLIENT
+  const parseSmartScan = (text: string) => {
+    const data: any = { serialNumber: "", model: "", manufacturer: "" };
+    const cleanText = text.replace(/[\n\r]/g, "").trim();
+    const brackets = cleanText.match(/<([^>]+)>/g);
+
+    if (brackets && brackets.length >= 2) {
+      data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
+      const midPart = brackets[1].replace(/[<>]/g, "").trim();
+      const parts = midPart.split("-");
+      if (parts.length >= 2) {
+        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
+        if (serialIdx !== -1) {
+          data.serialNumber = parts[serialIdx];
+          data.model = parts.slice(0, serialIdx).join("-");
+        } else {
+          data.model = parts[0];
+          data.serialNumber = parts[1] || midPart;
+        }
+      } else {
+        data.serialNumber = midPart;
+      }
+    } else {
+      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
+      const modelMatch = cleanText.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
+      const mfgMatch = cleanText.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
+      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
+      if (modelMatch) data.model = modelMatch[1];
+      if (mfgMatch) data.manufacturer = mfgMatch[1];
+    }
+    return data;
+  };
+
+  // ✅ LOCAL MAPPING LOGIC (Industrial Strength)
+  const handleLocalScanMatch = (rawInput: string) => {
     setIsSearching(true);
-    let foundInstance = null;
-    let foundParentItem = null;
-    let matchedSerial = "";
+    const smartData = parseSmartScan(rawInput);
+    const scannedSerial = smartData.serialNumber;
 
-    const scanInput = rawJunk.toLowerCase();
-
-    // Check if ALREADY in bucket first
-    const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn.toLowerCase() === scanInput || scanInput.includes(s.sn.toLowerCase()))
-    );
-
-    if (isAlreadyScanned) {
-      alert(`Stop! This item is already in your issue bucket.`);
+    if (!scannedSerial) {
+      alert("Could not extract a serial number from this scan.");
       setIsSearching(false);
       return;
     }
 
-    for (const item of items) {
-      const match = item.instances?.find((ins) => {
-        const dbSerial = ins.serialNumber.toLowerCase();
-        // Check if the DB serial exists anywhere inside the messy scan string
-        return dbSerial.length > 2 && scanInput.includes(dbSerial);
-      });
+    // Duplicate Check
+    const isAlreadyScanned = bucket.some(item => 
+      item.serials.some((s: any) => s.sn.toLowerCase() === scannedSerial.toLowerCase())
+    );
 
-      if (match) {
-        foundInstance = match;
-        foundParentItem = item;
-        matchedSerial = match.serialNumber;
+    if (isAlreadyScanned) {
+      alert(`Stop! Serial ${scannedSerial} is already in your issue bucket.`);
+      setIsSearching(false);
+      return;
+    }
+
+    let found = false;
+    for (const item of items) {
+      const instanceMatch = item.instances?.find(
+        (ins) => ins.serialNumber.toLowerCase() === scannedSerial.toLowerCase()
+      );
+
+      if (instanceMatch) {
+        found = true;
+        setBucket((prev) => {
+          const existing = prev.find((i) => i.id === item.id);
+          if (existing) {
+            return prev.map((i) => i.id === item.id ? { 
+              ...i, 
+              quantity: i.quantity + 1, 
+              serials: [...i.serials, { sn: instanceMatch.serialNumber, condition: instanceMatch.condition }] 
+            } : i);
+          }
+          return [...prev, {
+            id: item.id,
+            name: item.name,
+            itemType: item.itemType,
+            quantity: 1,
+            serials: [{ sn: instanceMatch.serialNumber, condition: instanceMatch.condition }],
+            expectedReturnDate: ""
+          }];
+        });
         break;
       }
     }
 
-    if (foundInstance && foundParentItem) {
-      setBucket((prev) => {
-        const existing = prev.find((i) => i.id === foundParentItem!.id);
-        if (existing) {
-          return prev.map((i) => i.id === foundParentItem!.id ? { 
-            ...i, 
-            quantity: i.quantity + 1, 
-            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
-          } : i);
-        }
-        return [...prev, {
-          id: foundParentItem!.id,
-          name: foundParentItem!.name,
-          itemType: foundParentItem!.itemType,
-          quantity: 1,
-          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
-          expectedReturnDate: ""
-        }];
-      });
-    } else {
-      alert(`Serial not found! No registered serial number was detected inside this scan.`);
+    if (!found) {
+      alert(`Serial ${scannedSerial} not found in this site's inventory.`);
     }
     setIsSearching(false);
   };
 
-  
-  // ✅ THE BULLETPROOF GUN LISTENER
+  // ✅ THE BULLETPROOF GUN LISTENER (Matches DeviceManagement logic)
   useEffect(() => {
     let timeout: NodeJS.Timeout;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If the gun is typing, keep adding to the buffer
-      if (e.key.length === 1) {
-        scanBuffer.current += e.key;
-      }
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
+      lastKeyTime.current = currentTime;
 
       if (e.key === "Enter") {
-        e.preventDefault();
-        
-        // We wait 150ms after the "Enter" to see if the gun 
-        // is sending more lines (common in R&S barcodes)
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          if (scanBuffer.current.trim().length > 3) {
-            const finalJunk = scanBuffer.current.trim();
-            scanBuffer.current = ""; // Clear buffer for the next physical item
-            handleLocalScanMatch(finalJunk);
-          }
-        }, 150); 
+        if (scanBuffer.current.length > 3) {
+          e.preventDefault();
+          const finalData = scanBuffer.current;
+          scanBuffer.current = ""; 
+          handleLocalScanMatch(finalData);
+        }
+      } else if (e.key.length === 1) {
+        scanBuffer.current += e.key;
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      clearTimeout(timeout);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [bucket, items]);
 
   // ✅ CAMERA SCANNER EFFECT
@@ -193,7 +214,6 @@ export default function IssueInventoryItemClient({
             </div>
           )}
 
-          {/* BUCKET TABLE */}
           <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-[#e7ded3] bg-white'}`}>
             <table className="w-full text-left">
               <thead>
