@@ -105,25 +105,38 @@ export default function IssueInventoryItemClient({
     setIsSearching(false);
   };
 
-  // ✅ SYBLE SCANNER LISTENER
+  
+  // ✅ THE BULLETPROOF GUN LISTENER
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
-      lastKeyTime.current = currentTime;
+    let timeout: NodeJS.Timeout;
 
-      if (e.key === "Enter") {
-        if (scanBuffer.current.length > 3) {
-          e.preventDefault();
-          handleLocalScanMatch(scanBuffer.current);
-          scanBuffer.current = "";
-        }
-      } else if (e.key.length === 1) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If the gun is typing, keep adding to the buffer
+      if (e.key.length === 1) {
         scanBuffer.current += e.key;
       }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        
+        // We wait 150ms after the "Enter" to see if the gun 
+        // is sending more lines (common in R&S barcodes)
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          if (scanBuffer.current.trim().length > 3) {
+            const finalJunk = scanBuffer.current.trim();
+            scanBuffer.current = ""; // Clear buffer for the next physical item
+            handleLocalScanMatch(finalJunk);
+          }
+        }, 150); 
+      }
     };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      clearTimeout(timeout);
+    };
   }, [bucket, items]);
 
   // ✅ CAMERA SCANNER EFFECT
