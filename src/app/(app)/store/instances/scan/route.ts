@@ -8,42 +8,30 @@ export async function GET(req: Request) {
 
     if (!rawInput) return new NextResponse("No data", { status: 400 });
 
-    // 1. Get all serial numbers from the AssetInstance table
+    // 1. Grab all valid serials from the table
     const allInstances = await prisma.assetInstance.findMany({
-      include: {
-        inventoryItem: {
-          select: {
-            id: true,
-            name: true,
-            itemType: true,
-          }
-        }
-      }
+      include: { inventoryItem: true }
     });
 
-    // 2. Search: Does the messy scanner string contain ANY of our serial numbers?
-    // This looks for "2434567" or "101793" anywhere inside the junk text.
-    const foundInstance = allInstances.find(ins => 
-      rawInput.toLowerCase().includes(ins.serialNumber.toLowerCase())
+    // 2. See if the messy scan contains ANY of our database serials
+    const match = allInstances.find(ins => 
+      rawInput.includes(ins.serialNumber) || 
+      ins.serialNumber.includes(rawInput) // Just in case
     );
 
-    if (!foundInstance) {
-      return NextResponse.json({ 
-        error: `Could not map scan to any serial in database.` 
-      }, { status: 404 });
+    if (!match) {
+      return NextResponse.json({ error: "No matching serial found in the scanned data." }, { status: 404 });
     }
 
-    // 3. Success: Return the mapped data
     return NextResponse.json({
-      id: foundInstance.inventoryItem.id,
-      name: foundInstance.inventoryItem.name,
-      itemType: foundInstance.inventoryItem.itemType,
-      serialNumber: foundInstance.serialNumber,
-      condition: foundInstance.condition,
+      id: match.inventoryItem.id,
+      name: match.inventoryItem.name,
+      itemType: match.inventoryItem.itemType,
+      serialNumber: match.serialNumber,
+      condition: match.condition,
     });
 
   } catch (error) {
-    console.error("SCAN_ERROR", error);
     return new NextResponse("Server Error", { status: 500 });
   }
 }
