@@ -1,49 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
-import { X, Trash2, Loader2, CheckCircle2, QrCode, ArrowLeft } from "lucide-react";
+import { Html5QrcodeScanner } from "html5-qrcode";
+import { QrCode, X, Loader2, CheckCircle2, PlusCircle, ArrowLeft, Printer, Trash2 } from "lucide-react";
 
-type ItemRow = {
-  id: string;
-  name: string;
-  itemType: "MATERIAL" | "EQUIPMENT";
-  quantity: number;
-  unit: string | null;
-  stockNumber: string | null;
-  serialNumber: string | null;
-  reorderLevel: number;
-  status: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
-  condition: "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null;
-  instances: { serialNumber: string; condition: string }[];
-};
-
-export default function IssueInventoryItemClient({
-  site,
-  items,
-  action,
-}: {
-  site: {
-    id: string;
-    name: string;
-    location: string | null;
-  };
-  items: ItemRow[];
-  action: (formData: FormData) => void;
-}) {
+export default function DeviceManagementClient({ item, canEdit }: any) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
-
-  const [bucket, setBucket] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const router = useRouter();
+  
+  const [localUnits, setLocalUnits] = useState(item.instances);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [scanningId, setScanningId] = useState<string | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
+  const hasPermission = canEdit === true;
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ THE DEVICE MANAGEMENT PARSER (EXACT SAME LOGIC)
+  useEffect(() => {
+    setLocalUnits(item.instances);
+  }, [item.instances]);
+
+  const isPlaceholder = (sn: string) => {
+    return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
+  };
+
   const parseSmartScan = (text: string) => {
     const data: any = { serialNumber: "", model: "", manufacturer: "" };
     const cleanText = text.replace(/[\n\r]/g, "").trim();
@@ -67,81 +53,28 @@ export default function IssueInventoryItemClient({
       }
     } else {
       const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
+      const modelMatch = cleanText.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
+      const mfgMatch = cleanText.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
       data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
+      if (modelMatch) data.model = modelMatch[1];
+      if (mfgMatch) data.manufacturer = mfgMatch[1];
     }
     return data;
   };
 
-  // ✅ LOCAL MAPPING LOGIC
-  const handleLocalScanMatch = (rawInput: string) => {
-    setIsSearching(true);
-    const smartData = parseSmartScan(rawInput);
-    const scannedSerial = smartData.serialNumber;
-
-    if (!scannedSerial) {
-      alert("Could not extract a serial number from this scan.");
-      setIsSearching(false);
-      return;
-    }
-
-    // Check if ALREADY in bucket
-    const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn.toLowerCase() === scannedSerial.toLowerCase())
-    );
-
-    if (isAlreadyScanned) {
-      alert(`Already Scanned: Serial ${scannedSerial} is already in the bucket.`);
-      setIsSearching(false);
-      return;
-    }
-
-    let found = false;
-    for (const item of items) {
-      const instanceMatch = item.instances?.find(
-        (ins) => ins.serialNumber.toLowerCase() === scannedSerial.toLowerCase()
-      );
-
-      if (instanceMatch) {
-        found = true;
-        setBucket((prev) => {
-          const existing = prev.find((i) => i.id === item.id);
-          if (existing) {
-            return prev.map((i) => i.id === item.id ? { 
-              ...i, 
-              quantity: i.quantity + 1, 
-              serials: [...i.serials, { sn: instanceMatch.serialNumber, condition: instanceMatch.condition }] 
-            } : i);
-          }
-          return [...prev, {
-            id: item.id,
-            name: item.name,
-            itemType: item.itemType,
-            quantity: 1,
-            serials: [{ sn: instanceMatch.serialNumber, condition: instanceMatch.condition }],
-            expectedReturnDate: ""
-          }];
-        });
-        break;
-      }
-    }
-
-    if (!found) {
-      alert(`Serial ${scannedSerial} not found in this site's inventory.`);
-    }
-    setIsSearching(false);
-  };
-
-  // ✅ SYBLE SCANNER LISTENER
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    if (!hasPermission) return;
+    const handleKeyDown = async (e: KeyboardEvent) => {
       const currentTime = Date.now();
       if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
       lastKeyTime.current = currentTime;
-
       if (e.key === "Enter") {
-        if (scanBuffer.current.length > 3) {
+        if (scanBuffer.current.length > 5) {
           e.preventDefault();
-          handleLocalScanMatch(scanBuffer.current);
+          const smartData = parseSmartScan(scanBuffer.current);
+          const emptySlot = localUnits.find((u: any) => isPlaceholder(u.serialNumber));
+          if (emptySlot) await updateUnit(emptySlot.id, smartData);
+          else await addNewInstance(smartData);
           scanBuffer.current = "";
         }
       } else if (e.key.length === 1) {
@@ -150,147 +83,187 @@ export default function IssueInventoryItemClient({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [bucket, items]);
+  }, [localUnits, hasPermission]);
 
-  const getConditionStyle = (c: string) => {
-    if (c === "NEW") return "bg-blue-600";
-    if (c === "GOOD") return "bg-emerald-600";
-    return "bg-rose-600";
+  useEffect(() => {
+    if (scanningId && hasPermission) {
+      const scanner = new Html5QrcodeScanner("qr-reader", { fps: 15, qrbox: { width: 250, height: 150 } }, false);
+      scanner.render(async (decodedText: string) => {
+        const smartData = parseSmartScan(decodedText);
+        await scanner.clear();
+        if (scanningId === "NEW_SLOT") await addNewInstance(smartData);
+        else await updateUnit(scanningId, smartData);
+        setScanningId(null);
+      }, () => {});
+      return () => { scanner.clear().catch(() => {}); };
+    }
+  }, [scanningId, hasPermission]);
+
+  async function addNewInstance(data: any) {
+    if (!hasPermission) return;
+    setIsAddingNew(true);
+    try {
+      const res = await fetch(`/store/instances/new`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, ...data }),
+      });
+      if (res.ok) router.refresh();
+      else {
+        const err = await res.json();
+        alert(err.message || "Duplicate Serial detected in another record.");
+      }
+    } catch (e) { alert("Network error adding stock"); }
+    finally { setIsAddingNew(false); }
+  }
+
+  async function updateUnit(instanceId: string, updates: any) {
+    if (!hasPermission) return;
+    setLoadingId(instanceId);
+    const payload = { ...updates };
+    // ✅ RULE: If Serial is erased, clear everything
+    if (payload.serialNumber === "") {
+      payload.serialNumber = `PENDING-${instanceId.slice(-5)}`;
+      payload.model = "";
+      payload.manufacturer = "";
+    }
+    try {
+      const res = await fetch(`/store/instances/${instanceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setLocalUnits((prev: any) => prev.map((u: any) => (u.id === instanceId ? { ...u, ...payload } : u)));
+        router.refresh();
+      } else {
+        const err = await res.json();
+        alert(err.message || "This serial number is already assigned to another item.");
+        router.refresh();
+      }
+    } catch (e) { alert("Error updating unit"); }
+    finally { setLoadingId(null); }
+  }
+
+  // ✅ BULK DELETE LOGIC
+  const deleteSelected = async () => {
+    if (!confirm(`Delete ${selectedIds.length} units? This will decrease total quantity.`)) return;
+    try {
+      const res = await fetch(`/store/instances/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds, itemId: item.id }),
+      });
+      if (res.ok) {
+        setSelectedIds([]);
+        router.refresh();
+      }
+    } catch (e) { alert("Delete failed."); }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   return (
-    <div className={dark ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200" : "min-h-screen bg-[linear-gradient(180deg,#fbf8f3_0%,#f5f2ed_48%,#f2ede5_100%)]"}>
-      <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
-        <section className={dark ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-8 backdrop-blur-xl" : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-8 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"}>
-          
-          <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
+    <div className={dark ? "min-h-screen bg-[#0d1117] text-white" : "min-h-screen bg-[#fbf8f3] text-slate-900"}>
+      <style jsx global>{`
+        @media print {
+          .no-print, button, svg, .header-nav, select { display: none !important; }
+          body { background: white !important; color: black !important; }
+          .table-container { border: 1px solid #ccc !important; }
+          th, td { border-bottom: 1px solid #eee !important; padding: 12px !important; }
+          input { border: none !important; background: transparent !important; }
+        }
+      `}</style>
 
-          <div className="flex flex-col gap-3">
-            <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
-              <ArrowLeft size={16} /> Back to {site.name} Inventory
-            </Link>
-            <div className="flex items-center justify-between">
-              <div className={dark ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]" : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"}>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Issue Smart Bucket
-              </div>
-              {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING...</div>}
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        {scanningId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 no-print">
+            <div className={dark ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10" : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"}>
+              <button onClick={() => setScanningId(null)} title="Close Scanner" aria-label="Close Scanner" className="absolute right-4 top-4 p-2 opacity-50 hover:opacity-100"><X size={24} /></button>
+              <h2 className="text-xl font-bold mb-4 text-center">Camera Smart Capture</h2>
+              <div id="qr-reader" className="overflow-hidden rounded-2xl border-2 border-dashed border-slate-500/30" />
             </div>
           </div>
+        )}
 
-          <h1 className={dark ? "mt-5 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl" : "mt-5 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"}>
-            Issue Inventory Items
-          </h1>
+        <div className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="header-nav">
+            <Link href={`/store/sites/${item.inventorySiteId}`} className="inline-flex items-center gap-2 text-sm font-bold opacity-60 hover:text-sky-500 mb-4"><ArrowLeft size={16} /> Back</Link>
+            <h1 className="text-4xl font-black tracking-tight">{item.name}</h1>
+          </div>
+          <div className="flex items-center gap-3 no-print">
+            {selectedIds.length > 0 && (
+              <button onClick={deleteSelected} className="bg-rose-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+                <Trash2 size={16}/> Delete ({selectedIds.length})
+              </button>
+            )}
+            <button onClick={() => window.print()} title="Print Labels" aria-label="Print Labels" className={dark ? "flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm" : "flex items-center gap-2 bg-white border border-slate-300 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm"}>
+              <Printer size={18} /> Print List
+            </button>
+            <div className={dark ? "bg-white/5 border border-white/10 p-4 rounded-2xl" : "bg-white border border-slate-300 shadow-sm p-4 rounded-2xl"}>
+               <span className="text-[10px] font-black uppercase opacity-40 block">Total Stock</span>
+               <span className="text-2xl font-black text-sky-500">{item.quantity} {item.unit || "pcs"}</span>
+            </div>
+          </div>
+        </div>
 
-          <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
-            <table className="w-full text-left">
+        <div className={`table-container ${dark ? "rounded-2xl border border-white/10 bg-white/5" : "rounded-2xl border border-slate-300 bg-white shadow-xl"}`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-200">
               <thead>
-                <tr className={`text-[10px] font-black uppercase tracking-widest ${dark ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                  <th className="px-6 py-4">Item</th>
-                  <th className="px-6 py-4">Serials / Condition</th>
-                  <th className="px-6 py-4 text-center">Qty</th>
-                  <th className="px-6 py-4">Return Date</th>
-                  <th className="px-6 py-4"></th>
+                <tr className={dark ? "bg-white/5 text-[11px] font-black uppercase text-slate-400" : "bg-slate-100 text-[11px] font-black uppercase text-slate-600"}>
+                  <th className="px-6 py-4 w-12 text-center">No.</th>
+                  <th className="px-6 py-4">Serial Number</th>
+                  <th className="px-6 py-4">Model</th>
+                  <th className="px-6 py-4">Manufacturer</th>
+                  <th className="px-6 py-4 w-32 text-right">Condition</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-500/10">
-                {bucket.length === 0 && (
-                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">Ready for Syble Scan...</td></tr>
-                )}
-                {bucket.map((item) => (
-                  <tr key={item.id} className="hover:bg-sky-500/5 transition-colors">
-                    <td className="px-6 py-4 font-bold text-sm text-sky-500">{item.name}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {item.serials.map((s: any) => (
-                          <span key={s.sn} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${getConditionStyle(s.condition)}`}>
-                            {s.sn}
-                            <button type="button" title={`Remove serial ${s.sn}`} aria-label={`Remove serial ${s.sn}`} className="hover:scale-125 transition-transform" onClick={() => {
-                               const filtered = item.serials.filter((x:any) => x.sn !== s.sn);
-                               setBucket(prev => filtered.length ? prev.map(i => i.id === item.id ? {...i, serials: filtered, quantity: filtered.length} : i) : prev.filter(i => i.id !== item.id));
-                            }}><X size={12} /></button>
-                          </span>
-                        ))}
-                        {item.itemType === "MATERIAL" && <span className="text-[10px] font-bold opacity-40 uppercase">Material Bulk</span>}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {item.itemType === "MATERIAL" ? (
-                        <input type="number" min="1" value={item.quantity} title="Quantity" aria-label="Quantity" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, quantity: Number(e.target.value)} : i))} className="w-16 bg-transparent border-b-sky-500 border-b-2 text-center font-bold outline-none" />
-                      ) : <span className="font-mono font-bold">{item.quantity}</span>}
-                    </td>
-                    <td className="px-6 py-4">
-                      {item.itemType === "EQUIPMENT" && (
-                        <input type="date" title="Return Date" aria-label="Return Date" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, expectedReturnDate: e.target.value} : i))} className="bg-transparent text-xs font-bold outline-none border-b border-slate-500/20" />
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                       <button type="button" aria-label="Remove item" title="Remove item" onClick={() => setBucket(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={18}/></button>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className={dark ? "divide-y divide-white/5" : "divide-y divide-slate-200"}>
+                {localUnits.map((unit: any, index: number) => {
+                  const hasRealSerial = !isPlaceholder(unit.serialNumber);
+                  const isSelected = selectedIds.includes(unit.id);
+                  const inputClass = dark 
+                    ? "w-full bg-transparent border-b border-white/10 focus:border-sky-500 outline-none font-mono text-sm py-1 text-white placeholder:text-slate-700" 
+                    : "w-full bg-transparent border-b border-slate-400 focus:border-sky-600 outline-none font-mono text-sm py-1 text-slate-900 placeholder:text-slate-400";
+
+                  return (
+                    <tr key={unit.id} className={`${isSelected ? 'bg-sky-500/10' : ''} ${loadingId === unit.id ? "bg-sky-500/5 animate-pulse" : "hover:bg-sky-500/2"} transition-colors`}>
+                      <td className="px-6 py-5 text-center font-mono text-xs cursor-pointer" onClick={() => toggleSelect(unit.id)}>
+                        <div className={`w-6 h-6 rounded flex items-center justify-center border ${isSelected ? 'bg-sky-500 border-sky-500 text-white' : 'border-slate-500/30 text-slate-500'}`}>
+                          {isSelected ? index + 1 : index + 1}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2">
+                          <input value={hasRealSerial ? unit.serialNumber : ""} title={`Serial ${index + 1}`} aria-label={`Serial ${index + 1}`} disabled={!hasPermission} onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, serialNumber: e.target.value } : u)))} onBlur={(e) => updateUnit(unit.id, { serialNumber: e.target.value })} placeholder="Scan Serial..." className={inputClass} />
+                          {hasPermission && (loadingId === unit.id ? <Loader2 className="animate-spin text-sky-500" size={16} /> : hasRealSerial ? <CheckCircle2 className="text-emerald-500 no-print" size={16} /> : <button onClick={() => setScanningId(unit.id)} title="Camera Scan" aria-label="Camera Scan" className="text-sky-500 hover:scale-110 no-print"><QrCode size={18} /></button>)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5"><input value={unit.model || ""} title={`Model ${index + 1}`} aria-label={`Model ${index + 1}`} disabled={!hasPermission} onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, model: e.target.value } : u)))} onBlur={(e) => updateUnit(unit.id, { model: e.target.value })} placeholder="—" className={inputClass} /></td>
+                      <td className="px-6 py-5"><input value={unit.manufacturer || ""} title={`Mfg ${index + 1}`} aria-label={`Mfg ${index + 1}`} disabled={!hasPermission} onChange={(e) => setLocalUnits((prev: any) => prev.map((u: any) => (u.id === unit.id ? { ...u, manufacturer: e.target.value } : u)))} onBlur={(e) => updateUnit(unit.id, { manufacturer: e.target.value })} placeholder="—" className={inputClass} /></td>
+                      <td className="px-6 py-5 text-right">
+                        <select value={unit.condition} title={`Condition ${index + 1}`} aria-label={`Condition ${index + 1}`} disabled={!hasPermission} onChange={(e) => updateUnit(unit.id, { condition: e.target.value })} className={`${dark ? "bg-slate-800 border-white/20 text-white" : "bg-white border-slate-400 text-slate-900"} no-print rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer`}>
+                          <option value="NEW">NEW</option><option value="GOOD">GOOD</option><option value="FAULTY">FAULTY</option><option value="DAMAGED">DAMAGED</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-
-          <div className="mt-6 flex flex-col md:flex-row gap-4">
-             <select title="Manual Add" aria-label="Manual Add" className={`flex-1 rounded-xl border px-4 py-3 text-sm font-medium outline-none ${dark ? "border-white/10 bg-white/5 text-slate-100" : "border-[#ddd5c9] bg-white text-slate-900"}`}
-              onChange={(e) => {
-                const itm = items.find((i: any) => i.id === e.target.value);
-                if (itm) setBucket(prev => [...prev, { id: itm.id, name: itm.name, itemType: itm.itemType, quantity: 1, serials: [], expectedReturnDate: "" }]);
-              }}
-             >
-               <option value="">Manual Search & Add (Bolts/Cables)...</option>
-               {items.filter((i: any) => i.itemType === "MATERIAL").map((i: any) => (
-                 <option key={i.id} value={i.id}>{i.name} ({i.quantity} available)</option>
-               ))}
-             </select>
-          </div>
-
-          <form action={action} onSubmit={(e) => {
-              if (bucket.length === 0) { e.preventDefault(); alert("Bucket is empty!"); return; }
-              const fd = new FormData(e.currentTarget);
-              fd.append("bucketData", JSON.stringify(bucket));
-            }}
-            className="mt-10 space-y-8"
-          >
-            <section className={dark ? "rounded-2xl border border-white/10 bg-white/5 p-5" : "rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-5"}>
-              <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>Requester Details</div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Requester Name" dark={dark}><input name="requesterName" required title="Requester Name" placeholder="Full Name" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field>
-                <Field label="Contact" dark={dark}><input name="requesterContact" required title="Contact" placeholder="Phone Number" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field>
-              </div>
-              <div className="mt-4"><Field label="Department" dark={dark}><input name="department" title="Department" placeholder="Team/Department" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field></div>
-            </section>
-
-            <section className={dark ? "rounded-2xl border border-white/10 bg-white/5 p-5" : "rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-5"}>
-              <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>Authorization & Purpose</div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Authorized By" dark={dark}><input name="authorizedBy" required title="Authorized By" placeholder="Approving Officer" className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field>
-              </div>
-              <div className="mt-4"><Field label="Purpose" dark={dark}><textarea name="purpose" rows={4} required title="Purpose" placeholder="Reason for issue..." className={dark ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none" : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"} /></Field></div>
-            </section>
-
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button type="submit" title="Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>
-                Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})
-              </button>
-              <Link href={`/store/sites/${site.id}`} className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"}>
-                Cancel
-              </Link>
+          {hasPermission && (
+            <div className="p-4 bg-sky-500/2 no-print">
+               <button onClick={() => setScanningId("NEW_SLOT")} disabled={isAddingNew} title="Camera Register" aria-label="Camera Register" className={dark ? "w-full py-4 border-2 border-dashed border-white/10 rounded-xl font-bold text-xs uppercase text-slate-400 hover:border-sky-500" : "w-full py-4 border-2 border-dashed border-slate-300 rounded-xl font-bold text-xs uppercase text-slate-500 hover:border-sky-600"}>
+                 {isAddingNew ? <Loader2 className="animate-spin inline mr-2" /> : <PlusCircle className="inline mr-2" size={16} />} Register Extra Stock (Camera)
+               </button>
             </div>
-          </form>
-        </section>
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, children, dark }: any) {
-  return (
-    <div className="block">
-      <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>{label}</div>
-      {children}
     </div>
   );
 }

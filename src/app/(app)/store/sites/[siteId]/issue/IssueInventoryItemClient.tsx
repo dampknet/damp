@@ -43,61 +43,90 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ LOCAL MAPPING (The "Search-Inside" Strategy)
-  const handleLocalScanMatch = (rawJunk: string) => {
+  // ✅ THE DEVICE MANAGEMENT PARSER (EXACT SAME LOGIC)
+  const parseSmartScan = (text: string) => {
+    const data: any = { serialNumber: "", model: "", manufacturer: "" };
+    const cleanText = text.replace(/[\n\r]/g, "").trim();
+    const brackets = cleanText.match(/<([^>]+)>/g);
+
+    if (brackets && brackets.length >= 2) {
+      data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
+      const midPart = brackets[1].replace(/[<>]/g, "").trim();
+      const parts = midPart.split("-");
+      if (parts.length >= 2) {
+        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
+        if (serialIdx !== -1) {
+          data.serialNumber = parts[serialIdx];
+          data.model = parts.slice(0, serialIdx).join("-");
+        } else {
+          data.model = parts[0];
+          data.serialNumber = parts[1] || midPart;
+        }
+      } else {
+        data.serialNumber = midPart;
+      }
+    } else {
+      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
+      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
+    }
+    return data;
+  };
+
+  // ✅ LOCAL MAPPING LOGIC
+  const handleLocalScanMatch = (rawInput: string) => {
     setIsSearching(true);
-    let foundInstance = null;
-    let foundParentItem = null;
-    let matchedSerial = "";
+    const smartData = parseSmartScan(rawInput);
+    const scannedSerial = smartData.serialNumber;
 
-    const scanInput = rawJunk.toLowerCase();
-
-    // Check if ALREADY in bucket first
-    const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn.toLowerCase() === scanInput || scanInput.includes(s.sn.toLowerCase()))
-    );
-
-    if (isAlreadyScanned) {
-      alert(`Stop! This item is already in your issue bucket.`);
+    if (!scannedSerial) {
+      alert("Could not extract a serial number from this scan.");
       setIsSearching(false);
       return;
     }
 
-    for (const item of items) {
-      const match = item.instances?.find((ins) => {
-        const dbSerial = ins.serialNumber.toLowerCase();
-        return dbSerial.length > 2 && scanInput.includes(dbSerial);
-      });
+    // Check if ALREADY in bucket
+    const isAlreadyScanned = bucket.some(item => 
+      item.serials.some((s: any) => s.sn.toLowerCase() === scannedSerial.toLowerCase())
+    );
 
-      if (match) {
-        foundInstance = match;
-        foundParentItem = item;
-        matchedSerial = match.serialNumber;
+    if (isAlreadyScanned) {
+      alert(`Already Scanned: Serial ${scannedSerial} is already in the bucket.`);
+      setIsSearching(false);
+      return;
+    }
+
+    let found = false;
+    for (const item of items) {
+      const instanceMatch = item.instances?.find(
+        (ins) => ins.serialNumber.toLowerCase() === scannedSerial.toLowerCase()
+      );
+
+      if (instanceMatch) {
+        found = true;
+        setBucket((prev) => {
+          const existing = prev.find((i) => i.id === item.id);
+          if (existing) {
+            return prev.map((i) => i.id === item.id ? { 
+              ...i, 
+              quantity: i.quantity + 1, 
+              serials: [...i.serials, { sn: instanceMatch.serialNumber, condition: instanceMatch.condition }] 
+            } : i);
+          }
+          return [...prev, {
+            id: item.id,
+            name: item.name,
+            itemType: item.itemType,
+            quantity: 1,
+            serials: [{ sn: instanceMatch.serialNumber, condition: instanceMatch.condition }],
+            expectedReturnDate: ""
+          }];
+        });
         break;
       }
     }
 
-    if (foundInstance && foundParentItem) {
-      setBucket((prev) => {
-        const existing = prev.find((i) => i.id === foundParentItem!.id);
-        if (existing) {
-          return prev.map((i) => i.id === foundParentItem!.id ? { 
-            ...i, 
-            quantity: i.quantity + 1, 
-            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
-          } : i);
-        }
-        return [...prev, {
-          id: foundParentItem!.id,
-          name: foundParentItem!.name,
-          itemType: foundParentItem!.itemType,
-          quantity: 1,
-          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
-          expectedReturnDate: ""
-        }];
-      });
-    } else {
-      alert(`Serial not found in this scan data.`);
+    if (!found) {
+      alert(`Serial ${scannedSerial} not found in this site's inventory.`);
     }
     setIsSearching(false);
   };
@@ -138,7 +167,7 @@ export default function IssueInventoryItemClient({
 
           <div className="flex flex-col gap-3">
             <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
-              ← Back to {site.name} Inventory
+              <ArrowLeft size={16} /> Back to {site.name} Inventory
             </Link>
             <div className="flex items-center justify-between">
               <div className={dark ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]" : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"}>
@@ -153,7 +182,6 @@ export default function IssueInventoryItemClient({
             Issue Inventory Items
           </h1>
 
-          {/* BUCKET TABLE */}
           <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
             <table className="w-full text-left">
               <thead>
@@ -247,7 +275,9 @@ export default function IssueInventoryItemClient({
               <button type="submit" title="Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>
                 Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})
               </button>
-              <Link href={`/store/sites/${site.id}`} className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"}>Cancel</Link>
+              <Link href={`/store/sites/${site.id}`} className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"}>
+                Cancel
+              </Link>
             </div>
           </form>
         </section>
