@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
+import { Html5QrcodeScanner } from "html5-qrcode";
 import { X, Trash2, Loader2, CheckCircle2, QrCode, ArrowLeft } from "lucide-react";
 
 type ItemRow = {
@@ -40,93 +41,66 @@ export default function IssueInventoryItemClient({
 
   const [bucket, setBucket] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ THE DEVICE MANAGEMENT PARSER (EXACT SAME LOGIC)
-  const parseSmartScan = (text: string) => {
-    const data: any = { serialNumber: "", model: "", manufacturer: "" };
-    const cleanText = text.replace(/[\n\r]/g, "").trim();
-    const brackets = cleanText.match(/<([^>]+)>/g);
-
-    if (brackets && brackets.length >= 2) {
-      data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
-      const midPart = brackets[1].replace(/[<>]/g, "").trim();
-      const parts = midPart.split("-");
-      if (parts.length >= 2) {
-        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
-        if (serialIdx !== -1) {
-          data.serialNumber = parts[serialIdx];
-          data.model = parts.slice(0, serialIdx).join("-");
-        } else {
-          data.model = parts[0];
-          data.serialNumber = parts[1] || midPart;
-        }
-      } else {
-        data.serialNumber = midPart;
-      }
-    } else {
-      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
-      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
-    }
-    return data;
-  };
-
-  // ✅ LOCAL MAPPING LOGIC
-  const handleLocalScanMatch = (rawInput: string) => {
+  // ✅ THE ULTIMATE MAPPING LOGIC (Works for Messy Rohde & Schwarz)
+  const handleLocalScanMatch = (rawJunk: string) => {
     setIsSearching(true);
-    const smartData = parseSmartScan(rawInput);
-    const scannedSerial = smartData.serialNumber;
+    let foundInstance = null;
+    let foundParentItem = null;
+    let matchedSerial = "";
 
-    if (!scannedSerial) {
-      alert("Could not extract a serial number from this scan.");
-      setIsSearching(false);
-      return;
-    }
+    const scanInput = rawJunk.toLowerCase();
 
-    // Check if ALREADY in bucket
+    // Check if ALREADY in bucket first
     const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn.toLowerCase() === scannedSerial.toLowerCase())
+      item.serials.some((s: any) => s.sn.toLowerCase() === scanInput || scanInput.includes(s.sn.toLowerCase()))
     );
 
     if (isAlreadyScanned) {
-      alert(`Already Scanned: Serial ${scannedSerial} is already in the bucket.`);
+      alert(`Stop! This item is already in your issue bucket.`);
       setIsSearching(false);
       return;
     }
 
-    let found = false;
     for (const item of items) {
-      const instanceMatch = item.instances?.find(
-        (ins) => ins.serialNumber.toLowerCase() === scannedSerial.toLowerCase()
-      );
+      const match = item.instances?.find((ins) => {
+        const dbSerial = ins.serialNumber.toLowerCase();
+        // Check if the DB serial exists anywhere inside the messy scan string
+        return dbSerial.length > 2 && scanInput.includes(dbSerial);
+      });
 
-      if (instanceMatch) {
-        found = true;
-        setBucket((prev) => {
-          const existing = prev.find((i) => i.id === item.id);
-          if (existing) {
-            return prev.map((i) => i.id === item.id ? { 
-              ...i, 
-              quantity: i.quantity + 1, 
-              serials: [...i.serials, { sn: instanceMatch.serialNumber, condition: instanceMatch.condition }] 
-            } : i);
-          }
-          return [...prev, {
-            id: item.id,
-            name: item.name,
-            itemType: item.itemType,
-            quantity: 1,
-            serials: [{ sn: instanceMatch.serialNumber, condition: instanceMatch.condition }],
-            expectedReturnDate: ""
-          }];
-        });
+      if (match) {
+        foundInstance = match;
+        foundParentItem = item;
+        matchedSerial = match.serialNumber;
         break;
       }
     }
 
-    if (!found) {
-      alert(`Serial ${scannedSerial} not found in this site's inventory.`);
+    if (foundInstance && foundParentItem) {
+      setBucket((prev) => {
+        const existing = prev.find((i) => i.id === foundParentItem!.id);
+        if (existing) {
+          return prev.map((i) => i.id === foundParentItem!.id ? { 
+            ...i, 
+            quantity: i.quantity + 1, 
+            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
+          } : i);
+        }
+        return [...prev, {
+          id: foundParentItem!.id,
+          name: foundParentItem!.name,
+          itemType: foundParentItem!.itemType,
+          quantity: 1,
+          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
+          expectedReturnDate: ""
+        }];
+      });
+    } else {
+      alert(`Serial not found! No registered serial number was detected inside this scan.`);
     }
     setIsSearching(false);
   };
@@ -152,6 +126,19 @@ export default function IssueInventoryItemClient({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [bucket, items]);
 
+  // ✅ CAMERA SCANNER EFFECT
+  useEffect(() => {
+    if (isCameraActive) {
+      const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
+      scanner.render((text) => {
+        handleLocalScanMatch(text);
+        setIsCameraActive(false);
+        scanner.clear();
+      }, () => {});
+      return () => { scanner.clear().catch(() => {}); };
+    }
+  }, [isCameraActive, bucket, items]);
+
   const getConditionStyle = (c: string) => {
     if (c === "NEW") return "bg-blue-600";
     if (c === "GOOD") return "bg-emerald-600";
@@ -166,7 +153,7 @@ export default function IssueInventoryItemClient({
           <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
 
           <div className="flex flex-col gap-3">
-            <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
+            <Link href={`/store/sites/${site.id}`} title="Back to site" className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
               <ArrowLeft size={16} /> Back to {site.name} Inventory
             </Link>
             <div className="flex items-center justify-between">
@@ -174,7 +161,12 @@ export default function IssueInventoryItemClient({
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Issue Smart Bucket
               </div>
-              {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING...</div>}
+              <div className="flex items-center gap-3">
+                 {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING...</div>}
+                 <button type="button" title="Use Camera Scanner" onClick={() => setIsCameraActive(!isCameraActive)} className="flex items-center gap-2 bg-sky-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg hover:bg-sky-600 transition-all">
+                    <QrCode size={16} /> {isCameraActive ? "Close Camera" : "Use Camera"}
+                 </button>
+              </div>
             </div>
           </div>
 
@@ -182,50 +174,59 @@ export default function IssueInventoryItemClient({
             Issue Inventory Items
           </h1>
 
-          <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
+          {isCameraActive && (
+            <div className="mt-6 overflow-hidden rounded-2xl border-2 border-dashed border-sky-500/50 bg-sky-500/5 p-4">
+              <div id="reader" className="mx-auto max-w-sm"></div>
+            </div>
+          )}
+
+          {/* BUCKET TABLE */}
+          <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-[#e7ded3] bg-white'}`}>
             <table className="w-full text-left">
               <thead>
                 <tr className={`text-[10px] font-black uppercase tracking-widest ${dark ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                  <th className="px-6 py-4">Item</th>
-                  <th className="px-6 py-4">Serials / Condition</th>
+                  <th className="px-6 py-4">Item Name</th>
+                  <th className="px-6 py-4 text-center">Serials / Condition</th>
                   <th className="px-6 py-4 text-center">Qty</th>
-                  <th className="px-6 py-4">Return Date</th>
+                  <th className="px-6 py-4 text-center">Return Date</th>
                   <th className="px-6 py-4"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-500/10">
                 {bucket.length === 0 && (
-                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">Ready for Syble Scan...</td></tr>
+                  <tr><td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">Point Syble gun or use camera to scan...</td></tr>
                 )}
                 {bucket.map((item) => (
                   <tr key={item.id} className="hover:bg-sky-500/5 transition-colors">
-                    <td className="px-6 py-4 font-bold text-sm text-sky-500">{item.name}</td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
+                       <div className="font-bold text-sm text-sky-500">{item.name}</div>
+                       <div className="text-[10px] opacity-50 uppercase font-black">{item.itemType}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap justify-center gap-2">
                         {item.serials.map((s: any) => (
                           <span key={s.sn} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${getConditionStyle(s.condition)}`}>
                             {s.sn}
-                            <button type="button" title={`Remove serial ${s.sn}`} aria-label={`Remove serial ${s.sn}`} className="hover:scale-125 transition-transform" onClick={() => {
+                            <button type="button" title={`Remove serial ${s.sn}`} onClick={() => {
                                const filtered = item.serials.filter((x:any) => x.sn !== s.sn);
                                setBucket(prev => filtered.length ? prev.map(i => i.id === item.id ? {...i, serials: filtered, quantity: filtered.length} : i) : prev.filter(i => i.id !== item.id));
                             }}><X size={12} /></button>
                           </span>
                         ))}
-                        {item.itemType === "MATERIAL" && <span className="text-[10px] font-bold opacity-40 uppercase">Material Bulk</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       {item.itemType === "MATERIAL" ? (
-                        <input type="number" min="1" value={item.quantity} title="Quantity" aria-label="Quantity" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, quantity: Number(e.target.value)} : i))} className="w-16 bg-transparent border-b-sky-500 border-b-2 text-center font-bold outline-none" />
-                      ) : <span className="font-mono font-bold">{item.quantity}</span>}
+                        <input type="number" min="1" value={item.quantity} title="Adjust Quantity" aria-label="Adjust Quantity" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, quantity: Number(e.target.value)} : i))} className="w-16 bg-transparent border-b-sky-500 border-b-2 text-center font-bold outline-none" />
+                      ) : <span className="font-mono font-bold text-sm">{item.quantity}</span>}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-center">
                       {item.itemType === "EQUIPMENT" && (
-                        <input type="date" title="Return Date" aria-label="Return Date" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, expectedReturnDate: e.target.value} : i))} className="bg-transparent text-xs font-bold outline-none border-b border-slate-500/20" />
+                        <input type="date" title="Expected Return Date" aria-label="Expected Return Date" onChange={(e) => setBucket(prev => prev.map(i => i.id === item.id ? {...i, expectedReturnDate: e.target.value} : i))} className="bg-transparent text-xs font-bold outline-none border-b border-slate-500/20" />
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                       <button type="button" aria-label="Remove item" title="Remove item" onClick={() => setBucket(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={18}/></button>
+                       <button type="button" title="Remove entire row" aria-label="Remove entire row" onClick={() => setBucket(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={18}/></button>
                     </td>
                   </tr>
                 ))}
@@ -234,13 +235,13 @@ export default function IssueInventoryItemClient({
           </div>
 
           <div className="mt-6 flex flex-col md:flex-row gap-4">
-             <select title="Manual Add" aria-label="Manual Add" className={`flex-1 rounded-xl border px-4 py-3 text-sm font-medium outline-none ${dark ? "border-white/10 bg-white/5 text-slate-100" : "border-[#ddd5c9] bg-white text-slate-900"}`}
+             <select title="Manual Search" aria-label="Manual Search" className={`flex-1 rounded-xl border px-4 py-3 text-sm font-medium outline-none ${dark ? "border-white/10 bg-white/5 text-slate-100" : "border-[#ddd5c9] bg-white text-slate-900"}`}
               onChange={(e) => {
                 const itm = items.find((i: any) => i.id === e.target.value);
                 if (itm) setBucket(prev => [...prev, { id: itm.id, name: itm.name, itemType: itm.itemType, quantity: 1, serials: [], expectedReturnDate: "" }]);
               }}
              >
-               <option value="">Manual Search & Add (Bolts/Cables)...</option>
+               <option value="">Manual Search & Add (Materials)...</option>
                {items.filter((i: any) => i.itemType === "MATERIAL").map((i: any) => (
                  <option key={i.id} value={i.id}>{i.name} ({i.quantity} available)</option>
                ))}
@@ -272,10 +273,10 @@ export default function IssueInventoryItemClient({
             </section>
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button type="submit" title="Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>
+              <button type="submit" title="Confirm and Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>
                 Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})
               </button>
-              <Link href={`/store/sites/${site.id}`} className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"}>
+              <Link href={`/store/sites/${site.id}`} title="Cancel operation" className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"}>
                 Cancel
               </Link>
             </div>
