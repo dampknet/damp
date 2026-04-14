@@ -43,87 +43,77 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ IMPROVED SMART PARSER
-  const parseSmartScan = (text: string) => {
-    const data: any = { serialNumber: "", model: "", manufacturer: "" };
-    const cleanText = text.replace(/[\n\r]/g, "").trim();
-    const brackets = cleanText.match(/<([^>]+)>/g);
+  // ✅ 1. BREAK JUNK INTO SEGMENTS (Works for messy Rohde & Schwarz strings)
+  const getScannedSegments = (text: string) => {
+    // This turns "<Rhode & Schwarz><2501.7406.06-101793-dZ>" 
+    // into ["Rhode", "Schwarz", "2501", "7406", "06", "101793", "dZ"]
+    return text
+      .replace(/[<>]/g, " ")
+      .split(/[\s\-:._]+/)
+      .map(p => p.trim())
+      .filter(p => p.length >= 3);
+  };
 
-    if (brackets && brackets.length >= 2) {
-      data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
-      
-      // Look through all bracketed content to find the serial
-      for (let content of brackets) {
-        const inner = content.replace(/[<>]/g, "").trim();
-        // Split by hyphens/dots and look for a numeric serial like 101793
-        const parts = inner.split(/[-.]/);
-        const found = parts.find(p => /^\d{5,}$/.test(p)); // Finds numbers 5 digits or longer
-        if (found) {
-          data.serialNumber = found;
+  // ✅ 2. INDUSTRIAL MAPPING LOGIC
+  const handleLocalScanMatch = (rawJunk: string) => {
+    setIsSearching(true);
+    const segments = getScannedSegments(rawJunk);
+    let foundInstance = null;
+    let foundParentItem = null;
+    let matchedSerial = "";
+
+    // Search: Does any segment from the scan match a serial in our DB?
+    for (const item of items) {
+      for (const word of segments) {
+        const match = item.instances?.find(
+          ins => ins.serialNumber.toLowerCase() === word.toLowerCase()
+        );
+        if (match) {
+          foundInstance = match;
+          foundParentItem = item;
+          matchedSerial = match.serialNumber;
           break;
         }
       }
-      // Fallback if the regex above didn't catch it
-      if (!data.serialNumber) data.serialNumber = brackets[1].replace(/[<>]/g, "").trim();
-    } else {
-      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
-      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
-    }
-    return data;
-  };
-
-  // ✅ LOCAL MAPPING (Fast, No Internet Required)
-  const handleLocalScanMatch = (scannedSerial: string) => {
-    setIsSearching(true);
-    let found = false;
-
-    // Check if ALREADY in bucket first
-    const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn === scannedSerial)
-    );
-
-    if (isAlreadyScanned) {
-      alert(`Stop! Serial ${scannedSerial} is already in your issue bucket.`);
-      setIsSearching(false);
-      return;
+      if (foundInstance) break;
     }
 
-    for (const item of items) {
-      const instanceMatch = item.instances?.find(
-        (ins) => ins.serialNumber === scannedSerial
-      );
-
-      if (instanceMatch) {
-        found = true;
-        setBucket((prev) => {
-          const existing = prev.find((i) => i.id === item.id);
-          if (existing) {
-            return prev.map((i) => i.id === item.id ? { 
-              ...i, 
-              quantity: i.quantity + 1, 
-              serials: [...i.serials, { sn: scannedSerial, condition: instanceMatch.condition }] 
-            } : i);
-          }
-          return [...prev, {
-            id: item.id,
-            name: item.name,
-            itemType: item.itemType,
-            quantity: 1,
-            serials: [{ sn: scannedSerial, condition: instanceMatch.condition }],
-            expectedReturnDate: ""
-          }];
-        });
-        break;
+    if (foundInstance && foundParentItem) {
+      // ✅ 3. DUPLICATE CHECK
+      const isAlreadyScanned = bucket.some(b => b.serials.some((s: any) => s.sn === matchedSerial));
+      
+      if (isAlreadyScanned) {
+        alert(`Already in Bucket: Serial ${matchedSerial} has already been scanned.`);
+        setIsSearching(false);
+        return;
       }
-    }
 
-    if (!found) {
-      alert(`Serial ${scannedSerial} not found in this site's inventory records.`);
+      // Add to bucket
+      setBucket((prev) => {
+        const existing = prev.find((i) => i.id === foundParentItem!.id);
+        if (existing) {
+          return prev.map((i) => i.id === foundParentItem!.id ? { 
+            ...i, 
+            quantity: i.quantity + 1, 
+            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
+          } : i);
+        }
+        return [...prev, {
+          id: foundParentItem!.id,
+          name: foundParentItem!.name,
+          itemType: foundParentItem!.itemType,
+          quantity: 1,
+          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
+          expectedReturnDate: ""
+        }];
+      });
+    } else {
+      alert(`Serial not found! No valid ID detected in: ${segments.join(', ')}`);
     }
     setIsSearching(false);
   };
 
-  // ✅ SYBLE SCANNER LISTENER
+  // ✅ 4. SCANNER LISTENER
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const currentTime = Date.now();
@@ -133,10 +123,7 @@ export default function IssueInventoryItemClient({
       if (e.key === "Enter") {
         if (scanBuffer.current.length > 3) {
           e.preventDefault();
-          const smartData = parseSmartScan(scanBuffer.current);
-          if (smartData.serialNumber) {
-            handleLocalScanMatch(smartData.serialNumber);
-          }
+          handleLocalScanMatch(scanBuffer.current);
           scanBuffer.current = "";
         }
       } else if (e.key.length === 1) {
@@ -157,27 +144,20 @@ export default function IssueInventoryItemClient({
     <div className={dark ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200" : "min-h-screen bg-[linear-gradient(180deg,#fbf8f3_0%,#f5f2ed_48%,#f2ede5_100%)]"}>
       <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
         <section className={dark ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-8 backdrop-blur-xl" : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-8 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"}>
-          
           <div className={dark ? "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#f97316)]" : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"} />
 
           <div className="flex flex-col gap-3">
-            <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
-              ← Back to {site.name} Inventory
-            </Link>
+            <Link href={`/store/sites/${site.id}`} className={dark ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>← Back to {site.name} Inventory</Link>
             <div className="flex items-center justify-between">
               <div className={dark ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]" : "inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"}>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Issue Smart Bucket
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />Issue Smart Bucket
               </div>
               {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING...</div>}
             </div>
           </div>
 
-          <h1 className={dark ? "mt-5 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl" : "mt-5 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"}>
-            Issue Inventory Items
-          </h1>
+          <h1 className={dark ? "mt-5 text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl" : "mt-5 text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"}>Issue Inventory Items</h1>
 
-          {/* BUCKET TABLE */}
           <div className={`mt-8 overflow-hidden rounded-2xl border ${dark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
             <table className="w-full text-left">
               <thead>
@@ -201,7 +181,7 @@ export default function IssueInventoryItemClient({
                         {item.serials.map((s: any) => (
                           <span key={s.sn} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${getConditionStyle(s.condition)}`}>
                             {s.sn}
-                            <button type="button" aria-label={`Remove serial ${s.sn}`} title={`Remove serial ${s.sn}`} className="hover:scale-125 transition-transform" onClick={() => {
+                            <button type="button" aria-label={`Remove ${s.sn}`} title={`Remove ${s.sn}`} className="hover:scale-125 transition-transform" onClick={() => {
                                const filtered = item.serials.filter((x:any) => x.sn !== s.sn);
                                setBucket(prev => filtered.length ? prev.map(i => i.id === item.id ? {...i, serials: filtered, quantity: filtered.length} : i) : prev.filter(i => i.id !== item.id));
                             }}><X size={12} /></button>
@@ -236,7 +216,7 @@ export default function IssueInventoryItemClient({
                 if (itm) setBucket(prev => [...prev, { id: itm.id, name: itm.name, itemType: itm.itemType, quantity: 1, serials: [], expectedReturnDate: "" }]);
               }}
              >
-               <option value="">Manual Search & Add (Bolts/Cables)...</option>
+               <option value="">Manual Search & Add (Materials)...</option>
                {items.filter((i: any) => i.itemType === "MATERIAL").map((i: any) => (
                  <option key={i.id} value={i.id}>{i.name} ({i.quantity} available)</option>
                ))}
@@ -268,9 +248,7 @@ export default function IssueInventoryItemClient({
             </section>
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button type="submit" title="Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>
-                Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})
-              </button>
+              <button type="submit" title="Process" className={dark ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90" : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"}>Process Multi-Item Issue ({bucket.reduce((acc, i) => acc + i.quantity, 0)})</button>
               <Link href={`/store/sites/${site.id}`} className={dark ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200" : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814]"}>Cancel</Link>
             </div>
           </form>
