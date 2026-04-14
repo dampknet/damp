@@ -17,6 +17,7 @@ type ItemRow = {
   reorderLevel: number;
   status: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
   condition: "GOOD" | "FAULTY" | "DAMAGED" | "UNDER_REPAIR" | null;
+  instances: { serialNumber: string; condition: string }[];
 };
 
 export default function IssueInventoryItemClient({
@@ -42,87 +43,100 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
+  // ✅ YOUR PROVEN SMART PARSER (From DeviceManagement)
+  const parseSmartScan = (text: string) => {
+    const data: any = { serialNumber: "", model: "", manufacturer: "" };
+    const cleanText = text.replace(/[\n\r]/g, "").trim();
+    const brackets = cleanText.match(/<([^>]+)>/g);
 
-  // ✅ HIGH-SPEED SYBLE COLLECTOR
+    if (brackets && brackets.length >= 2) {
+      data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
+      const midPart = brackets[1].replace(/[<>]/g, "").trim();
+      const parts = midPart.split("-");
+      if (parts.length >= 2) {
+        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
+        if (serialIdx !== -1) {
+          data.serialNumber = parts[serialIdx];
+          data.model = parts.slice(0, serialIdx).join("-");
+        } else {
+          data.model = parts[0];
+          data.serialNumber = parts[1] || midPart;
+        }
+      } else {
+        data.serialNumber = midPart;
+      }
+    } else {
+      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
+      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
+    }
+    return data;
+  };
+
+  // ✅ LOCAL MAPPING (Fast, No Internet Required)
+  const handleLocalScanMatch = (scannedSerial: string) => {
+    setIsSearching(true);
+    let found = false;
+
+    for (const item of items) {
+      // Find instance matching the extracted serial
+      const instanceMatch = item.instances?.find(
+        (ins) => ins.serialNumber === scannedSerial
+      );
+
+      if (instanceMatch) {
+        found = true;
+        setBucket((prev) => {
+          const existing = prev.find((i) => i.id === item.id);
+          if (existing) {
+            if (existing.serials.some((s: any) => s.sn === scannedSerial)) return prev;
+            return prev.map((i) => i.id === item.id ? { 
+              ...i, 
+              quantity: i.quantity + 1, 
+              serials: [...i.serials, { sn: scannedSerial, condition: instanceMatch.condition }] 
+            } : i);
+          }
+          return [...prev, {
+            id: item.id,
+            name: item.name,
+            itemType: item.itemType,
+            quantity: 1,
+            serials: [{ sn: scannedSerial, condition: instanceMatch.condition }],
+            expectedReturnDate: ""
+          }];
+        });
+        break;
+      }
+    }
+
+    if (!found) {
+      alert(`Serial ${scannedSerial} not found in this site's inventory.`);
+    }
+    setIsSearching(false);
+  };
+
+  // ✅ SYBLE SCANNER LISTENER
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If it's a normal character, add to buffer
-      if (e.key.length === 1) {
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
+      lastKeyTime.current = currentTime;
+
+      if (e.key === "Enter") {
+        if (scanBuffer.current.length > 3) {
+          e.preventDefault();
+          const smartData = parseSmartScan(scanBuffer.current);
+          if (smartData.serialNumber) {
+            handleLocalScanMatch(smartData.serialNumber);
+          }
+          scanBuffer.current = "";
+        }
+      } else if (e.key.length === 1) {
         scanBuffer.current += e.key;
       }
-
-      // If "Enter" is hit, the gun is done with one segment
-      if (e.key === "Enter") {
-        e.preventDefault();
-        
-        // We wait 150ms after the last "Enter" to make sure 
-        // the multi-line scan is fully captured before sending to DB
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          if (scanBuffer.current.length > 3) {
-            const fullJunk = scanBuffer.current;
-            scanBuffer.current = ""; // Reset for next item
-            handleScan(fullJunk);
-          }
-        }, 150); 
-      }
     };
-
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      clearTimeout(timeout);
-    };
-  }, [bucket]);
-
- const handleScan = async (fullData: string) => {
-    setIsSearching(true);
-    try {
-      // ✅ Using absolute-style path to ensure it finds the API
-      const res = await fetch("/api/store/instances/scan", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ serial: fullData }),
-      });
-      
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || "Item not found");
-        return;
-      }
-      
-      setBucket((prev) => {
-        const existing = prev.find((i) => i.id === data.id);
-        if (existing) {
-          if (existing.serials.some((s: any) => s.sn === data.serialNumber)) return prev;
-          return prev.map((i) => i.id === data.id ? { 
-            ...i, 
-            quantity: i.quantity + 1, 
-            serials: [...i.serials, { sn: data.serialNumber, condition: data.condition }] 
-          } : i);
-        }
-        return [...prev, {
-          id: data.id, 
-          name: data.name, 
-          itemType: data.itemType, 
-          quantity: 1,
-          serials: [{ sn: data.serialNumber, condition: data.condition }],
-          expectedReturnDate: ""
-        }];
-      });
-    } catch (e: any) { 
-      // ✅ This will tell us the REAL error if it fails
-      console.error("Fetch Error:", e);
-      alert("System Error: " + e.message); 
-    } finally { 
-      setIsSearching(false); 
-    }
-  };
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [bucket, items]);
 
   const getConditionStyle = (c: string) => {
     if (c === "NEW") return "bg-blue-600";
@@ -146,7 +160,7 @@ export default function IssueInventoryItemClient({
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Issue Smart Bucket
               </div>
-              {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> SCANNING...</div>}
+              {isSearching && <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse"><Loader2 size={14} className="animate-spin" /> MAPPING SERIAL...</div>}
             </div>
           </div>
 
@@ -171,7 +185,7 @@ export default function IssueInventoryItemClient({
                 )}
                 {bucket.map((item, index) => (
                   <tr key={item.id} className="hover:bg-sky-500/5 transition-colors">
-                    <td className="px-6 py-4 font-bold text-sm">{item.name}</td>
+                    <td className="px-6 py-4 font-bold text-sm text-sky-500">{item.name}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-2">
                         {item.serials.map((s: any) => (
