@@ -70,16 +70,15 @@ export default function IssueInventoryItemClient({
 
   const handleScan = async (serial: string) => {
     setIsSearching(true);
-    // ✅ Clean the string of any hidden whitespace/newlines from the gun
-    const cleanInput = serial.trim(); 
-    
     try {
-      // Use encodeURIComponent to make sure the junk symbols (< > &) don't break the URL
-      const res = await fetch(`/api/store/instances/scan?serial=${encodeURIComponent(cleanInput)}`);
+      // ✅ FIX: encodeURIComponent prevents symbols like < > from breaking the request
+      const safeSerial = encodeURIComponent(serial.trim());
+      const res = await fetch(`/api/store/instances/scan?serial=${safeSerial}`);
+      
       const data = await res.json();
       
       if (!res.ok) { 
-        alert(data.error || `Serial not found!`); 
+        alert(data.error || "Serial not found"); 
         return; 
       }
       
@@ -103,7 +102,8 @@ export default function IssueInventoryItemClient({
         }];
       });
     } catch (e) { 
-      alert("System communication error. Check your internet."); 
+      // This was the error you saw. 
+      alert("Scan failed. Try scanning again slowly."); 
     } finally { 
       setIsSearching(false); 
     }

@@ -8,49 +8,42 @@ export async function GET(req: Request) {
 
     if (!rawInput) return new NextResponse("No data", { status: 400 });
 
-    // ✅ STEP 1: Aggressive Extraction
-    // This finds every string of 5 or more digits anywhere in the junk
-    const allNumericPotentials = rawInput.match(/\d{5,}/g) || [];
-
-    if (allNumericPotentials.length === 0) {
-      return NextResponse.json({ error: "No serial-like numbers found in scan." }, { status: 404 });
-    }
-
-    // ✅ STEP 2: Database Cross-Reference
-    // We check all potential numbers found in the junk against the DB
-    const instance = await prisma.assetInstance.findFirst({
-      where: {
-        serialNumber: {
-          in: allNumericPotentials,
-        },
-      },
+    // 1. Get all serial numbers from the AssetInstance table
+    const allInstances = await prisma.assetInstance.findMany({
       include: {
         inventoryItem: {
           select: {
             id: true,
             name: true,
             itemType: true,
-          },
-        },
-      },
+          }
+        }
+      }
     });
 
-    if (!instance) {
+    // 2. Search: Does the messy scanner string contain ANY of our serial numbers?
+    // This looks for "2434567" or "101793" anywhere inside the junk text.
+    const foundInstance = allInstances.find(ins => 
+      rawInput.toLowerCase().includes(ins.serialNumber.toLowerCase())
+    );
+
+    if (!foundInstance) {
       return NextResponse.json({ 
-        error: `Found numbers ${allNumericPotentials.join(', ')} but none match our database.` 
+        error: `Could not map scan to any serial in database.` 
       }, { status: 404 });
     }
 
-    // ✅ STEP 3: Return the Parent Item Data
+    // 3. Success: Return the mapped data
     return NextResponse.json({
-      id: instance.inventoryItem.id,
-      name: instance.inventoryItem.name,
-      itemType: instance.inventoryItem.itemType,
-      serialNumber: instance.serialNumber,
-      condition: instance.condition,
+      id: foundInstance.inventoryItem.id,
+      name: foundInstance.inventoryItem.name,
+      itemType: foundInstance.inventoryItem.itemType,
+      serialNumber: foundInstance.serialNumber,
+      condition: foundInstance.condition,
     });
 
   } catch (error) {
+    console.error("SCAN_ERROR", error);
     return new NextResponse("Server Error", { status: 500 });
   }
 }
