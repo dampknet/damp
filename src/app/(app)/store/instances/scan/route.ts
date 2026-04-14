@@ -8,42 +8,40 @@ export async function GET(req: Request) {
 
     if (!rawInput) return new NextResponse("No data", { status: 400 });
 
-    /**
-     * ✅ THE EXTRACTION LOGIC
-     * This Regex finds the actual serial numbers like 101793 or 2434567 
-     * inside the messy strings you showed me.
-     */
-    const serialMatch = rawInput.match(/\b\d{5,}\b/); 
-    const extractedSerial = serialMatch ? serialMatch[0] : null;
+    // ✅ STEP 1: Aggressive Extraction
+    // This finds every string of 5 or more digits anywhere in the junk
+    const allNumericPotentials = rawInput.match(/\d{5,}/g) || [];
 
-    if (!extractedSerial) {
-      return NextResponse.json({ 
-        error: `Could not find a serial number in that junk data.` 
-      }, { status: 404 });
+    if (allNumericPotentials.length === 0) {
+      return NextResponse.json({ error: "No serial-like numbers found in scan." }, { status: 404 });
     }
 
-    // ✅ DATABASE SEARCH
-    // We look in AssetInstance for the clean serial we just extracted
-    const instance = await prisma.assetInstance.findUnique({
-      where: { serialNumber: extractedSerial },
+    // ✅ STEP 2: Database Cross-Reference
+    // We check all potential numbers found in the junk against the DB
+    const instance = await prisma.assetInstance.findFirst({
+      where: {
+        serialNumber: {
+          in: allNumericPotentials,
+        },
+      },
       include: {
         inventoryItem: {
           select: {
             id: true,
             name: true,
             itemType: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!instance) {
       return NextResponse.json({ 
-        error: `Found serial ${extractedSerial}, but it's not in the database.` 
+        error: `Found numbers ${allNumericPotentials.join(', ')} but none match our database.` 
       }, { status: 404 });
     }
 
-    // ✅ SUCCESS: Return the Item Name and Condition
+    // ✅ STEP 3: Return the Parent Item Data
     return NextResponse.json({
       id: instance.inventoryItem.id,
       name: instance.inventoryItem.name,

@@ -70,10 +70,18 @@ export default function IssueInventoryItemClient({
 
   const handleScan = async (serial: string) => {
     setIsSearching(true);
+    // ✅ Clean the string of any hidden whitespace/newlines from the gun
+    const cleanInput = serial.trim(); 
+    
     try {
-      const res = await fetch(`/api/store/instances/scan?serial=${serial}`);
-      if (!res.ok) { alert(`Serial ${serial} not found!`); return; }
+      // Use encodeURIComponent to make sure the junk symbols (< > &) don't break the URL
+      const res = await fetch(`/api/store/instances/scan?serial=${encodeURIComponent(cleanInput)}`);
       const data = await res.json();
+      
+      if (!res.ok) { 
+        alert(data.error || `Serial not found!`); 
+        return; 
+      }
       
       setBucket((prev) => {
         const existing = prev.find((i) => i.id === data.id);
@@ -86,13 +94,19 @@ export default function IssueInventoryItemClient({
           } : i);
         }
         return [...prev, {
-          id: data.id, name: data.name, itemType: data.itemType, quantity: 1,
+          id: data.id, 
+          name: data.name, 
+          itemType: data.itemType, 
+          quantity: 1,
           serials: [{ sn: data.serialNumber, condition: data.condition }],
           expectedReturnDate: ""
         }];
       });
-    } catch (e) { alert("Scan Error"); } 
-    finally { setIsSearching(false); }
+    } catch (e) { 
+      alert("System communication error. Check your internet."); 
+    } finally { 
+      setIsSearching(false); 
+    }
   };
 
   const getConditionStyle = (c: string) => {
