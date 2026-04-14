@@ -43,44 +43,53 @@ export default function IssueInventoryItemClient({
   const lastKeyTime = useRef(0);
 
 
+  // ✅ HIGH-SPEED SYBLE COLLECTOR
   useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      const currentTime = Date.now();
-      
-      // If human is typing (slow), reset. If gun is firing (fast), keep going.
-      if (currentTime - lastKeyTime.current > 50) {
-        scanBuffer.current = "";
-      }
-      lastKeyTime.current = currentTime;
+    let timeout: NodeJS.Timeout;
 
-      if (e.key === "Enter") {
-        if (scanBuffer.current.length > 2) {
-          e.preventDefault();
-          const finalData = scanBuffer.current;
-          scanBuffer.current = ""; // Clear immediately
-          handleScan(finalData);
-        }
-      } else if (e.key.length === 1) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If it's a normal character, add to buffer
+      if (e.key.length === 1) {
         scanBuffer.current += e.key;
       }
+
+      // If "Enter" is hit, the gun is done with one segment
+      if (e.key === "Enter") {
+        e.preventDefault();
+        
+        // We wait 150ms after the last "Enter" to make sure 
+        // the multi-line scan is fully captured before sending to DB
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          if (scanBuffer.current.length > 3) {
+            const fullJunk = scanBuffer.current;
+            scanBuffer.current = ""; // Reset for next item
+            handleScan(fullJunk);
+          }
+        }, 150); 
+      }
     };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      clearTimeout(timeout);
+    };
   }, [bucket]);
 
-  const handleScan = async (serial: string) => {
+  const handleScan = async (fullData: string) => {
     setIsSearching(true);
     try {
-      // ✅ FIX: encodeURIComponent prevents symbols like < > from breaking the request
-      const safeSerial = encodeURIComponent(serial.trim());
-      const res = await fetch(`/api/store/instances/scan?serial=${safeSerial}`);
+      // Use encodeURIComponent so the messy symbols don't break the internet connection
+      const res = await fetch(`/api/store/instances/scan?serial=${encodeURIComponent(fullData.trim())}`);
       
-      const data = await res.json();
-      
-      if (!res.ok) { 
-        alert(data.error || "Serial not found"); 
-        return; 
+      if (!res.ok) {
+        const errData = await res.json();
+        alert(errData.error || "Item not found in database");
+        return;
       }
+
+      const data = await res.json();
       
       setBucket((prev) => {
         const existing = prev.find((i) => i.id === data.id);
@@ -101,11 +110,11 @@ export default function IssueInventoryItemClient({
           expectedReturnDate: ""
         }];
       });
-    } catch (e) { 
-      // This was the error you saw. 
-      alert("Scan failed. Try scanning again slowly."); 
-    } finally { 
-      setIsSearching(false); 
+    } catch (e) {
+      // If it still fails, it's likely a network timeout because the string was too long
+      alert("Connection timeout. The scan was too large. Try scanning that specific item again.");
+    } finally {
+      setIsSearching(false);
     }
   };
 
