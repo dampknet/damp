@@ -45,13 +45,18 @@ export default function IssueInventoryItemClient({
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
+      
+      // If time between keys is > 100ms, it's a human, reset buffer
+      if (currentTime - lastKeyTime.current > 100) {
+        scanBuffer.current = "";
+      }
       lastKeyTime.current = currentTime;
 
       if (e.key === "Enter") {
-        if (scanBuffer.current.length > 3) {
+        if (scanBuffer.current.length > 2) {
           e.preventDefault();
-          handleScan(scanBuffer.current);
+          // Trim the buffer before sending to avoid hidden spaces
+          handleScan(scanBuffer.current.trim());
           scanBuffer.current = "";
         }
       } else if (e.key.length === 1) {
