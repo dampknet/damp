@@ -42,12 +42,13 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
+
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       const currentTime = Date.now();
       
-      // If time between keys is > 100ms, it's a human, reset buffer
-      if (currentTime - lastKeyTime.current > 100) {
+      // If human is typing (slow), reset. If gun is firing (fast), keep going.
+      if (currentTime - lastKeyTime.current > 50) {
         scanBuffer.current = "";
       }
       lastKeyTime.current = currentTime;
@@ -55,9 +56,9 @@ export default function IssueInventoryItemClient({
       if (e.key === "Enter") {
         if (scanBuffer.current.length > 2) {
           e.preventDefault();
-          // Trim the buffer before sending to avoid hidden spaces
-          handleScan(scanBuffer.current.trim());
-          scanBuffer.current = "";
+          const finalData = scanBuffer.current;
+          scanBuffer.current = ""; // Clear immediately
+          handleScan(finalData);
         }
       } else if (e.key.length === 1) {
         scanBuffer.current += e.key;
