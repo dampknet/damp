@@ -54,28 +54,31 @@ export default function IssueInventoryItemClient({
       .filter(p => p.length >= 3);
   };
 
-  // ✅ 2. INDUSTRIAL MAPPING LOGIC
+  // ✅ LOCAL MAPPING (The "Search-Inside" Strategy)
   const handleLocalScanMatch = (rawJunk: string) => {
     setIsSearching(true);
-    const segments = getScannedSegments(rawJunk);
     let foundInstance = null;
     let foundParentItem = null;
     let matchedSerial = "";
 
-    // Search: Does any segment from the scan match a serial in our DB?
+    // Normalize the junk for search
+    const cleanJunk = rawJunk.toLowerCase();
+
+    // 1. Look through every item in your site inventory
     for (const item of items) {
-      for (const word of segments) {
-        const match = item.instances?.find(
-          ins => ins.serialNumber.toLowerCase() === word.toLowerCase()
-        );
-        if (match) {
-          foundInstance = match;
-          foundParentItem = item;
-          matchedSerial = match.serialNumber;
-          break;
-        }
+      // 2. Check every serial number registered to this item
+      const match = item.instances?.find(ins => {
+        const sn = ins.serialNumber.toLowerCase();
+        // Check if the registered serial is hidden ANYWHERE inside the scanned junk
+        return sn.length > 2 && cleanJunk.includes(sn);
+      });
+
+      if (match) {
+        foundInstance = match;
+        foundParentItem = item;
+        matchedSerial = match.serialNumber;
+        break;
       }
-      if (foundInstance) break;
     }
 
     if (foundInstance && foundParentItem) {
@@ -83,12 +86,12 @@ export default function IssueInventoryItemClient({
       const isAlreadyScanned = bucket.some(b => b.serials.some((s: any) => s.sn === matchedSerial));
       
       if (isAlreadyScanned) {
-        alert(`Already in Bucket: Serial ${matchedSerial} has already been scanned.`);
+        alert(`Already Scanned: Serial ${matchedSerial} is already in the bucket.`);
         setIsSearching(false);
         return;
       }
 
-      // Add to bucket
+      // 4. ADD TO BUCKET
       setBucket((prev) => {
         const existing = prev.find((i) => i.id === foundParentItem!.id);
         if (existing) {
@@ -108,7 +111,8 @@ export default function IssueInventoryItemClient({
         }];
       });
     } else {
-      alert(`Serial not found! No valid ID detected in: ${segments.join(', ')}`);
+      // If we got here, none of the serials in your DB match any part of the scan
+      alert(`Serial not found! No registered serial number was detected inside this scan: \n\n ${rawJunk}`);
     }
     setIsSearching(false);
   };
