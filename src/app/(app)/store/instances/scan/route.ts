@@ -8,56 +8,55 @@ export async function GET(req: Request) {
 
     if (!rawInput) return new NextResponse("Serial required", { status: 400 });
 
-    // 1. Clean the input: Remove brackets and split by spaces/hyphens/colons
-    // This turns "<Rhode & Schwarz><2501-101793>" into ["Rhode", "Schwarz", "2501", "101793"]
+    // 1. Clean the input and break it into every possible "word"
+    // We split by brackets, spaces, colons, hyphens, and even newlines
     const segments = rawInput
-      .replace(/[<>]/g, " ")
-      .split(/[\s\-:]+/)
-      .filter(part => part.length > 2); // ignore tiny segments
+      .replace(/[<>]/g, " ") 
+      .split(/[\s\-:\n\r]+/)
+      .map(s => s.trim())
+      .filter(s => s.length >= 4); // Only look at segments that could be serials
 
-    // 2. SEARCH: Check AssetInstance table for any record where the serialNumber 
-    // is contained WITHIN the raw scanner input.
+    // 2. THE SMART SEARCH: 
+    // We ask the database: "Give me the record where the serialNumber IS ONE OF these segments"
     const instance = await prisma.assetInstance.findFirst({
       where: {
-        OR: segments.map(segment => ({
-          serialNumber: {
-            equals: segment.trim(),
-            mode: 'insensitive'
-          }
-        }))
+        serialNumber: {
+          in: segments, // This is the magic line. It looks for ANY segment that matches a serial.
+          mode: 'insensitive'
+        }
       },
       include: {
-        inventoryItem: true // Pull the parent InventoryItem name
+        inventoryItem: true 
       }
     });
 
-    // 3. Fallback: If segments didn't work, try a direct "contains" search on the whole string
     if (!instance) {
-       const fallback = await prisma.assetInstance.findFirst({
-         where: {
-           OR: [
-             { serialNumber: { contains: rawInput.trim(), mode: 'insensitive' } },
-             // This is the winner: is the serialNumber part of what was scanned?
-             { serialNumber: { in: segments } } 
-           ]
-         },
-         include: { inventoryItem: true }
-       });
-       
-       if (!fallback) {
-         return NextResponse.json({ error: `Serial not found in segments: ${segments.join(', ')}` }, { status: 404 });
-       }
-       
-       return NextResponse.json({
-         id: fallback.inventoryItem.id,
-         name: fallback.inventoryItem.name,
-         itemType: fallback.inventoryItem.itemType,
-         serialNumber: fallback.serialNumber,
-         condition: fallback.condition,
-       });
+      // 3. Last resort: If the serial is something like "2434567" but the scanner sent "SN2434567"
+      // we check if any serial in our DB is "contained" within that messy string.
+      const allInstances = await prisma.assetInstance.findMany({
+        include: { inventoryItem: true }
+      });
+      
+      const foundMatch = allInstances.find(ins => 
+        rawInput.toLowerCase().includes(ins.serialNumber.toLowerCase())
+      );
+
+      if (foundMatch) {
+        return NextResponse.json({
+          id: foundMatch.inventoryItem.id,
+          name: foundMatch.inventoryItem.name,
+          itemType: foundMatch.inventoryItem.itemType,
+          serialNumber: foundMatch.serialNumber,
+          condition: foundMatch.condition,
+        });
+      }
+
+      return NextResponse.json({ 
+        error: `Item not found. I checked these segments: ${segments.join(', ')}` 
+      }, { status: 404 });
     }
 
-    // 4. Success: Return the parent Item Name and the specific Serial
+    // 4. Success: Return the mapped parent Item Name
     return NextResponse.json({
       id: instance.inventoryItem.id,
       name: instance.inventoryItem.name,
@@ -68,6 +67,6 @@ export async function GET(req: Request) {
 
   } catch (error) {
     console.error("Scan API Error:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return new NextResponse("Internal Error", { status: 500 });
   }
 }
