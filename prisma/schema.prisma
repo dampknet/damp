@@ -121,9 +121,10 @@ model Site {
   locationName    String?
   
   // FUEL TRACKING FIELDS
-  fuelCapacity    Int?            // Total liters tank can hold
+  vrmId           String?         @unique // The 12-digit VRM Portal ID
+  fuelCapacity    Int?            @default(1000) // Total tank size in liters
   fuelLevel       Float?          // Current percentage (0-100)
-  lastRefillDate  DateTime?
+  lastFuelUpdate  DateTime?       // Timestamp of last API sync
 
   txMux1Serial    String?
   txMux2Serial    String?

@@ -48,64 +48,73 @@ export default function IssueInventoryItemClient({
   // ─────────────────────────────────────────────────────────────────
   // SMART UNIVERSAL BARCODE / QR-CODE PARSER
   //
-  // Extracts the serial number (and optionally model/manufacturer)
-  // from any scan format the Syble gun or camera might produce:
-  //
-  // 1. Rohde & Schwarz  <Manufacturer><Model-Serial-suffix><...>
-  // 2. Key:Value text   Serial Number: X  Model: Y  Manufacturer: Z
-  // 3. GS1 App IDs      (21)SN  (240)Model  (710)Brand
-  // 4. Victron Energy   HQYYWWxxxxx
-  // 5. Pipe-delimited   serial|model|manufacturer
-  // 6. Semicolon        serial;model;manufacturer
-  // 7. Tab-delimited    serial\tmodel\tmanufacturer
-  // 8. CSV              serial,model,manufacturer
-  // 9. JSON             {"serialNumber":"X","model":"Y",...}
-  // 10. URL query-str   ?sn=X&model=Y&mfg=Z
-  // 11. Plain serial    bare alphanumeric string
+  // KEY DIFFERENCE FROM DeviceManagement version:
+  // This returns ALL possible candidate serial numbers extracted from
+  // the scan (not just the best one), so the DB match can try every
+  // candidate. This is critical for R&S format where the "serial"
+  // could be stored as "101793", "101793-dZ", or the full field.
   // ─────────────────────────────────────────────────────────────────
-  const parseSmartScan = (text: string): { serialNumber: string; model: string; manufacturer: string } => {
-    const result = { serialNumber: "", model: "", manufacturer: "" };
+  const parseSmartScan = (text: string): {
+    candidates: string[];
+    model: string;
+    manufacturer: string;
+  } => {
+    const candidates: string[] = [];
+    let model = "";
+    let manufacturer = "";
 
-    const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    const raw   = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
     const clean = raw.replace(/[ \t]+/g, " ");
 
+    // Add a candidate only if non-empty, long enough, and not duplicate
+    const addCandidate = (s: string) => {
+      const t = s.trim();
+      if (t && t.length >= 3 && !candidates.includes(t)) candidates.push(t);
+    };
+
     // ── 1. Rohde & Schwarz angle-bracket format ───────────────────────────────
+    // e.g. <Rhode & Schwarz><2501.7406.06-101793-dZ><-><UHF AMPLIFIER><...>
     const angleFields = [...clean.matchAll(/<([^>]*)>/g)].map(m => m[1].trim());
     if (angleFields.length >= 2) {
-      result.manufacturer = angleFields[0];
-      const field1 = angleFields[1];
-      const parts = field1.split("-");
+      manufacturer      = angleFields[0];
+      const field1      = angleFields[1]; // "2501.7406.06-101793-dZ"
+      const parts       = field1.split("-");
 
-      if (parts.length === 1) {
-        result.serialNumber = field1;
-      } else {
-        let serialIdx = -1;
-        for (let i = parts.length - 1; i >= 0; i--) {
-          const p = parts[i];
-          if (/[0-9]/.test(p) && p.length >= 4 && /^[A-Za-z0-9]+$/.test(p)) {
-            serialIdx = i;
-            break;
+      // Always add every individual segment and the full field as candidates
+      // so no matter how the serial was saved, we find a match
+      addCandidate(field1);
+      parts.forEach(p => addCandidate(p));
+
+      // Also add every multi-segment suffix (e.g. "101793-dZ", "dZ")
+      for (let i = 1; i < parts.length; i++) {
+        addCandidate(parts.slice(i).join("-"));
+      }
+
+      // Best-guess serial: walk right-to-left, first token that is
+      // alphanumeric-only, has a digit, and is ≥4 chars
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        if (/[0-9]/.test(p) && p.length >= 4 && /^[A-Za-z0-9]+$/.test(p)) {
+          // Move this to front of candidates so it's tried first
+          const idx = candidates.indexOf(p);
+          if (idx > 0) {
+            candidates.splice(idx, 1);
+            candidates.unshift(p);
           }
-        }
-        if (serialIdx > 0) {
-          result.serialNumber = parts[serialIdx];
-          result.model = parts.slice(0, serialIdx).join("-");
-        } else if (serialIdx === 0) {
-          result.serialNumber = parts[0];
-          result.model = parts.slice(1).join("-");
-        } else {
-          result.serialNumber = parts[parts.length - 1];
-          result.model = parts.slice(0, -1).join("-");
+          model = parts.slice(0, i).join("-");
+          break;
         }
       }
 
-      if (!result.model && angleFields.length > 3) {
+      // Description field as model fallback
+      if (!model && angleFields.length > 3) {
         const desc = angleFields[3];
         if (!/^\d{2}-\d{2}-\d{4}$/.test(desc) && !/\d+KG/i.test(desc) && desc !== "-") {
-          result.model = desc;
+          model = desc;
         }
       }
-      return result;
+
+      return { candidates, model, manufacturer };
     }
 
     // ── 2. JSON object ────────────────────────────────────────────────────────
@@ -113,13 +122,11 @@ export default function IssueInventoryItemClient({
       try {
         const obj = JSON.parse(clean);
         const sn  = obj.serialNumber ?? obj.serial_number ?? obj.sn ?? obj.serial ?? obj.SN ?? "";
-        const mdl = obj.model ?? obj.Model ?? obj.partNumber ?? obj.part_number ?? obj.pn ?? "";
-        const mfg = obj.manufacturer ?? obj.Manufacturer ?? obj.brand ?? obj.Brand ?? obj.make ?? "";
-        result.serialNumber  = String(sn);
-        result.model         = String(mdl);
-        result.manufacturer  = String(mfg);
-        if (result.serialNumber) return result;
-      } catch (_) { /* not valid JSON */ }
+        model        = String(obj.model ?? obj.Model ?? obj.partNumber ?? obj.part_number ?? obj.pn ?? "");
+        manufacturer = String(obj.manufacturer ?? obj.Manufacturer ?? obj.brand ?? obj.Brand ?? obj.make ?? "");
+        addCandidate(String(sn));
+        if (candidates.length) return { candidates, model, manufacturer };
+      } catch (_) { /* not JSON */ }
     }
 
     // ── 3. URL query-string ───────────────────────────────────────────────────
@@ -127,156 +134,143 @@ export default function IssueInventoryItemClient({
     if (qsMatch) {
       try {
         const params = new URLSearchParams(qsMatch[1]);
-        const sn =
-          params.get("sn") ?? params.get("serialNumber") ?? params.get("serial") ??
-          params.get("serial_number") ?? params.get("SN") ?? "";
-        const mdl = params.get("model") ?? params.get("Model") ?? params.get("partNumber") ?? params.get("part") ?? "";
-        const mfg = params.get("manufacturer") ?? params.get("mfg") ?? params.get("brand") ?? params.get("make") ?? "";
-        if (sn) {
-          result.serialNumber = sn;
-          result.model        = mdl;
-          result.manufacturer = mfg;
-          return result;
-        }
+        const sn = params.get("sn") ?? params.get("serialNumber") ?? params.get("serial") ??
+                   params.get("serial_number") ?? params.get("SN") ?? "";
+        model        = params.get("model") ?? params.get("partNumber") ?? params.get("part") ?? "";
+        manufacturer = params.get("manufacturer") ?? params.get("mfg") ?? params.get("brand") ?? "";
+        addCandidate(sn);
+        if (candidates.length) return { candidates, model, manufacturer };
       } catch (_) { /* ignore */ }
     }
 
-    // ── 4. GS1 Application Identifier format ─────────────────────────────────
-    const gs1ParenRx = /\((\d{2,4})\)([^(]+)/g;
+    // ── 4. GS1 Application Identifiers ───────────────────────────────────────
     const gs1Paren: Record<string, string> = {};
-    let gs1Match;
-    while ((gs1Match = gs1ParenRx.exec(clean)) !== null) {
-      gs1Paren[gs1Match[1]] = gs1Match[2].trim();
-    }
+    const gs1Rx = /\((\d{2,4})\)([^(]+)/g;
+    let gs1m;
+    while ((gs1m = gs1Rx.exec(clean)) !== null) gs1Paren[gs1m[1]] = gs1m[2].trim();
     if (Object.keys(gs1Paren).length > 0) {
-      result.serialNumber = gs1Paren["21"]  ?? gs1Paren["251"] ?? "";
-      result.model        = gs1Paren["240"] ?? gs1Paren["8012"] ?? gs1Paren["01"] ?? "";
-      result.manufacturer = gs1Paren["710"] ?? gs1Paren["711"] ?? gs1Paren["712"] ??
-                            gs1Paren["713"] ?? gs1Paren["714"] ?? "";
-      if (result.serialNumber) return result;
+      addCandidate(gs1Paren["21"]  ?? gs1Paren["251"] ?? "");
+      model        = gs1Paren["240"] ?? gs1Paren["8012"] ?? gs1Paren["01"] ?? "";
+      manufacturer = gs1Paren["710"] ?? gs1Paren["711"] ?? gs1Paren["712"] ??
+                     gs1Paren["713"] ?? gs1Paren["714"] ?? "";
+      if (candidates.length) return { candidates, model, manufacturer };
     }
 
     // ── 5. Key:Value text ─────────────────────────────────────────────────────
     const kvText = clean.replace(/\n/g, " ");
-    const snKv  = kvText.match(/(?:serial\s*(?:number|no\.?|#)?|s\/n|sn)\s*[:\-=]\s*([^\s,;|]+)/i);
-    const mdlKv = kvText.match(/(?:model\s*(?:no\.?|number|#)?|mod|part\s*(?:no\.?|number)?|pn)\s*[:\-=]\s*([^\s,;|]+)/i);
-    const mfgKv = kvText.match(/(?:manufacturer|mfg|make|brand|vendor)\s*[:\-=]\s*([^\n,;|]+)/i);
+    const snKv   = kvText.match(/(?:serial\s*(?:number|no\.?|#)?|s\/n|sn)\s*[:\-=]\s*([^\s,;|]+)/i);
+    const mdlKv  = kvText.match(/(?:model\s*(?:no\.?|number|#)?|mod|part\s*(?:no\.?|number)?|pn)\s*[:\-=]\s*([^\s,;|]+)/i);
+    const mfgKv  = kvText.match(/(?:manufacturer|mfg|make|brand|vendor)\s*[:\-=]\s*([^\n,;|]+)/i);
     if (snKv) {
-      result.serialNumber = snKv[1].trim();
-      if (mdlKv) result.model        = mdlKv[1].trim();
-      if (mfgKv) result.manufacturer = mfgKv[1].trim().replace(/\s+/g, " ");
-      return result;
+      addCandidate(snKv[1].trim());
+      if (mdlKv) model        = mdlKv[1].trim();
+      if (mfgKv) manufacturer = mfgKv[1].trim().replace(/\s+/g, " ");
+      return { candidates, model, manufacturer };
     }
 
-    // ── 6. Victron Energy serial number ──────────────────────────────────────
+    // ── 6. Victron Energy HQYYWWxxxxx ────────────────────────────────────────
     if (/^HQ\d{4}[A-Z0-9]{4,}$/i.test(raw)) {
-      result.serialNumber  = raw;
-      result.manufacturer  = "Victron Energy";
-      return result;
+      addCandidate(raw);
+      manufacturer = "Victron Energy";
+      return { candidates, model, manufacturer };
     }
 
-    // ── 7. Pipe-delimited ─────────────────────────────────────────────────────
+    // ── 7–10. Delimited formats ───────────────────────────────────────────────
     if (clean.includes("|")) {
-      const parts = clean.split("|").map(s => s.trim());
-      result.serialNumber  = parts[0] ?? "";
-      result.model         = parts[1] ?? "";
-      result.manufacturer  = parts[2] ?? "";
-      if (result.serialNumber) return result;
+      const p = clean.split("|").map(s => s.trim());
+      addCandidate(p[0]); model = p[1] ?? ""; manufacturer = p[2] ?? "";
+      if (candidates.length) return { candidates, model, manufacturer };
     }
-
-    // ── 8. Semicolon-delimited ────────────────────────────────────────────────
     if (clean.includes(";")) {
-      const parts = clean.split(";").map(s => s.trim());
-      result.serialNumber  = parts[0] ?? "";
-      result.model         = parts[1] ?? "";
-      result.manufacturer  = parts[2] ?? "";
-      if (result.serialNumber) return result;
+      const p = clean.split(";").map(s => s.trim());
+      addCandidate(p[0]); model = p[1] ?? ""; manufacturer = p[2] ?? "";
+      if (candidates.length) return { candidates, model, manufacturer };
     }
-
-    // ── 9. Tab-delimited ──────────────────────────────────────────────────────
     if (raw.includes("\t")) {
-      const parts = raw.split("\t").map(s => s.trim());
-      result.serialNumber  = parts[0] ?? "";
-      result.model         = parts[1] ?? "";
-      result.manufacturer  = parts[2] ?? "";
-      if (result.serialNumber) return result;
+      const p = raw.split("\t").map(s => s.trim());
+      addCandidate(p[0]); model = p[1] ?? ""; manufacturer = p[2] ?? "";
+      if (candidates.length) return { candidates, model, manufacturer };
     }
-
-    // ── 10. CSV (2–4 tokens only) ─────────────────────────────────────────────
     const csvParts = clean.split(",").map(s => s.trim());
     if (csvParts.length >= 2 && csvParts.length <= 4 && csvParts[0].length <= 60) {
-      result.serialNumber  = csvParts[0];
-      result.model         = csvParts[1] ?? "";
-      result.manufacturer  = csvParts[2] ?? "";
-      if (result.serialNumber) return result;
+      addCandidate(csvParts[0]); model = csvParts[1] ?? ""; manufacturer = csvParts[2] ?? "";
+      if (candidates.length) return { candidates, model, manufacturer };
     }
 
     // ── 11. Plain serial fallback ─────────────────────────────────────────────
-    const plainCandidate = raw.replace(/\s+/g, "");
-    if (plainCandidate.length > 0 && plainCandidate.length <= 60 && /^[A-Za-z0-9\-_.\/]+$/.test(plainCandidate)) {
-      result.serialNumber = plainCandidate;
-      return result;
+    const plain = raw.replace(/\s+/g, "");
+    if (plain.length > 0 && plain.length <= 60 && /^[A-Za-z0-9\-_.\/]+$/.test(plain)) {
+      addCandidate(plain);
+      return { candidates, model, manufacturer };
     }
 
-    // ── 12. Last resort: first word that looks like a serial ──────────────────
+    // ── 12. Last resort ───────────────────────────────────────────────────────
     const wordMatch = clean.match(/\b([A-Z0-9][A-Z0-9\-]{4,})\b/i);
-    if (wordMatch) result.serialNumber = wordMatch[1];
+    if (wordMatch) addCandidate(wordMatch[1]);
 
-    return result;
+    return { candidates, model, manufacturer };
   };
 
   // ─────────────────────────────────────────────────────────────────
-  // SCAN MATCH LOGIC
-  // After parsing the scan, extract the serial number and look it up
-  // against all registered instances in the database.  The match uses
-  // substring search so messy Rohde & Schwarz / multi-field strings
-  // still resolve correctly even if the scanner emits extra fields.
+  // SCAN MATCH LOGIC — THREE-PASS MATCHING
+  //
+  // Pass A: exact — candidate === dbSerial
+  // Pass B: scan contains db serial (raw substring)
+  // Pass C: candidate contains db serial, OR db serial contains candidate
+  //
+  // This means it doesn't matter whether the device was registered
+  // with "101793", "101793-dZ", or "2501.7406.06-101793-dZ" —
+  // one of the three passes will always find it.
   // ─────────────────────────────────────────────────────────────────
   const handleLocalScanMatch = (rawScan: string) => {
     setIsSearching(true);
 
-    // 1. Try to extract a clean serial via the smart parser first
-    const parsed = parseSmartScan(rawScan);
-    // We'll also keep the raw lowercased string as a fallback for
-    // the substring-match path (preserves old behaviour for edge cases)
-    const rawLower = rawScan.toLowerCase();
-    const parsedSerial = parsed.serialNumber.toLowerCase();
+    const { candidates } = parseSmartScan(rawScan);
+    const rawLower        = rawScan.toLowerCase();
+    const candidatesLower = candidates.map(c => c.toLowerCase());
 
-    // 2. Duplicate check — look in the bucket
+    // ── Duplicate check ───────────────────────────────────────────────────────
     const isAlreadyScanned = bucket.some(item =>
       item.serials.some((s: any) => {
         const existing = s.sn.toLowerCase();
         return (
-          (parsedSerial && existing === parsedSerial) ||
-          rawLower.includes(existing)
+          candidatesLower.some(c => c === existing) ||
+          rawLower.includes(existing) ||
+          candidatesLower.some(c => c.includes(existing) || existing.includes(c))
         );
       })
     );
-
     if (isAlreadyScanned) {
       alert("Stop! This item is already in your issue bucket.");
       setIsSearching(false);
       return;
     }
 
-    // 3. Search all instances for a match
+    // ── Database search ───────────────────────────────────────────────────────
     let foundInstance: { serialNumber: string; condition: string } | null = null;
     let foundParentItem: ItemRow | null = null;
     let matchedSerial = "";
 
+    outer:
     for (const item of items) {
-      const match = item.instances?.find((ins) => {
+      for (const ins of (item.instances ?? [])) {
         const dbSerial = ins.serialNumber.toLowerCase();
-        if (dbSerial.length < 3) return false;
-        // Prefer exact match on the parsed serial; fall back to substring
-        return (parsedSerial && dbSerial === parsedSerial) || rawLower.includes(dbSerial);
-      });
+        if (dbSerial.length < 3) continue;
 
-      if (match) {
-        foundInstance  = match;
-        foundParentItem = item;
-        matchedSerial  = match.serialNumber;
-        break;
+        const hit =
+          // A. Exact match
+          candidatesLower.some(c => c === dbSerial) ||
+          // B. Raw scan string contains the db serial
+          rawLower.includes(dbSerial) ||
+          // C. Candidate contains db serial, or db serial contains candidate
+          candidatesLower.some(c => c.includes(dbSerial) || dbSerial.includes(c));
+
+        if (hit) {
+          foundInstance   = ins;
+          foundParentItem = item;
+          matchedSerial   = ins.serialNumber;
+          break outer;
+        }
       }
     }
 
@@ -291,16 +285,25 @@ export default function IssueInventoryItemClient({
           );
         }
         return [...prev, {
-          id: foundParentItem!.id,
-          name: foundParentItem!.name,
-          itemType: foundParentItem!.itemType,
-          quantity: 1,
-          serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
+          id:                 foundParentItem!.id,
+          name:               foundParentItem!.name,
+          itemType:           foundParentItem!.itemType,
+          quantity:           1,
+          serials:            [{ sn: matchedSerial, condition: foundInstance!.condition }],
           expectedReturnDate: "",
         }];
       });
     } else {
-      alert("Serial not found! No registered serial number was detected inside this scan.");
+      // Debug info printed to console so you can see exactly what was tried
+      console.warn("[Scanner] No match found.");
+      console.warn("  Raw scan   :", rawScan);
+      console.warn("  Candidates :", candidates);
+      console.warn("  DB serials :", items.flatMap(i => i.instances.map(ins => ins.serialNumber)));
+      alert(
+        `Serial not found!\n\n` +
+        `Candidates tried:\n${candidates.join("\n") || "(none extracted)"}\n\n` +
+        `Open browser console (F12) to see all DB serials and compare.`
+      );
     }
 
     setIsSearching(false);
