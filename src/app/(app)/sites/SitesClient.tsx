@@ -13,6 +13,7 @@ import SiteGpsInlineEdit from "@/components/SiteGpsInlineEdit";
 type GroupType = "status" | "tt" | "tower" | undefined;
 
 type SiteRow = {
+  fuelLevel: number | null;
   id: string;
   name: string;
   regMFreq: string | null;
@@ -111,6 +112,36 @@ function GpsLink({ gps, dark }: { gps: string | null; dark: boolean }) {
     >
       {gps}
     </a>
+  );
+}
+
+function RealTimeFuelTank({ level, dark }: { level: number | null, dark: boolean }) {
+  if (level === null) return <span className="opacity-20 text-[10px] font-bold">NO DATA</span>;
+
+  const displayLevel = Math.round(level);
+
+  // Rule: 65+ Green, 31-64 Yellow, <31 Red
+  const getFuelStyles = (l: number) => {
+    if (l >= 65) return { color: "bg-emerald-500", glow: "shadow-[0_0_12px_rgba(16,185,129,0.4)]" };
+    if (l >= 31) return { color: "bg-amber-500", glow: "shadow-[0_0_12px_rgba(245,158,11,0.3)]" };
+    return { color: "bg-rose-500 animate-pulse", glow: "shadow-[0_0_15px_rgba(244,63,94,0.5)]" };
+  };
+
+  const { color, glow } = getFuelStyles(displayLevel);
+  const isCritical = displayLevel <= 30;
+
+  return (
+    <div className="flex items-center gap-3 justify-center group" title={`Fuel Level: ${displayLevel}%`}>
+      <span className={`text-[11px] font-black tabular-nums ${isCritical ? 'text-rose-500 animate-bounce' : dark ? 'text-slate-300' : 'text-slate-700'}`}>
+        {displayLevel}%
+      </span>
+      <div className={`relative w-4 h-7 rounded-[3px] border-[1.5px] overflow-hidden flex flex-col justify-end ${dark ? 'border-white/20 bg-black/40' : 'border-slate-400 bg-slate-100'}`}>
+        <div className={`w-full transition-all duration-1000 ease-in-out ${color} ${glow}`} style={{ height: `${displayLevel}%` }}>
+          <div className="absolute top-0 left-0 w-full h-0.5 bg-white/30" />
+        </div>
+      </div>
+      {isCritical && <span className="text-xs animate-pulse">⚠️</span>}
+    </div>
   );
 }
 
@@ -880,6 +911,7 @@ function SitesSection({
               </th>
 
               <th className="min-w-32.5 px-2 py-3 font-semibold">GPS</th>
+              <th className="min-w-24 px-1.5 py-3 font-semibold text-center">Fuel Level</th>
 
               <th className="min-w-23 px-1.5 py-3 text-right font-semibold">
                 <span className="print-only">Status</span>
@@ -1033,6 +1065,9 @@ function SitesSection({
                       </div>
                     )}
                   </td>
+                  <td className="px-2 py-3 text-center">
+                  <RealTimeFuelTank level={s.fuelLevel} dark={dark} />
+                </td>
 
                   <td className="px-2 py-3 text-right">
                     {filteringActive ? (

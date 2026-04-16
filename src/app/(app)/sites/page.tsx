@@ -21,6 +21,8 @@ type SiteRow = {
   towerHeight: number | null;
   gps: string | null;
   locationName: string | null;
+  fuelLevel: number | null;    
+  fuelCapacity: number | null; 
 };
 
 function sectionTitle(group: SearchParams["group"]) {
@@ -81,6 +83,8 @@ export default async function SitesPage({
       towerHeight: true,
       gps: true,
       locationName: true,
+      fuelLevel: true,   
+      fuelCapacity: true,
     },
     orderBy: { name: "asc" },
   })) as SiteRow[];
