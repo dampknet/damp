@@ -30,36 +30,232 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     return !sn || sn.startsWith("PENDING") || sn.startsWith("IMPORT") || sn.startsWith("RESTOCK");
   };
 
-  const parseSmartScan = (text: string) => {
-    const data: any = { serialNumber: "", model: "", manufacturer: "" };
-    const cleanText = text.replace(/[\n\r]/g, "").trim();
-    const brackets = cleanText.match(/<([^>]+)>/g);
+  // ─────────────────────────────────────────────────────────────────
+  // SMART UNIVERSAL BARCODE / QR-CODE PARSER
+  //
+  // Handles the following formats (in priority order):
+  //
+  // 1. ROHDE & SCHWARZ angle-bracket format
+  //    <Manufacturer><Model-SerialNumber-suffix><-><Description><...>
+  //    e.g. <Rhode & Schwarz><2501.7406.06-101793-dZ><-><UHF AMPLIFIER><...>
+  //
+  // 2. KEY:VALUE label text (any order, any separator)
+  //    e.g. "Serial Number: 2434567 Model: 333332 Manufacturer: Rhode and Schwarz"
+  //    Also handles multi-line versions from physical label scanners.
+  //
+  // 3. GS1 Application Identifier format
+  //    e.g. (21)SN12345(240)ModelABC(10)BatchXYZ
+  //    AI 21 = serial number, AI 240/8012 = model, AI 710-714 = brand
+  //
+  // 4. Victron Energy serial number format
+  //    HQYYWWxxxxx  e.g. HQ2237ABCDE  → serial only, manufacturer = Victron Energy
+  //
+  // 5. CSV / tab-delimited   (serial,model,manufacturer  or  serial\tmodel\tmfg)
+  //
+  // 6. JSON object           {"serialNumber":"X","model":"Y","manufacturer":"Z"}
+  //
+  // 7. URL query-string      ?sn=X&model=Y&mfg=Z  or  ?serial=X&...
+  //
+  // 8. Pipe / semicolon delimited with positional fields
+  //    serial|model|manufacturer   or   serial;model;manufacturer
+  //
+  // 9. Plain serial number (fallback — just a bare alphanumeric string)
+  // ─────────────────────────────────────────────────────────────────
+  const parseSmartScan = (text: string): { serialNumber: string; model: string; manufacturer: string } => {
+    const result = { serialNumber: "", model: "", manufacturer: "" };
 
-    if (brackets && brackets.length >= 2) {
-      data.manufacturer = brackets[0].replace(/[<>]/g, "").trim();
-      const midPart = brackets[1].replace(/[<>]/g, "").trim();
-      const parts = midPart.split("-");
-      if (parts.length >= 2) {
-        const serialIdx = parts.findIndex(p => /^\d+$/.test(p));
-        if (serialIdx !== -1) {
-          data.serialNumber = parts[serialIdx];
-          data.model = parts.slice(0, serialIdx).join("-");
-        } else {
-          data.model = parts[0];
-          data.serialNumber = parts[1] || midPart;
-        }
+    // Normalise line endings and trim
+    const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    // Collapse runs of whitespace (but keep newlines so multi-line KV still works)
+    const clean = raw.replace(/[ \t]+/g, " ");
+
+    // ── 1. ROHDE & SCHWARZ angle-bracket format ──────────────────────────────
+    // Pattern: one or more <...> fields
+    // Field[0] = manufacturer, Field[1] = "Model-Serial[-variant]", remaining = description etc.
+    const angleFields = [...clean.matchAll(/<([^>]*)>/g)].map(m => m[1].trim());
+    if (angleFields.length >= 2) {
+      result.manufacturer = angleFields[0];
+
+      // Field[1] looks like "2501.7406.06-101793-dZ"
+      // Convention: last purely-numeric-or-alphanumeric segment after a dash that
+      // looks like a serial (6+ chars, contains digits) is the serial.
+      // Everything before it is the model / part number.
+      const field1 = angleFields[1];
+      const parts = field1.split("-");
+
+      if (parts.length === 1) {
+        // No dash — treat whole thing as serial number
+        result.serialNumber = field1;
       } else {
-        data.serialNumber = midPart;
+        // Walk from the right to find the serial-number segment.
+        // Serial: alphanumeric, 4+ chars, must contain at least one digit.
+        let serialIdx = -1;
+        for (let i = parts.length - 1; i >= 0; i--) {
+          const p = parts[i];
+          if (/[0-9]/.test(p) && p.length >= 4 && /^[A-Za-z0-9]+$/.test(p)) {
+            serialIdx = i;
+            break;
+          }
+        }
+        if (serialIdx > 0) {
+          result.serialNumber = parts[serialIdx];
+          result.model = parts.slice(0, serialIdx).join("-");
+        } else if (serialIdx === 0) {
+          result.serialNumber = parts[0];
+          result.model = parts.slice(1).join("-");
+        } else {
+          // Fallback: last segment = serial, rest = model
+          result.serialNumber = parts[parts.length - 1];
+          result.model = parts.slice(0, -1).join("-");
+        }
       }
-    } else {
-      const snMatch = cleanText.match(/(?:serial number|sn|s\/n|serial)[:\s]+([^\s,]+)/i);
-      const modelMatch = cleanText.match(/(?:model|mod)[:\s]+([^\s,]+)/i);
-      const mfgMatch = cleanText.match(/(?:manufacturer|mfg|make)[:\s]+([^\s,]+)/i);
-      data.serialNumber = snMatch ? snMatch[1] : cleanText.split(' ')[0];
-      if (modelMatch) data.model = modelMatch[1];
-      if (mfgMatch) data.manufacturer = mfgMatch[1];
+
+      // Optional: Field[3] may be a human-readable description — append to model
+      // if model is blank and description doesn't look like a date/weight/dimension
+      if (!result.model && angleFields.length > 3) {
+        const desc = angleFields[3];
+        if (!/^\d{2}-\d{2}-\d{4}$/.test(desc) && !/\d+KG/i.test(desc) && desc !== "-") {
+          result.model = desc;
+        }
+      }
+
+      return result;
     }
-    return data;
+
+    // ── 2. JSON object ────────────────────────────────────────────────────────
+    if (clean.startsWith("{") && clean.endsWith("}")) {
+      try {
+        const obj = JSON.parse(clean);
+        const sn = obj.serialNumber ?? obj.serial_number ?? obj.sn ?? obj.serial ?? obj.SN ?? "";
+        const mdl = obj.model ?? obj.Model ?? obj.partNumber ?? obj.part_number ?? obj.pn ?? "";
+        const mfg = obj.manufacturer ?? obj.Manufacturer ?? obj.brand ?? obj.Brand ?? obj.make ?? "";
+        result.serialNumber = String(sn);
+        result.model = String(mdl);
+        result.manufacturer = String(mfg);
+        if (result.serialNumber) return result;
+      } catch (_) { /* not valid JSON */ }
+    }
+
+    // ── 3. URL query-string ───────────────────────────────────────────────────
+    // e.g. https://example.com/asset?sn=ABC123&model=X200&mfg=Victron
+    // or just  ?sn=ABC123&model=X200
+    const qsMatch = clean.match(/[?&]([^#]+)/);
+    if (qsMatch) {
+      try {
+        const params = new URLSearchParams(qsMatch[1]);
+        const sn =
+          params.get("sn") ?? params.get("serialNumber") ?? params.get("serial") ??
+          params.get("serial_number") ?? params.get("SN") ?? "";
+        const mdl =
+          params.get("model") ?? params.get("Model") ?? params.get("partNumber") ??
+          params.get("part") ?? "";
+        const mfg =
+          params.get("manufacturer") ?? params.get("mfg") ?? params.get("brand") ??
+          params.get("make") ?? "";
+        if (sn) {
+          result.serialNumber = sn;
+          result.model = mdl;
+          result.manufacturer = mfg;
+          return result;
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    // ── 4. GS1 Application Identifier format ─────────────────────────────────
+    // Parenthesised AIs: (21)SN  (240)Model  (710)-(714)Manufacturer
+    const gs1ParenRx = /\((\d{2,4})\)([^(]+)/g;
+    const gs1Paren: Record<string, string> = {};
+    let gs1Match;
+    while ((gs1Match = gs1ParenRx.exec(clean)) !== null) {
+      gs1Paren[gs1Match[1]] = gs1Match[2].trim();
+    }
+    if (Object.keys(gs1Paren).length > 0) {
+      result.serialNumber = gs1Paren["21"] ?? gs1Paren["251"] ?? "";
+      result.model        = gs1Paren["240"] ?? gs1Paren["8012"] ?? gs1Paren["01"] ?? "";
+      result.manufacturer = gs1Paren["710"] ?? gs1Paren["711"] ?? gs1Paren["712"] ??
+                            gs1Paren["713"] ?? gs1Paren["714"] ?? "";
+      if (result.serialNumber) return result;
+    }
+
+    // ── 5. KEY : VALUE text (case-insensitive, flexible separators) ───────────
+    // Supports both single-line and multi-line label text.
+    // Keys: serial number / sn / s/n / serial | model / mod / part | manufacturer / mfg / make / brand
+    const kvText = clean.replace(/\n/g, " ");
+
+    const snKv  = kvText.match(/(?:serial\s*(?:number|no\.?|#)?|s\/n|sn)\s*[:\-=]\s*([^\s,;|]+)/i);
+    const mdlKv = kvText.match(/(?:model\s*(?:no\.?|number|#)?|mod|part\s*(?:no\.?|number)?|pn)\s*[:\-=]\s*([^\s,;|]+)/i);
+    const mfgKv = kvText.match(/(?:manufacturer|mfg|make|brand|vendor)\s*[:\-=]\s*([^\n,;|]+)/i);
+
+    if (snKv) {
+      result.serialNumber = snKv[1].trim();
+      if (mdlKv) result.model = mdlKv[1].trim();
+      if (mfgKv) result.manufacturer = mfgKv[1].trim().replace(/\s+/g, " ");
+      return result;
+    }
+
+    // ── 6. Victron Energy serial number ──────────────────────────────────────
+    // Format: HQ + 2-digit year + 2-digit week + alphanumeric suffix
+    // e.g. HQ2237ABCDE   HQ1846XYZAB
+    if (/^HQ\d{4}[A-Z0-9]{4,}$/i.test(raw)) {
+      result.serialNumber = raw;
+      result.manufacturer = "Victron Energy";
+      return result;
+    }
+
+    // ── 7. Pipe-delimited  serial|model|manufacturer ─────────────────────────
+    if (clean.includes("|")) {
+      const parts = clean.split("|").map(s => s.trim());
+      if (parts.length >= 1) result.serialNumber  = parts[0];
+      if (parts.length >= 2) result.model         = parts[1];
+      if (parts.length >= 3) result.manufacturer  = parts[2];
+      if (result.serialNumber) return result;
+    }
+
+    // ── 8. Semicolon-delimited  serial;model;manufacturer ────────────────────
+    if (clean.includes(";")) {
+      const parts = clean.split(";").map(s => s.trim());
+      if (parts.length >= 1) result.serialNumber  = parts[0];
+      if (parts.length >= 2) result.model         = parts[1];
+      if (parts.length >= 3) result.manufacturer  = parts[2];
+      if (result.serialNumber) return result;
+    }
+
+    // ── 9. Tab-delimited  serial\tmodel\tmanufacturer ─────────────────────────
+    if (raw.includes("\t")) {
+      const parts = raw.split("\t").map(s => s.trim());
+      if (parts.length >= 1) result.serialNumber  = parts[0];
+      if (parts.length >= 2) result.model         = parts[1];
+      if (parts.length >= 3) result.manufacturer  = parts[2];
+      if (result.serialNumber) return result;
+    }
+
+    // ── 10. CSV  serial,model,manufacturer ────────────────────────────────────
+    // Only treat as CSV if there are exactly 2 or 3 comma-separated tokens
+    // (avoids splitting a plain description sentence)
+    const csvParts = clean.split(",").map(s => s.trim());
+    if (csvParts.length >= 2 && csvParts.length <= 4 && csvParts[0].length <= 60) {
+      result.serialNumber = csvParts[0];
+      if (csvParts.length >= 2) result.model        = csvParts[1];
+      if (csvParts.length >= 3) result.manufacturer = csvParts[2];
+      if (result.serialNumber) return result;
+    }
+
+    // ── 11. PLAIN SERIAL NUMBER FALLBACK ─────────────────────────────────────
+    // At this point treat the whole trimmed string as a serial number,
+    // but only if it looks like one (alphanumeric, no long spaces / sentences).
+    const plainCandidate = raw.replace(/\s+/g, "");
+    if (plainCandidate.length > 0 && plainCandidate.length <= 60 && /^[A-Za-z0-9\-_.\/]+$/.test(plainCandidate)) {
+      result.serialNumber = plainCandidate;
+      return result;
+    }
+
+    // ── 12. Last-resort: take the first "word" that looks like a serial ───────
+    const wordMatch = clean.match(/\b([A-Z0-9][A-Z0-9\-]{4,})\b/i);
+    if (wordMatch) {
+      result.serialNumber = wordMatch[1];
+    }
+
+    return result;
   };
 
   useEffect(() => {

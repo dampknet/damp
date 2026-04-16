@@ -45,37 +45,237 @@ export default function IssueInventoryItemClient({
   const scanBuffer = useRef("");
   const lastKeyTime = useRef(0);
 
-  // ✅ THE ULTIMATE MAPPING LOGIC (Works for Messy Rohde & Schwarz)
-  const handleLocalScanMatch = (rawJunk: string) => {
+  // ─────────────────────────────────────────────────────────────────
+  // SMART UNIVERSAL BARCODE / QR-CODE PARSER
+  //
+  // Extracts the serial number (and optionally model/manufacturer)
+  // from any scan format the Syble gun or camera might produce:
+  //
+  // 1. Rohde & Schwarz  <Manufacturer><Model-Serial-suffix><...>
+  // 2. Key:Value text   Serial Number: X  Model: Y  Manufacturer: Z
+  // 3. GS1 App IDs      (21)SN  (240)Model  (710)Brand
+  // 4. Victron Energy   HQYYWWxxxxx
+  // 5. Pipe-delimited   serial|model|manufacturer
+  // 6. Semicolon        serial;model;manufacturer
+  // 7. Tab-delimited    serial\tmodel\tmanufacturer
+  // 8. CSV              serial,model,manufacturer
+  // 9. JSON             {"serialNumber":"X","model":"Y",...}
+  // 10. URL query-str   ?sn=X&model=Y&mfg=Z
+  // 11. Plain serial    bare alphanumeric string
+  // ─────────────────────────────────────────────────────────────────
+  const parseSmartScan = (text: string): { serialNumber: string; model: string; manufacturer: string } => {
+    const result = { serialNumber: "", model: "", manufacturer: "" };
+
+    const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    const clean = raw.replace(/[ \t]+/g, " ");
+
+    // ── 1. Rohde & Schwarz angle-bracket format ───────────────────────────────
+    const angleFields = [...clean.matchAll(/<([^>]*)>/g)].map(m => m[1].trim());
+    if (angleFields.length >= 2) {
+      result.manufacturer = angleFields[0];
+      const field1 = angleFields[1];
+      const parts = field1.split("-");
+
+      if (parts.length === 1) {
+        result.serialNumber = field1;
+      } else {
+        let serialIdx = -1;
+        for (let i = parts.length - 1; i >= 0; i--) {
+          const p = parts[i];
+          if (/[0-9]/.test(p) && p.length >= 4 && /^[A-Za-z0-9]+$/.test(p)) {
+            serialIdx = i;
+            break;
+          }
+        }
+        if (serialIdx > 0) {
+          result.serialNumber = parts[serialIdx];
+          result.model = parts.slice(0, serialIdx).join("-");
+        } else if (serialIdx === 0) {
+          result.serialNumber = parts[0];
+          result.model = parts.slice(1).join("-");
+        } else {
+          result.serialNumber = parts[parts.length - 1];
+          result.model = parts.slice(0, -1).join("-");
+        }
+      }
+
+      if (!result.model && angleFields.length > 3) {
+        const desc = angleFields[3];
+        if (!/^\d{2}-\d{2}-\d{4}$/.test(desc) && !/\d+KG/i.test(desc) && desc !== "-") {
+          result.model = desc;
+        }
+      }
+      return result;
+    }
+
+    // ── 2. JSON object ────────────────────────────────────────────────────────
+    if (clean.startsWith("{") && clean.endsWith("}")) {
+      try {
+        const obj = JSON.parse(clean);
+        const sn  = obj.serialNumber ?? obj.serial_number ?? obj.sn ?? obj.serial ?? obj.SN ?? "";
+        const mdl = obj.model ?? obj.Model ?? obj.partNumber ?? obj.part_number ?? obj.pn ?? "";
+        const mfg = obj.manufacturer ?? obj.Manufacturer ?? obj.brand ?? obj.Brand ?? obj.make ?? "";
+        result.serialNumber  = String(sn);
+        result.model         = String(mdl);
+        result.manufacturer  = String(mfg);
+        if (result.serialNumber) return result;
+      } catch (_) { /* not valid JSON */ }
+    }
+
+    // ── 3. URL query-string ───────────────────────────────────────────────────
+    const qsMatch = clean.match(/[?&]([^#]+)/);
+    if (qsMatch) {
+      try {
+        const params = new URLSearchParams(qsMatch[1]);
+        const sn =
+          params.get("sn") ?? params.get("serialNumber") ?? params.get("serial") ??
+          params.get("serial_number") ?? params.get("SN") ?? "";
+        const mdl = params.get("model") ?? params.get("Model") ?? params.get("partNumber") ?? params.get("part") ?? "";
+        const mfg = params.get("manufacturer") ?? params.get("mfg") ?? params.get("brand") ?? params.get("make") ?? "";
+        if (sn) {
+          result.serialNumber = sn;
+          result.model        = mdl;
+          result.manufacturer = mfg;
+          return result;
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    // ── 4. GS1 Application Identifier format ─────────────────────────────────
+    const gs1ParenRx = /\((\d{2,4})\)([^(]+)/g;
+    const gs1Paren: Record<string, string> = {};
+    let gs1Match;
+    while ((gs1Match = gs1ParenRx.exec(clean)) !== null) {
+      gs1Paren[gs1Match[1]] = gs1Match[2].trim();
+    }
+    if (Object.keys(gs1Paren).length > 0) {
+      result.serialNumber = gs1Paren["21"]  ?? gs1Paren["251"] ?? "";
+      result.model        = gs1Paren["240"] ?? gs1Paren["8012"] ?? gs1Paren["01"] ?? "";
+      result.manufacturer = gs1Paren["710"] ?? gs1Paren["711"] ?? gs1Paren["712"] ??
+                            gs1Paren["713"] ?? gs1Paren["714"] ?? "";
+      if (result.serialNumber) return result;
+    }
+
+    // ── 5. Key:Value text ─────────────────────────────────────────────────────
+    const kvText = clean.replace(/\n/g, " ");
+    const snKv  = kvText.match(/(?:serial\s*(?:number|no\.?|#)?|s\/n|sn)\s*[:\-=]\s*([^\s,;|]+)/i);
+    const mdlKv = kvText.match(/(?:model\s*(?:no\.?|number|#)?|mod|part\s*(?:no\.?|number)?|pn)\s*[:\-=]\s*([^\s,;|]+)/i);
+    const mfgKv = kvText.match(/(?:manufacturer|mfg|make|brand|vendor)\s*[:\-=]\s*([^\n,;|]+)/i);
+    if (snKv) {
+      result.serialNumber = snKv[1].trim();
+      if (mdlKv) result.model        = mdlKv[1].trim();
+      if (mfgKv) result.manufacturer = mfgKv[1].trim().replace(/\s+/g, " ");
+      return result;
+    }
+
+    // ── 6. Victron Energy serial number ──────────────────────────────────────
+    if (/^HQ\d{4}[A-Z0-9]{4,}$/i.test(raw)) {
+      result.serialNumber  = raw;
+      result.manufacturer  = "Victron Energy";
+      return result;
+    }
+
+    // ── 7. Pipe-delimited ─────────────────────────────────────────────────────
+    if (clean.includes("|")) {
+      const parts = clean.split("|").map(s => s.trim());
+      result.serialNumber  = parts[0] ?? "";
+      result.model         = parts[1] ?? "";
+      result.manufacturer  = parts[2] ?? "";
+      if (result.serialNumber) return result;
+    }
+
+    // ── 8. Semicolon-delimited ────────────────────────────────────────────────
+    if (clean.includes(";")) {
+      const parts = clean.split(";").map(s => s.trim());
+      result.serialNumber  = parts[0] ?? "";
+      result.model         = parts[1] ?? "";
+      result.manufacturer  = parts[2] ?? "";
+      if (result.serialNumber) return result;
+    }
+
+    // ── 9. Tab-delimited ──────────────────────────────────────────────────────
+    if (raw.includes("\t")) {
+      const parts = raw.split("\t").map(s => s.trim());
+      result.serialNumber  = parts[0] ?? "";
+      result.model         = parts[1] ?? "";
+      result.manufacturer  = parts[2] ?? "";
+      if (result.serialNumber) return result;
+    }
+
+    // ── 10. CSV (2–4 tokens only) ─────────────────────────────────────────────
+    const csvParts = clean.split(",").map(s => s.trim());
+    if (csvParts.length >= 2 && csvParts.length <= 4 && csvParts[0].length <= 60) {
+      result.serialNumber  = csvParts[0];
+      result.model         = csvParts[1] ?? "";
+      result.manufacturer  = csvParts[2] ?? "";
+      if (result.serialNumber) return result;
+    }
+
+    // ── 11. Plain serial fallback ─────────────────────────────────────────────
+    const plainCandidate = raw.replace(/\s+/g, "");
+    if (plainCandidate.length > 0 && plainCandidate.length <= 60 && /^[A-Za-z0-9\-_.\/]+$/.test(plainCandidate)) {
+      result.serialNumber = plainCandidate;
+      return result;
+    }
+
+    // ── 12. Last resort: first word that looks like a serial ──────────────────
+    const wordMatch = clean.match(/\b([A-Z0-9][A-Z0-9\-]{4,})\b/i);
+    if (wordMatch) result.serialNumber = wordMatch[1];
+
+    return result;
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // SCAN MATCH LOGIC
+  // After parsing the scan, extract the serial number and look it up
+  // against all registered instances in the database.  The match uses
+  // substring search so messy Rohde & Schwarz / multi-field strings
+  // still resolve correctly even if the scanner emits extra fields.
+  // ─────────────────────────────────────────────────────────────────
+  const handleLocalScanMatch = (rawScan: string) => {
     setIsSearching(true);
-    let foundInstance = null;
-    let foundParentItem = null;
-    let matchedSerial = "";
 
-    const scanInput = rawJunk.toLowerCase();
+    // 1. Try to extract a clean serial via the smart parser first
+    const parsed = parseSmartScan(rawScan);
+    // We'll also keep the raw lowercased string as a fallback for
+    // the substring-match path (preserves old behaviour for edge cases)
+    const rawLower = rawScan.toLowerCase();
+    const parsedSerial = parsed.serialNumber.toLowerCase();
 
-    // Check if ALREADY in bucket first
-    const isAlreadyScanned = bucket.some(item => 
-      item.serials.some((s: any) => s.sn.toLowerCase() === scanInput || scanInput.includes(s.sn.toLowerCase()))
+    // 2. Duplicate check — look in the bucket
+    const isAlreadyScanned = bucket.some(item =>
+      item.serials.some((s: any) => {
+        const existing = s.sn.toLowerCase();
+        return (
+          (parsedSerial && existing === parsedSerial) ||
+          rawLower.includes(existing)
+        );
+      })
     );
 
     if (isAlreadyScanned) {
-      alert(`Stop! This item is already in your issue bucket.`);
+      alert("Stop! This item is already in your issue bucket.");
       setIsSearching(false);
       return;
     }
 
+    // 3. Search all instances for a match
+    let foundInstance: { serialNumber: string; condition: string } | null = null;
+    let foundParentItem: ItemRow | null = null;
+    let matchedSerial = "";
+
     for (const item of items) {
       const match = item.instances?.find((ins) => {
         const dbSerial = ins.serialNumber.toLowerCase();
-        // Check if the DB serial exists anywhere inside the messy scan string
-        return dbSerial.length > 2 && scanInput.includes(dbSerial);
+        if (dbSerial.length < 3) return false;
+        // Prefer exact match on the parsed serial; fall back to substring
+        return (parsedSerial && dbSerial === parsedSerial) || rawLower.includes(dbSerial);
       });
 
       if (match) {
-        foundInstance = match;
+        foundInstance  = match;
         foundParentItem = item;
-        matchedSerial = match.serialNumber;
+        matchedSerial  = match.serialNumber;
         break;
       }
     }
@@ -84,11 +284,11 @@ export default function IssueInventoryItemClient({
       setBucket((prev) => {
         const existing = prev.find((i) => i.id === foundParentItem!.id);
         if (existing) {
-          return prev.map((i) => i.id === foundParentItem!.id ? { 
-            ...i, 
-            quantity: i.quantity + 1, 
-            serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] 
-          } : i);
+          return prev.map((i) =>
+            i.id === foundParentItem!.id
+              ? { ...i, quantity: i.quantity + 1, serials: [...i.serials, { sn: matchedSerial, condition: foundInstance!.condition }] }
+              : i
+          );
         }
         return [...prev, {
           id: foundParentItem!.id,
@@ -96,12 +296,13 @@ export default function IssueInventoryItemClient({
           itemType: foundParentItem!.itemType,
           quantity: 1,
           serials: [{ sn: matchedSerial, condition: foundInstance!.condition }],
-          expectedReturnDate: ""
+          expectedReturnDate: "",
         }];
       });
     } else {
-      alert(`Serial not found! No registered serial number was detected inside this scan.`);
+      alert("Serial not found! No registered serial number was detected inside this scan.");
     }
+
     setIsSearching(false);
   };
 
@@ -140,7 +341,7 @@ export default function IssueInventoryItemClient({
   }, [isCameraActive, bucket, items]);
 
   const getConditionStyle = (c: string) => {
-    if (c === "NEW") return "bg-blue-600";
+    if (c === "NEW")  return "bg-blue-600";
     if (c === "GOOD") return "bg-emerald-600";
     return "bg-rose-600";
   };
@@ -208,7 +409,7 @@ export default function IssueInventoryItemClient({
                           <span key={s.sn} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${getConditionStyle(s.condition)}`}>
                             {s.sn}
                             <button type="button" title={`Remove serial ${s.sn}`} onClick={() => {
-                               const filtered = item.serials.filter((x:any) => x.sn !== s.sn);
+                               const filtered = item.serials.filter((x: any) => x.sn !== s.sn);
                                setBucket(prev => filtered.length ? prev.map(i => i.id === item.id ? {...i, serials: filtered, quantity: filtered.length} : i) : prev.filter(i => i.id !== item.id));
                             }}><X size={12} /></button>
                           </span>
