@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { useState, useEffect } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
@@ -38,151 +36,38 @@ function progressWidthClass(width: number) {
   const safe = Math.max(0, Math.min(100, width));
   const rounded = Math.round(safe / 5) * 5;
   switch (rounded) {
-    case 0: return "w-0";
-    case 5: return "w-[5%]";
-    case 10: return "w-[10%]";
-    case 15: return "w-[15%]";
-    case 20: return "w-[20%]";
-    case 25: return "w-[25%]";
-    case 30: return "w-[30%]";
-    case 35: return "w-[35%]";
-    case 40: return "w-[40%]";
-    case 45: return "w-[45%]";
-    case 50: return "w-[50%]";
-    case 55: return "w-[55%]";
-    case 60: return "w-[60%]";
-    case 65: return "w-[65%]";
-    case 70: return "w-[70%]";
-    case 75: return "w-[75%]";
-    case 80: return "w-[80%]";
-    case 85: return "w-[85%]";
-    case 90: return "w-[90%]";
-    case 95: return "w-[95%]";
+    case 0:   return "w-0";
+    case 5:   return "w-[5%]";
+    case 10:  return "w-[10%]";
+    case 15:  return "w-[15%]";
+    case 20:  return "w-[20%]";
+    case 25:  return "w-[25%]";
+    case 30:  return "w-[30%]";
+    case 35:  return "w-[35%]";
+    case 40:  return "w-[40%]";
+    case 45:  return "w-[45%]";
+    case 50:  return "w-[50%]";
+    case 55:  return "w-[55%]";
+    case 60:  return "w-[60%]";
+    case 65:  return "w-[65%]";
+    case 70:  return "w-[70%]";
+    case 75:  return "w-[75%]";
+    case 80:  return "w-[80%]";
+    case 85:  return "w-[85%]";
+    case 90:  return "w-[90%]";
+    case 95:  return "w-[95%]";
     case 100: return "w-full";
-    default: return "w-0";
+    default:  return "w-0";
   }
 }
 
-// ── Splash Screen ─────────────────────────────────────────────────────────────
-function SplashScreen({ onDone }: { onDone: () => void }) {
-  const [phase, setPhase] = useState<"enter" | "hold" | "exit">("enter");
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase("hold"), 100);
-    const t2 = setTimeout(() => setPhase("exit"), 2600);
-    const t3 = setTimeout(() => onDone(), 3200);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [onDone]);
-
-  return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 9999,
-        background: "linear-gradient(135deg, #080c10 0%, #0c1520 50%, #080c10 100%)",
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        transition: "opacity 0.6s ease",
-        opacity: phase === "exit" ? 0 : 1,
-        pointerEvents: phase === "exit" ? "none" : "all",
-      }}
-    >
-      {/* Decorative grid lines */}
-      <div style={{
-        position: "absolute", inset: 0, overflow: "hidden", opacity: 0.04,
-        backgroundImage: "linear-gradient(#d4a843 1px, transparent 1px), linear-gradient(90deg, #d4a843 1px, transparent 1px)",
-        backgroundSize: "80px 80px",
-      }} />
-
-      {/* Top accent bar */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: "3px",
-        background: "linear-gradient(90deg, transparent, #d4a843, #e8c46a, #d4a843, transparent)",
-        transform: phase === "enter" ? "scaleX(0)" : "scaleX(1)",
-        transition: "transform 1.2s cubic-bezier(0.22,1,0.36,1)",
-      }} />
-
-      {/* Logo mark */}
-      <div style={{
-        transform: phase === "enter" ? "translateY(20px)" : "translateY(0)",
-        opacity: phase === "enter" ? 0 : 1,
-        transition: "all 0.8s cubic-bezier(0.22,1,0.36,1)",
-      }}>
-        {/* Hex emblem */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: "32px" }}>
-          <div style={{
-            width: "72px", height: "72px",
-            border: "2px solid #d4a843",
-            borderRadius: "16px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            position: "relative",
-            boxShadow: "0 0 40px rgba(212,168,67,0.2), inset 0 0 20px rgba(212,168,67,0.05)",
-          }}>
-            <div style={{
-              position: "absolute", inset: "4px",
-              border: "1px solid rgba(212,168,67,0.3)",
-              borderRadius: "12px",
-            }} />
-            <span style={{ fontSize: "28px", fontWeight: 900, color: "#d4a843", letterSpacing: "-1px", fontFamily: "Georgia, serif" }}>K</span>
-          </div>
-        </div>
-
-        {/* Organisation name */}
-        <div style={{ textAlign: "center" }}>
-          <div style={{
-            fontSize: "11px", fontWeight: 700, letterSpacing: "0.35em",
-            color: "#d4a843", marginBottom: "16px", textTransform: "uppercase",
-            fontFamily: "Georgia, serif",
-          }}>
-            KNET — GHANA
-          </div>
-          <div style={{
-            fontSize: "clamp(22px, 4vw, 32px)",
-            fontWeight: 700,
-            color: "#f0ece4",
-            letterSpacing: "-0.5px",
-            lineHeight: 1.2,
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            maxWidth: "520px",
-            textAlign: "center",
-          }}>
-            DTT Asset Management
-            <br />
-            <span style={{ color: "#d4a843" }}>&amp;</span> Inventory Platform
-          </div>
-          <div style={{
-            marginTop: "20px",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
-          }}>
-            <div style={{ height: "1px", width: "48px", background: "linear-gradient(90deg, transparent, #d4a843)" }} />
-            <span style={{ fontSize: "10px", letterSpacing: "0.25em", color: "rgba(212,168,67,0.6)", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>
-              Secure · Live · Integrated
-            </span>
-            <div style={{ height: "1px", width: "48px", background: "linear-gradient(90deg, #d4a843, transparent)" }} />
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom loading bar */}
-      <div style={{
-        position: "absolute", bottom: "48px",
-        width: "200px", height: "2px",
-        background: "rgba(212,168,67,0.15)",
-        borderRadius: "2px", overflow: "hidden",
-      }}>
-        <div style={{
-          height: "100%", borderRadius: "2px",
-          background: "linear-gradient(90deg, #d4a843, #e8c46a)",
-          width: phase === "enter" ? "0%" : "100%",
-          transition: "width 2s cubic-bezier(0.22,1,0.36,1)",
-        }} />
-      </div>
-    </div>
-  );
-}
-
-// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function DashboardClient({
-  role, email, displayName, dateLabel, stats, recentActivity,
+  role,
+  email,
+  displayName,
+  dateLabel,
+  stats,
+  recentActivity,
 }: {
   role: Role;
   email: string | null;
@@ -193,301 +78,338 @@ export default function DashboardClient({
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
-  const [showSplash, setShowSplash] = useState(true);
-  const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
-    if (!showSplash) {
-      const t = setTimeout(() => setVisible(true), 60);
-      return () => clearTimeout(t);
-    }
-  }, [showSplash]);
-
-  // ── Light/dark tokens ──────────────────────────────────────────────────────
-  const t = dark ? {
-    page:       "bg-[#080c10]",
-    text:       "text-[#e8e2d8]",
-    muted:      "text-[#6b7280]",
-    subtle:     "text-[#9ca3af]",
-    card:       "bg-[#0d1520] border-[#1e2d3d]",
-    cardHover:  "hover:border-[#2a3f55] hover:bg-[#101a27]",
-    divider:    "border-[#1e2d3d]",
-    tag:        "bg-[#0d1520] border-[#1e2d3d] text-[#6b7280]",
-    input:      "bg-[#0d1520] border-[#1e2d3d]",
-    accent:     "#d4a843",
-    bar:        "bg-[#131f2e]",
-  } : {
-    page:       "bg-[#f4f1ec]",
-    text:       "text-[#1a1610]",
-    muted:      "text-[#6b6560]",
-    subtle:     "text-[#9c978f]",
-    card:       "bg-white border-[#e2dcd4]",
-    cardHover:  "hover:border-[#c8bfb0] hover:shadow-md",
-    divider:    "border-[#e8e2d8]",
-    tag:        "bg-[#f0ebe3] border-[#e2dcd4] text-[#6b6560]",
-    input:      "bg-white border-[#e2dcd4]",
-    accent:     "#b8891e",
-    bar:        "bg-[#ece7df]",
-  };
-
-  const gold    = dark ? "#d4a843" : "#b8891e";
-  const goldBg  = dark ? "rgba(212,168,67,0.08)" : "rgba(184,137,30,0.08)";
-  const goldBdr = dark ? "border-[rgba(212,168,67,0.2)]" : "border-[rgba(184,137,30,0.2)]";
+  // ── Exact navbar palette ──────────────────────────────────────────────────
+  const bg        = dark ? "bg-[#0d1117]"       : "bg-[#f5f2ed]";
+  const surface   = dark ? "bg-[#101720]"       : "bg-[#fffdf9]";
+  const border    = dark ? "border-white/8"      : "border-[#e7dfd4]";
+  const txt       = dark ? "text-slate-100"      : "text-[#1a1814]";
+  const muted     = dark ? "text-slate-500"      : "text-[#8b857c]";
+  const subtler   = dark ? "text-slate-600"      : "text-[#a09890]";
+  const hoverBg   = dark ? "hover:bg-white/5"   : "hover:bg-[#f5f2ed]";
+  const divider   = dark ? "divide-white/6"      : "divide-[#efe8de]";
+  const pill      = dark ? "bg-white/6 border-white/10 text-slate-400" : "bg-[#f5f2ed] border-[#e7dfd4] text-[#6b6560]";
+  const accent    = "#1d5fa8";  // the blue from your navbar
+  const accentHov = "#164a82";
 
   return (
-    <>
-      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+    <div className={`min-h-screen ${bg}`}>
+      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
 
-      <div className={`min-h-screen ${t.page} ${t.text} transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}>
+        {/* ── Page header ──────────────────────────────────────────────────── */}
+        <div className={`mb-8 flex flex-col gap-4 border-b ${border} pb-6 lg:flex-row lg:items-end lg:justify-between`}>
+          <div>
+            <div className={`mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${muted}`}>
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Live · {dateLabel}
+            </div>
+            <h1 className={`text-[28px] font-semibold tracking-tight ${txt}`}>
+              Asset Dashboard
+            </h1>
+            <p className={`mt-1 text-sm ${muted}`}>
+              Welcome back,{" "}
+              <span className={`font-semibold ${txt}`}>{displayName}</span>.
+              Here's a live summary of sites, assets and store activity.
+            </p>
+          </div>
 
-        {/* Top rule */}
-        <div className="h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${gold}, transparent)` }} />
+          <div className="flex gap-2">
+            <Link
+              href="/sites"
+              className={`rounded-xl border ${border} ${surface} px-4 py-2 text-sm font-semibold ${txt} transition ${hoverBg}`}
+            >
+              Go to Sites
+            </Link>
+            <Link
+              href="/store"
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ backgroundColor: accent }}
+            >
+              Go to Store
+            </Link>
+          </div>
+        </div>
 
-        <div className="mx-auto max-w-7xl px-5 py-7 md:px-8">
-
-          {/* ── Header ─────────────────────────────────────────────────────── */}
-          <header className={`mb-8 flex flex-col gap-5 border-b ${t.divider} pb-7 lg:flex-row lg:items-end lg:justify-between`}>
-            <div>
-              {/* Eyebrow */}
-              <div className="mb-3 flex items-center gap-3">
-                <div className={`flex items-center gap-2 rounded-full border ${goldBdr} px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]`}
-                  style={{ color: gold, background: goldBg }}>
-                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: gold }} />
-                  Live System · {dateLabel}
-                </div>
-                <span className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${t.muted}`}>
-                  {role}
+        {/* ── KPI cards ────────────────────────────────────────────────────── */}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              href: "/sites",
+              label: "Total Sites",
+              value: String(stats.sites),
+              chip: `${stats.sites} total`,
+              chipOk: true,
+              meta: "registered in system",
+              bar: accent,
+            },
+            {
+              href: "/sites?group=status",
+              label: "Active / Down",
+              value: `${stats.sitesActive} / ${stats.sitesDown}`,
+              chip: `${stats.sitesDown} offline`,
+              chipOk: stats.sitesDown === 0,
+              meta: "view grouped status",
+              bar: "#10b981",
+            },
+            {
+              href: "/sites?group=tt",
+              label: "Air / Liquid",
+              value: `${stats.airSites} / ${stats.liquidSites}`,
+              chip: `${stats.airPct}% air`,
+              chipOk: true,
+              meta: "view grouped cooling",
+              bar: "#f59e0b",
+            },
+            {
+              href: "/sites?group=tower",
+              label: "KNET / GBC",
+              value: `${stats.knetSites} / ${stats.gbcSites}`,
+              chip: `${stats.knetPct}% KNET`,
+              chipOk: true,
+              meta: "view grouped towers",
+              bar: "#6366f1",
+            },
+          ].map((k) => (
+            <Link
+              key={k.label}
+              href={k.href}
+              className={`group relative overflow-hidden rounded-2xl border ${border} ${surface} p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
+            >
+              {/* coloured left edge */}
+              <div
+                className="absolute inset-y-0 left-0 w-0.75 rounded-l-2xl"
+                style={{ backgroundColor: k.bar }}
+              />
+              <div className={`pl-1 text-[11px] font-bold uppercase tracking-[0.14em] ${muted}`}>
+                {k.label}
+              </div>
+              <div className={`mt-2 text-[28px] font-semibold tracking-tight ${txt}`}>
+                {k.value}
+              </div>
+              <div className={`mt-3 flex items-center justify-between border-t ${border} pt-3`}>
+                <span className={`text-[11px] ${muted}`}>{k.meta}</span>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  style={
+                    k.chipOk
+                      ? { background: "rgba(16,185,129,0.1)", color: "#10b981" }
+                      : { background: "rgba(239,68,68,0.1)", color: "#ef4444" }
+                  }
+                >
+                  {k.chip}
                 </span>
               </div>
-
-              {/* Title block */}
-              <div>
-                <div className={`text-[10px] font-bold uppercase tracking-[0.3em] mb-1`} style={{ color: gold }}>
-                  KNET — GHANA
-                </div>
-                <h1 className={`text-3xl font-bold tracking-tight ${t.text}`} style={{ fontFamily: "Georgia, serif" }}>
-                  DTT Asset Management
-                </h1>
-                <p className={`mt-1 text-sm ${t.muted}`}>
-                  Welcome back, <span className={`font-semibold ${t.text}`}>{displayName}</span>. Live summary of sites, assets &amp; store.
-                </p>
-              </div>
-            </div>
-
-            {/* CTA buttons */}
-            <div className="flex flex-wrap gap-2.5">
-              <Link href="/sites"
-                className={`rounded-lg border ${t.input} px-5 py-2.5 text-sm font-semibold ${t.text} transition ${t.cardHover}`}>
-                ← Sites
-              </Link>
-              <Link href="/store"
-                className="rounded-lg px-5 py-2.5 text-sm font-semibold text-[#0d1520] transition hover:opacity-90"
-                style={{ background: `linear-gradient(135deg, ${gold}, #e8c46a)` }}>
-                Store →
-              </Link>
-            </div>
-          </header>
-
-          {/* ── KPI Row ────────────────────────────────────────────────────── */}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard t={t} dark={dark} gold={gold} goldBg={goldBg} goldBdr={goldBdr}
-              href="/sites" label="Total Sites" value={String(stats.sites)}
-              sub="registered" delta={`${stats.sitesActive} online`} deltaOk />
-
-            <KpiCard t={t} dark={dark} gold={gold} goldBg={goldBg} goldBdr={goldBdr}
-              href="/sites?group=status" label="Active / Down"
-              value={`${stats.sitesActive} / ${stats.sitesDown}`}
-              sub="site status" delta={`${stats.sitesDown} offline`} deltaOk={stats.sitesDown === 0} />
-
-            <KpiCard t={t} dark={dark} gold={gold} goldBg={goldBg} goldBdr={goldBdr}
-              href="/sites?group=tt" label="Air / Liquid"
-              value={`${stats.airSites} / ${stats.liquidSites}`}
-              sub="cooling type" delta={`${stats.airPct}% air-cooled`} deltaOk />
-
-            <KpiCard t={t} dark={dark} gold={gold} goldBg={goldBg} goldBdr={goldBdr}
-              href="/sites?group=tower" label="KNET / GBC"
-              value={`${stats.knetSites} / ${stats.gbcSites}`}
-              sub="tower group" delta={`${stats.knetPct}% KNET`} deltaOk />
-          </div>
-
-          {/* ── Middle row ─────────────────────────────────────────────────── */}
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-
-            {/* Assets */}
-            <SectionCard t={t} dark={dark} gold={gold} title="Assets" badge={`${stats.assets} total`} href="/assets">
-              <ProgressBar t={t} dark={dark} gold={gold} label="Utilisation" value={`${stats.assetUtilPct}%`} pct={stats.assetUtilPct} color={gold} />
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <MiniStat t={t} dark={dark} label="Assets" value={String(stats.assets)} color="#10b981" />
-                <MiniStat t={t} dark={dark} label="Sites" value={String(stats.sites)} color={gold} />
-              </div>
-            </SectionCard>
-
-            {/* Store */}
-            <SectionCard t={t} dark={dark} gold={gold} title="Store" badge={`${stats.storeTotal} items`}>
-              <StoreRow t={t} dark={dark} label="Received" value={String(stats.received)} color="#10b981" icon="✓" />
-              <StoreRow t={t} dark={dark} label="Pending" value={String(stats.notReceived)} color="#f97316" icon="⏳" />
-              <div className="mt-4">
-                <ProgressBar t={t} dark={dark} gold={gold} label="Fulfilment" value={`${stats.receivedPct}%`} pct={stats.receivedPct} color="#10b981" />
-              </div>
-            </SectionCard>
-
-            {/* Site Health */}
-            <SectionCard t={t} dark={dark} gold={gold} title="Site Health" badge={`${stats.activePct}% up`}>
-              <ProgressBar t={t} dark={dark} gold={gold} label="Active" value={`${stats.sitesActive}/${stats.sites}`} pct={stats.activePct} color="#10b981" />
-              <ProgressBar t={t} dark={dark} gold={gold} label="Air-cooled" value={`${stats.airSites}/${stats.sites}`} pct={stats.airPct} color="#3b82f6" />
-              <ProgressBar t={t} dark={dark} gold={gold} label="KNET" value={`${stats.knetSites}/${stats.sites}`} pct={stats.knetPct} color={gold} />
-            </SectionCard>
-          </div>
-
-          {/* ── Bottom row ─────────────────────────────────────────────────── */}
-          <div className="mt-4 grid gap-4 lg:grid-cols-[1.8fr_1fr]">
-
-            {/* Activity */}
-            <SectionCard t={t} dark={dark} gold={gold} title="Recent Activity"
-              action={
-                <Link href="/activity" className="text-[11px] font-bold uppercase tracking-widest transition hover:opacity-70"
-                  style={{ color: gold }}>View all →</Link>
-              }>
-              <div className="space-y-0">
-                {recentActivity.length === 0 ? (
-                  <p className={`py-8 text-sm ${t.muted}`}>No recent activity yet.</p>
-                ) : recentActivity.map((item, i) => (
-                  <div key={item.id}
-                    className={`flex items-start gap-3 border-b ${t.divider} py-3.5 last:border-b-0`}
-                    style={{ animationDelay: `${i * 60}ms` }}>
-                    <div className="mt-2 flex-shrink-0">
-                      <div className="h-1.5 w-1.5 rounded-full" style={{ background: gold }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className={`text-sm font-semibold ${t.text}`}>{item.title}</div>
-                      {item.details && <div className={`mt-0.5 text-xs ${t.muted}`}>{item.details}</div>}
-                      {item.actorEmail && <div className={`mt-0.5 text-[11px] ${t.muted} opacity-70`}>by {item.actorEmail}</div>}
-                    </div>
-                    <div className={`flex-shrink-0 rounded-md border ${t.tag} px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap`}>
-                      {item.createdAtLabel}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            {/* Quick Actions */}
-            <SectionCard t={t} dark={dark} gold={gold} title="Quick Actions">
-              <QuickAction t={t} dark={dark} gold={gold} href="/sites"
-                title="Go to Sites" sub={`Manage all ${stats.sites} sites`} icon="🗺" />
-              <QuickAction t={t} dark={dark} gold={gold} href="/store"
-                title="Go to Store" sub={`${stats.storeTotal} items · ${stats.notReceived} pending`} icon="📦" />
-              <QuickAction t={t} dark={dark} gold={gold} href="/sites?group=status"
-                title="Down Sites" sub={`${stats.sitesDown} currently offline`} icon="⚠️" />
-            </SectionCard>
-          </div>
-
-          {/* ── Footer ─────────────────────────────────────────────────────── */}
-          <footer className={`mt-8 flex items-center justify-between border-t ${t.divider} pt-5`}>
-            <div className={`text-[11px] ${t.muted}`}>
-              Signed in as <span className={`font-bold ${t.text}`}>{role}</span>
-              {email ? <span className="opacity-60"> · {email}</span> : null}
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: gold, opacity: 0.6 }}>
-              KNET — Ghana DTT
-            </div>
-          </footer>
+            </Link>
+          ))}
         </div>
+
+        {/* ── Middle row ───────────────────────────────────────────────────── */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+
+          {/* Assets card */}
+          <Link
+            href="/assets"
+            className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
+          >
+            <SectionHeader dark={dark} border={border} txt={txt} muted={muted} pill={pill}
+              title="Assets" badge={`${stats.assets} total`} />
+            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
+              label="Utilisation" value={`${stats.assetUtilPct}%`}
+              pct={stats.assetUtilPct} color={accent} />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MiniStat dark={dark} border={border} txt={txt} muted={muted}
+                label="Registered Assets" value={String(stats.assets)} valueColor="#10b981" />
+              <MiniStat dark={dark} border={border} txt={txt} muted={muted}
+                label="Site Records" value={String(stats.sites)} valueColor="#f59e0b" />
+            </div>
+          </Link>
+
+          {/* Store card */}
+          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
+            <SectionHeader dark={dark} border={border} txt={txt} muted={muted} pill={pill}
+              title="Store" badge={`${stats.storeTotal} items`} />
+            <StoreRow dark={dark} border={border} txt={txt} muted={muted}
+              label="Received" value={String(stats.received)} valueColor="#10b981" icon="✓" iconBg={dark ? "bg-emerald-500/10" : "bg-emerald-50"} />
+            <StoreRow dark={dark} border={border} txt={txt} muted={muted}
+              label="Pending" value={String(stats.notReceived)} valueColor="#f97316" icon="⏳" iconBg={dark ? "bg-orange-500/10" : "bg-orange-50"} />
+            <div className="mt-4">
+              <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
+                label="Fulfilment rate" value={`${stats.receivedPct}%`}
+                pct={stats.receivedPct} color="#10b981" />
+            </div>
+          </div>
+
+          {/* Site health card */}
+          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
+            <SectionHeader dark={dark} border={border} txt={txt} muted={muted} pill={pill}
+              title="Site Health" badge={`${stats.activePct}% up`} />
+            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
+              label="Active" value={`${stats.sitesActive} / ${stats.sites}`}
+              pct={stats.activePct} color="#10b981" />
+            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
+              label="Air-cooled" value={`${stats.airSites} / ${stats.sites}`}
+              pct={stats.airPct} color={accent} />
+            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
+              label="KNET" value={`${stats.knetSites} / ${stats.sites}`}
+              pct={stats.knetPct} color="#f97316" />
+          </div>
+        </div>
+
+        {/* ── Bottom row ───────────────────────────────────────────────────── */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+
+          {/* Recent activity */}
+          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
+            <div className={`mb-4 flex items-center justify-between border-b ${border} pb-4`}>
+              <span className={`text-sm font-semibold ${txt}`}>Recent Activity</span>
+              <Link
+                href="/activity"
+                className="text-[11px] font-bold transition hover:opacity-70"
+                style={{ color: accent }}
+              >
+                View all →
+              </Link>
+            </div>
+            <div className={`divide-y ${divider}`}>
+              {recentActivity.length === 0 ? (
+                <p className={`py-8 text-sm ${muted}`}>No recent activity yet.</p>
+              ) : recentActivity.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 py-3">
+                  <span
+                    className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: accent }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold ${txt}`}>{item.title}</p>
+                    {item.details && (
+                      <p className={`mt-0.5 text-xs ${muted}`}>{item.details}</p>
+                    )}
+                    {item.actorEmail && (
+                      <p className={`mt-0.5 text-[11px] ${subtler}`}>
+                        by {item.actorEmail}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${pill}`}>
+                    {item.createdAtLabel}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
+            <div className={`mb-4 border-b ${border} pb-4`}>
+              <span className={`text-sm font-semibold ${txt}`}>Quick Actions</span>
+            </div>
+            <div className="space-y-2">
+              {[
+                {
+                  href: "/sites",
+                  title: "Go to Sites",
+                  sub: `Manage all ${stats.sites} sites`,
+                  icon: "🗺",
+                  iconBg: dark ? "bg-blue-500/10" : "bg-blue-50",
+                },
+                {
+                  href: "/store",
+                  title: "Go to Store",
+                  sub: `${stats.storeTotal} items · ${stats.notReceived} pending`,
+                  icon: "📦",
+                  iconBg: dark ? "bg-amber-500/10" : "bg-amber-50",
+                },
+                {
+                  href: "/sites?group=status",
+                  title: "Review Down Sites",
+                  sub: `${stats.sitesDown} currently offline`,
+                  icon: "⚠️",
+                  iconBg: dark ? "bg-red-500/10" : "bg-red-50",
+                },
+              ].map((a) => (
+                <Link
+                  key={a.href}
+                  href={a.href}
+                  className={`flex items-center gap-3 rounded-xl border ${border} px-4 py-3 transition ${hoverBg} hover:-translate-y-0.5`}
+                >
+                  <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-base ${a.iconBg}`}>
+                    {a.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold ${txt}`}>{a.title}</p>
+                    <p className={`text-[11px] ${muted}`}>{a.sub}</p>
+                  </div>
+                  <span className={`text-base ${muted}`}>›</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Footer ───────────────────────────────────────────────────────── */}
+        <p className={`mt-6 text-xs font-medium ${subtler}`}>
+          Signed in as{" "}
+          <span className={`font-semibold ${txt}`}>{role}</span>
+          {email ? <> · {email}</> : null}
+        </p>
       </div>
-    </>
+    </div>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+/* ── Shared sub-components ──────────────────────────────────────────────────── */
 
-function KpiCard({ t, dark, gold, goldBg, goldBdr, href, label, value, sub, delta, deltaOk }: any) {
-  const inner = (
-    <div className={`group overflow-hidden rounded-xl border ${t.card} ${t.cardHover} p-5 transition-all duration-200 cursor-pointer`}>
-      {/* Gold top rule on hover */}
-      <div className="h-[2px] -mx-5 -mt-5 mb-5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{ background: `linear-gradient(90deg, transparent, ${gold}, transparent)` }} />
-
-      <div className={`text-[10px] font-bold uppercase tracking-[0.18em] ${t.muted} mb-3`}>{label}</div>
-      <div className={`text-3xl font-bold tracking-tight ${t.text} mb-4`} style={{ fontFamily: "Georgia, serif" }}>
-        {value}
-      </div>
-      <div className={`flex items-center justify-between border-t ${t.divider} pt-3`}>
-        <span className={`text-[11px] ${t.muted}`}>{sub}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border`}
-          style={{
-            color: deltaOk ? "#10b981" : "#f87171",
-            borderColor: deltaOk ? "rgba(16,185,129,0.25)" : "rgba(248,113,113,0.25)",
-            background: deltaOk ? "rgba(16,185,129,0.08)" : "rgba(248,113,113,0.08)",
-          }}>
-          {delta}
+function SectionHeader({ dark, border, txt, muted, pill, title, badge }: any) {
+  return (
+    <div className={`mb-4 flex items-center justify-between border-b ${border} pb-4`}>
+      <span className={`text-sm font-semibold ${txt}`}>{title}</span>
+      {badge && (
+        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${pill}`}>
+          {badge}
         </span>
-      </div>
+      )}
     </div>
   );
-  return href ? <Link href={href} className="block">{inner}</Link> : inner;
 }
 
-function SectionCard({ t, dark, gold, title, badge, action, children, href }: any) {
-  const inner = (
-    <div className={`rounded-xl border ${t.card} p-5 transition-all duration-200 h-full`}>
-      <div className={`mb-5 flex items-center justify-between border-b ${t.divider} pb-4`}>
-        <h2 className={`text-sm font-bold uppercase tracking-[0.12em] ${t.text}`}>{title}</h2>
-        {action ?? (badge
-          ? <span className={`rounded-full border ${t.tag} px-2.5 py-0.5 text-[10px] font-semibold`}>{badge}</span>
-          : null)}
-      </div>
-      {children}
-    </div>
-  );
-  return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
-}
-
-function ProgressBar({ t, dark, gold, label, value, pct, color }: any) {
+function ProgressRow({ dark, border, txt, muted, label, value, pct, color }: any) {
   return (
     <div className="mb-4 last:mb-0">
-      <div className={`mb-1.5 flex justify-between text-xs`}>
-        <span className={t.muted}>{label}</span>
-        <span className={`font-semibold ${t.text}`}>{value}</span>
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className={`text-xs font-medium ${muted}`}>{label}</span>
+        <span className={`text-xs font-semibold ${txt}`}>{value}</span>
       </div>
-      <div className={`h-1.5 rounded-full overflow-hidden ${t.bar}`}>
-        <div className={`h-full rounded-full ${progressWidthClass(pct)} transition-all duration-1000`}
-          style={{ background: color }} />
+      <div className={`h-1.5 overflow-hidden rounded-full ${dark ? "bg-white/8" : "bg-[#efe8de]"}`}>
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${progressWidthClass(pct)}`}
+          style={{ backgroundColor: color }}
+        />
       </div>
     </div>
   );
 }
 
-function MiniStat({ t, dark, label, value, color }: any) {
+function MiniStat({ dark, border, txt, muted, label, value, valueColor }: any) {
   return (
-    <div className={`rounded-lg border ${t.card} px-4 py-3`}>
-      <div className={`text-[10px] font-bold uppercase tracking-[0.1em] ${t.muted} mb-1`}>{label}</div>
-      <div className="text-2xl font-bold" style={{ color, fontFamily: "Georgia, serif" }}>{value}</div>
+    <div className={`rounded-xl border ${border} ${dark ? "bg-white/3" : "bg-[#f5f2ed]"} px-4 py-3`}>
+      <p className={`text-[10px] font-bold uppercase tracking-widest ${muted}`}>{label}</p>
+      <p className="mt-1 text-2xl font-semibold" style={{ color: valueColor }}>
+        {value}
+      </p>
     </div>
   );
 }
 
-function StoreRow({ t, dark, label, value, color, icon }: any) {
+function StoreRow({ dark, border, txt, muted, label, value, valueColor, icon, iconBg }: any) {
   return (
-    <div className={`flex items-center justify-between border-b ${t.divider} py-3.5 last:border-b-0`}>
+    <div className={`flex items-center justify-between border-b ${border} py-3.5 last:border-b-0`}>
       <div>
-        <div className={`text-[11px] font-bold uppercase tracking-[0.1em] ${t.muted}`}>{label}</div>
-        <div className="text-2xl font-bold mt-0.5" style={{ color, fontFamily: "Georgia, serif" }}>{value}</div>
+        <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${muted}`}>{label}</p>
+        <p className="mt-0.5 text-2xl font-semibold" style={{ color: valueColor }}>{value}</p>
       </div>
-      <div className="text-xl opacity-60">{icon}</div>
+      <div className={`grid h-10 w-10 place-items-center rounded-xl text-lg ${iconBg}`}>
+        {icon}
+      </div>
     </div>
-  );
-}
-
-function QuickAction({ t, dark, gold, href, title, sub, icon }: any) {
-  return (
-    <Link href={href}
-      className={`group mb-2.5 flex items-center gap-3 rounded-lg border ${t.card} ${t.cardHover} p-3.5 transition-all duration-200 last:mb-0`}>
-      <div className="text-lg w-8 text-center flex-shrink-0">{icon}</div>
-      <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold ${t.text}`}>{title}</div>
-        <div className={`text-[11px] ${t.muted} mt-0.5`}>{sub}</div>
-      </div>
-      <span className={`text-lg ${t.muted} group-hover:translate-x-0.5 transition-transform`}>›</span>
-    </Link>
   );
 }
