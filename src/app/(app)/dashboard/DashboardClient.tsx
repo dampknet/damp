@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
@@ -35,29 +36,30 @@ type ActivityItem = {
 function progressWidthClass(width: number) {
   const safe = Math.max(0, Math.min(100, width));
   const rounded = Math.round(safe / 5) * 5;
+
   switch (rounded) {
-    case 0:   return "w-0";
-    case 5:   return "w-[5%]";
-    case 10:  return "w-[10%]";
-    case 15:  return "w-[15%]";
-    case 20:  return "w-[20%]";
-    case 25:  return "w-[25%]";
-    case 30:  return "w-[30%]";
-    case 35:  return "w-[35%]";
-    case 40:  return "w-[40%]";
-    case 45:  return "w-[45%]";
-    case 50:  return "w-[50%]";
-    case 55:  return "w-[55%]";
-    case 60:  return "w-[60%]";
-    case 65:  return "w-[65%]";
-    case 70:  return "w-[70%]";
-    case 75:  return "w-[75%]";
-    case 80:  return "w-[80%]";
-    case 85:  return "w-[85%]";
-    case 90:  return "w-[90%]";
-    case 95:  return "w-[95%]";
+    case 0: return "w-0";
+    case 5: return "w-[5%]";
+    case 10: return "w-[10%]";
+    case 15: return "w-[15%]";
+    case 20: return "w-[20%]";
+    case 25: return "w-[25%]";
+    case 30: return "w-[30%]";
+    case 35: return "w-[35%]";
+    case 40: return "w-[40%]";
+    case 45: return "w-[45%]";
+    case 50: return "w-[50%]";
+    case 55: return "w-[55%]";
+    case 60: return "w-[60%]";
+    case 65: return "w-[65%]";
+    case 70: return "w-[70%]";
+    case 75: return "w-[75%]";
+    case 80: return "w-[80%]";
+    case 85: return "w-[85%]";
+    case 90: return "w-[90%]";
+    case 95: return "w-[95%]";
     case 100: return "w-full";
-    default:  return "w-0";
+    default: return "w-0";
   }
 }
 
@@ -79,337 +81,478 @@ export default function DashboardClient({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
 
-  // ── Exact navbar palette ──────────────────────────────────────────────────
-  const bg        = dark ? "bg-[#0d1117]"       : "bg-[#f5f2ed]";
-  const surface   = dark ? "bg-[#101720]"       : "bg-[#fffdf9]";
-  const border    = dark ? "border-white/8"      : "border-[#e7dfd4]";
-  const txt       = dark ? "text-slate-100"      : "text-[#1a1814]";
-  const muted     = dark ? "text-slate-500"      : "text-[#8b857c]";
-  const subtler   = dark ? "text-slate-600"      : "text-[#a09890]";
-  const hoverBg   = dark ? "hover:bg-white/5"   : "hover:bg-[#f5f2ed]";
-  const divider   = dark ? "divide-white/6"      : "divide-[#efe8de]";
-  const pill      = dark ? "bg-white/6 border-white/10 text-slate-400" : "bg-[#f5f2ed] border-[#e7dfd4] text-[#6b6560]";
-  const accent    = "#1d5fa8";  // the blue from your navbar
-  const accentHov = "#164a82";
-
   return (
-    <div className={`min-h-screen ${bg}`}>
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-
-        {/* ── Page header ──────────────────────────────────────────────────── */}
-        <div className={`mb-8 flex flex-col gap-4 border-b ${border} pb-6 lg:flex-row lg:items-end lg:justify-between`}>
+    <div
+      className={
+        dark
+          ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200"
+          : "min-h-screen bg-[#f5f2ed]"
+      }
+    >
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+        <div
+          className={
+            dark
+              ? "mb-8 flex flex-col gap-5 pb-7 lg:flex-row lg:items-end lg:justify-between"
+              : "mb-8 flex flex-col gap-5 border-b border-[#e0dbd2] pb-7 lg:flex-row lg:items-end lg:justify-between"
+          }
+        >
           <div>
-            <div className={`mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${muted}`}>
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Live · {dateLabel}
+            <div
+              className={
+                dark
+                  ? "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]"
+                  : "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"
+              }
+            >
+              ● Live · {dateLabel}
             </div>
-            <h1 className={`text-[28px] font-semibold tracking-tight ${txt}`}>
+
+            <h1
+              className={
+                dark
+                  ? "text-4xl font-semibold tracking-tight text-slate-50"
+                  : "text-4xl font-semibold tracking-tight text-[#1a1814]"
+              }
+            >
               Asset Dashboard
             </h1>
-            <p className={`mt-1 text-sm ${muted}`}>
-              Welcome back,{" "}
-              <span className={`font-semibold ${txt}`}>{displayName}</span>.
-              Here's a live summary of sites, assets and store activity.
+
+            <p
+              className={
+                dark
+                  ? "mt-2 text-sm font-medium text-slate-500"
+                  : "mt-2 text-sm font-medium text-[#8b857c]"
+              }
+            >
+              Welcome back, {displayName}. Here is a live summary of sites,
+              assets and store activity.
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link
               href="/sites"
-              className={`rounded-xl border ${border} ${surface} px-4 py-2 text-sm font-semibold ${txt} transition ${hoverBg}`}
+              onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
+              className={
+                dark
+                  ? "rounded-xl border border-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/25"
+                  : "rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] transition hover:border-[#4a4740]"
+              }
             >
               Go to Sites
             </Link>
+
             <Link
               href="/store"
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ backgroundColor: accent }}
+              onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
+              className={
+                dark
+                  ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_20px_rgba(59,130,246,0.3)] transition hover:opacity-95"
+                  : "rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2c2823]"
+              }
             >
               Go to Store
             </Link>
           </div>
         </div>
 
-        {/* ── KPI cards ────────────────────────────────────────────────────── */}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            {
-              href: "/sites",
-              label: "Total Sites",
-              value: String(stats.sites),
-              chip: `${stats.sites} total`,
-              chipOk: true,
-              meta: "registered in system",
-              bar: accent,
-            },
-            {
-              href: "/sites?group=status",
-              label: "Active / Down",
-              value: `${stats.sitesActive} / ${stats.sitesDown}`,
-              chip: `${stats.sitesDown} offline`,
-              chipOk: stats.sitesDown === 0,
-              meta: "view grouped status",
-              bar: "#10b981",
-            },
-            {
-              href: "/sites?group=tt",
-              label: "Air / Liquid",
-              value: `${stats.airSites} / ${stats.liquidSites}`,
-              chip: `${stats.airPct}% air`,
-              chipOk: true,
-              meta: "view grouped cooling",
-              bar: "#f59e0b",
-            },
-            {
-              href: "/sites?group=tower",
-              label: "KNET / GBC",
-              value: `${stats.knetSites} / ${stats.gbcSites}`,
-              chip: `${stats.knetPct}% KNET`,
-              chipOk: true,
-              meta: "view grouped towers",
-              bar: "#6366f1",
-            },
-          ].map((k) => (
-            <Link
-              key={k.label}
-              href={k.href}
-              className={`group relative overflow-hidden rounded-2xl border ${border} ${surface} p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
-            >
-              {/* coloured left edge */}
-              <div
-                className="absolute inset-y-0 left-0 w-0.75 rounded-l-2xl"
-                style={{ backgroundColor: k.bar }}
-              />
-              <div className={`pl-1 text-[11px] font-bold uppercase tracking-[0.14em] ${muted}`}>
-                {k.label}
-              </div>
-              <div className={`mt-2 text-[28px] font-semibold tracking-tight ${txt}`}>
-                {k.value}
-              </div>
-              <div className={`mt-3 flex items-center justify-between border-t ${border} pt-3`}>
-                <span className={`text-[11px] ${muted}`}>{k.meta}</span>
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                  style={
-                    k.chipOk
-                      ? { background: "rgba(16,185,129,0.1)", color: "#10b981" }
-                      : { background: "rgba(239,68,68,0.1)", color: "#ef4444" }
-                  }
-                >
-                  {k.chip}
-                </span>
-              </div>
-            </Link>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            dark={dark}
+            href="/sites"
+            label="Total Sites"
+            value={String(stats.sites)}
+            stripe={
+              dark
+                ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]"
+                : "bg-[#1d5fa8]"
+            }
+            tag={`${stats.sites} total`}
+            tagClass={
+              dark
+                ? "bg-[rgba(59,130,246,0.12)] text-[#60a5fa]"
+                : "bg-[#e8f0fb] text-[#1d5fa8]"
+            }
+            meta="registered in system"
+          />
+
+          <KpiCard
+            dark={dark}
+            href="/sites?group=status"
+            label="Active / Down"
+            value={`${stats.sitesActive} / ${stats.sitesDown}`}
+            stripe={
+              dark
+                ? "bg-[linear-gradient(90deg,#10b981,#34d399)]"
+                : "bg-[#2a7d52]"
+            }
+            tag={`${stats.sitesDown} offline`}
+            tagClass={
+              dark
+                ? "bg-[rgba(248,113,113,0.12)] text-[#f87171]"
+                : "bg-[#fdecea] text-[#c0392b]"
+            }
+            meta="view grouped status"
+          />
+
+          <KpiCard
+            dark={dark}
+            href="/sites?group=tt"
+            label="Air / Liquid"
+            value={`${stats.airSites} / ${stats.liquidSites}`}
+            stripe={
+              dark
+                ? "bg-[linear-gradient(90deg,#f59e0b,#fbbf24)]"
+                : "bg-[#b08b2c]"
+            }
+            tag={`${stats.airPct}% air`}
+            tagClass={
+              dark
+                ? "bg-[rgba(251,191,36,0.12)] text-[#fbbf24]"
+                : "bg-[#fdf6e3] text-[#b08b2c]"
+            }
+            meta="view grouped cooling"
+          />
+
+          <KpiCard
+            dark={dark}
+            href="/sites?group=tower"
+            label="KNET / GBC"
+            value={`${stats.knetSites} / ${stats.gbcSites}`}
+            stripe={
+              dark
+                ? "bg-[linear-gradient(90deg,#f97316,#fb923c)]"
+                : "bg-[#c8611a]"
+            }
+            tag={`${stats.knetPct}% KNET`}
+            tagClass={
+              dark
+                ? "bg-[rgba(249,115,22,0.12)] text-[#fb923c]"
+                : "bg-[#fdf0e6] text-[#c8611a]"
+            }
+            meta="view grouped towers"
+          />
         </div>
 
-        {/* ── Middle row ───────────────────────────────────────────────────── */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-
-          {/* Assets card */}
-          <Link
-            href="/assets"
-            className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
-          >
-            <SectionHeader dark={dark} border={border} txt={txt} muted={muted} pill={pill}
-              title="Assets" badge={`${stats.assets} total`} />
-            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
-              label="Utilisation" value={`${stats.assetUtilPct}%`}
-              pct={stats.assetUtilPct} color={accent} />
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <Card dark={dark} title="Assets" rightTag={`${stats.assets} total`} href="/assets">
+            <ProgressRow
+              dark={dark}
+              label="Utilization"
+              value={`${stats.assetUtilPct}%`}
+              width={stats.assetUtilPct}
+              fill={
+                dark
+                  ? "bg-[linear-gradient(90deg,#1d5fa8,#60a5fa)]"
+                  : "bg-[#1a1814]"
+              }
+            />
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <MiniStat dark={dark} border={border} txt={txt} muted={muted}
-                label="Registered Assets" value={String(stats.assets)} valueColor="#10b981" />
-              <MiniStat dark={dark} border={border} txt={txt} muted={muted}
-                label="Site Records" value={String(stats.sites)} valueColor="#f59e0b" />
+              <MiniStat
+                dark={dark}
+                label="Registered Assets"
+                value={String(stats.assets)}
+                valueClass="text-[#10b981]"
+              />
+              <MiniStat
+                dark={dark}
+                label="Site Records"
+                value={String(stats.sites)}
+                valueClass="text-[#f59e0b]"
+              />
             </div>
-          </Link>
+          </Card>
 
-          {/* Store card */}
-          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
-            <SectionHeader dark={dark} border={border} txt={txt} muted={muted} pill={pill}
-              title="Store" badge={`${stats.storeTotal} items`} />
-            <StoreRow dark={dark} border={border} txt={txt} muted={muted}
-              label="Received" value={String(stats.received)} valueColor="#10b981" icon="✓" iconBg={dark ? "bg-emerald-500/10" : "bg-emerald-50"} />
-            <StoreRow dark={dark} border={border} txt={txt} muted={muted}
-              label="Pending" value={String(stats.notReceived)} valueColor="#f97316" icon="⏳" iconBg={dark ? "bg-orange-500/10" : "bg-orange-50"} />
+          <Card dark={dark} title="Store" rightTag={`${stats.storeTotal} items`}>
+            <StoreRow
+              dark={dark}
+              label="Received"
+              value={String(stats.received)}
+              valueClass="text-[#10b981]"
+              icon="✓"
+              iconBg={dark ? "bg-[rgba(16,185,129,0.1)]" : "bg-[#ecfdf5]"}
+            />
+            <StoreRow
+              dark={dark}
+              label="Pending"
+              value={String(stats.notReceived)}
+              valueClass="text-[#f97316]"
+              icon="⏳"
+              iconBg={dark ? "bg-[rgba(249,115,22,0.1)]" : "bg-[#fff7ed]"}
+            />
+
             <div className="mt-4">
-              <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
-                label="Fulfilment rate" value={`${stats.receivedPct}%`}
-                pct={stats.receivedPct} color="#10b981" />
+              <ProgressRow
+                dark={dark}
+                label="Fulfilment rate"
+                value={`${stats.receivedPct}%`}
+                width={stats.receivedPct}
+                fill={
+                  dark
+                    ? "bg-[linear-gradient(90deg,#059669,#10b981)]"
+                    : "bg-[#2a7d52]"
+                }
+              />
             </div>
-          </div>
+          </Card>
 
-          {/* Site health card */}
-          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
-            <SectionHeader dark={dark} border={border} txt={txt} muted={muted} pill={pill}
-              title="Site Health" badge={`${stats.activePct}% up`} />
-            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
-              label="Active" value={`${stats.sitesActive} / ${stats.sites}`}
-              pct={stats.activePct} color="#10b981" />
-            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
-              label="Air-cooled" value={`${stats.airSites} / ${stats.sites}`}
-              pct={stats.airPct} color={accent} />
-            <ProgressRow dark={dark} border={border} txt={txt} muted={muted}
-              label="KNET" value={`${stats.knetSites} / ${stats.sites}`}
-              pct={stats.knetPct} color="#f97316" />
-          </div>
+          <Card dark={dark} title="Site Health" rightTag={`${stats.activePct}% up`}>
+            <ProgressRow
+              dark={dark}
+              label="Active"
+              value={`${stats.sitesActive} / ${stats.sites}`}
+              width={stats.activePct}
+              fill={
+                dark
+                  ? "bg-[linear-gradient(90deg,#059669,#10b981)]"
+                  : "bg-[#2a7d52]"
+              }
+            />
+            <ProgressRow
+              dark={dark}
+              label="Air-cooled"
+              value={`${stats.airSites} / ${stats.sites}`}
+              width={stats.airPct}
+              fill={
+                dark
+                  ? "bg-[linear-gradient(90deg,#1d5fa8,#3b82f6)]"
+                  : "bg-[#1d5fa8]"
+              }
+            />
+            <ProgressRow
+              dark={dark}
+              label="KNET"
+              value={`${stats.knetSites} / ${stats.sites}`}
+              width={stats.knetPct}
+              fill={
+                dark
+                  ? "bg-[linear-gradient(90deg,#ea6c00,#f97316)]"
+                  : "bg-[#c8611a]"
+              }
+            />
+          </Card>
         </div>
 
-        {/* ── Bottom row ───────────────────────────────────────────────────── */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
-
-          {/* Recent activity */}
-          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
-            <div className={`mb-4 flex items-center justify-between border-b ${border} pb-4`}>
-              <span className={`text-sm font-semibold ${txt}`}>Recent Activity</span>
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+          <Card
+            dark={dark}
+            title="Recent Activity"
+            action={
               <Link
                 href="/activity"
-                className="text-[11px] font-bold transition hover:opacity-70"
-                style={{ color: accent }}
+                onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
+                className={
+                  dark
+                    ? "text-xs font-bold text-[#f97316] hover:underline"
+                    : "text-xs font-bold text-[#c8611a] hover:underline"
+                }
               >
                 View all →
               </Link>
-            </div>
-            <div className={`divide-y ${divider}`}>
+            }
+            href="/activity"
+          >
+            <div className="space-y-1">
               {recentActivity.length === 0 ? (
-                <p className={`py-8 text-sm ${muted}`}>No recent activity yet.</p>
-              ) : recentActivity.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 py-3">
-                  <span
-                    className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: accent }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-semibold ${txt}`}>{item.title}</p>
-                    {item.details && (
-                      <p className={`mt-0.5 text-xs ${muted}`}>{item.details}</p>
-                    )}
-                    {item.actorEmail && (
-                      <p className={`mt-0.5 text-[11px] ${subtler}`}>
-                        by {item.actorEmail}
-                      </p>
-                    )}
-                  </div>
-                  <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${pill}`}>
-                    {item.createdAtLabel}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick actions */}
-          <div className={`rounded-2xl border ${border} ${surface} p-5 shadow-sm`}>
-            <div className={`mb-4 border-b ${border} pb-4`}>
-              <span className={`text-sm font-semibold ${txt}`}>Quick Actions</span>
-            </div>
-            <div className="space-y-2">
-              {[
-                {
-                  href: "/sites",
-                  title: "Go to Sites",
-                  sub: `Manage all ${stats.sites} sites`,
-                  icon: "🗺",
-                  iconBg: dark ? "bg-blue-500/10" : "bg-blue-50",
-                },
-                {
-                  href: "/store",
-                  title: "Go to Store",
-                  sub: `${stats.storeTotal} items · ${stats.notReceived} pending`,
-                  icon: "📦",
-                  iconBg: dark ? "bg-amber-500/10" : "bg-amber-50",
-                },
-                {
-                  href: "/sites?group=status",
-                  title: "Review Down Sites",
-                  sub: `${stats.sitesDown} currently offline`,
-                  icon: "⚠️",
-                  iconBg: dark ? "bg-red-500/10" : "bg-red-50",
-                },
-              ].map((a) => (
-                <Link
-                  key={a.href}
-                  href={a.href}
-                  className={`flex items-center gap-3 rounded-xl border ${border} px-4 py-3 transition ${hoverBg} hover:-translate-y-0.5`}
+                <div
+                  className={
+                    dark ? "py-8 text-sm text-slate-500" : "py-8 text-sm text-[#8b857c]"
+                  }
                 >
-                  <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-base ${a.iconBg}`}>
-                    {a.icon}
+                  No recent activity yet.
+                </div>
+              ) : (
+                recentActivity.map((item) => (
+                  <div
+                    key={item.id}
+                    className={
+                      dark
+                        ? "flex items-start gap-3 border-b border-white/6 py-3 last:border-b-0"
+                        : "flex items-start gap-3 border-b border-[#e9e2d8] py-3 last:border-b-0"
+                    }
+                  >
+                    <span
+                      className={
+                        dark
+                          ? "mt-1.5 h-2 w-2 rounded-full bg-[#f97316]"
+                          : "mt-1.5 h-2 w-2 rounded-full bg-[#c8611a]"
+                      }
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={
+                          dark
+                            ? "text-sm font-semibold text-slate-200"
+                            : "text-sm font-semibold text-[#1a1814]"
+                        }
+                      >
+                        {item.title}
+                      </div>
+                      {item.details ? (
+                        <div
+                          className={
+                            dark
+                              ? "mt-1 text-sm text-slate-500"
+                              : "mt-1 text-sm text-[#6f6a62]"
+                          }
+                        >
+                          {item.details}
+                        </div>
+                      ) : null}
+                      {item.actorEmail ? (
+                        <div
+                          className={
+                            dark
+                              ? "mt-1 text-xs font-medium text-slate-600"
+                              : "mt-1 text-xs font-medium text-[#9c9890]"
+                          }
+                        >
+                          By {item.actorEmail}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div
+                      className={
+                        dark
+                          ? "whitespace-nowrap rounded-md bg-white/5 px-2 py-1 text-xs font-semibold text-slate-500"
+                          : "whitespace-nowrap pt-0.5 text-xs font-semibold text-[#9c9890]"
+                      }
+                    >
+                      {item.createdAtLabel}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-semibold ${txt}`}>{a.title}</p>
-                    <p className={`text-[11px] ${muted}`}>{a.sub}</p>
-                  </div>
-                  <span className={`text-base ${muted}`}>›</span>
-                </Link>
-              ))}
+                ))
+              )}
             </div>
-          </div>
+          </Card>
+
+          <Card dark={dark} title="Quick Actions">
+            <QuickAction
+              dark={dark}
+              href="/sites"
+              title="Go to Sites"
+              subtitle={`Manage all ${stats.sites} sites`}
+              iconBg={dark ? "bg-[rgba(59,130,246,0.12)]" : "bg-[#e8f0fb]"}
+              iconColor="text-[#1d5fa8]"
+              icon="🗺"
+            />
+            <QuickAction
+              dark={dark}
+              href="/store"
+              title="Go to Store"
+              subtitle={`${stats.storeTotal} items · ${stats.notReceived} pending`}
+              iconBg={dark ? "bg-[rgba(245,158,11,0.12)]" : "bg-[#fdf6e3]"}
+              iconColor="text-[#b08b2c]"
+              icon="📦"
+            />
+            <QuickAction
+              dark={dark}
+              href="/sites?group=status"
+              title="Review Down Sites"
+              subtitle={`${stats.sitesDown} currently offline`}
+              iconBg={dark ? "bg-[rgba(248,113,113,0.12)]" : "bg-[#fdecea]"}
+              iconColor="text-[#c0392b]"
+              icon="⚠️"
+            />
+          </Card>
         </div>
 
-        {/* ── Footer ───────────────────────────────────────────────────────── */}
-        <p className={`mt-6 text-xs font-medium ${subtler}`}>
+        <div
+          className={
+            dark ? "mt-6 text-xs font-medium text-slate-600" : "mt-6 text-xs font-medium text-[#9c9890]"
+          }
+        >
           Signed in as{" "}
-          <span className={`font-semibold ${txt}`}>{role}</span>
-          {email ? <> · {email}</> : null}
-        </p>
+          <span
+            className={
+              dark ? "font-semibold text-slate-200" : "font-semibold text-[#1a1814]"
+            }
+          >
+            {role}
+          </span>
+          {email ? <> • {email}</> : null}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ── Shared sub-components ──────────────────────────────────────────────────── */
-
-function SectionHeader({ dark, border, txt, muted, pill, title, badge }: any) {
-  return (
-    <div className={`mb-4 flex items-center justify-between border-b ${border} pb-4`}>
-      <span className={`text-sm font-semibold ${txt}`}>{title}</span>
-      {badge && (
-        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${pill}`}>
-          {badge}
-        </span>
-      )}
+// Helper components remain exactly the same as provided in your prompt
+function KpiCard({ dark, href, label, value, stripe, tag, tagClass, meta }: any) {
+  const content = (
+    <div className={dark ? "overflow-hidden rounded-2xl border border-white/8 bg-white/5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
+      <div className={`h-1 ${stripe}`} />
+      <div className="p-5">
+        <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600" : "text-[11px] font-bold uppercase tracking-[0.12em] text-[#9c9890]"}>{label}</div>
+        <div className={dark ? "mt-3 text-3xl font-semibold tracking-tight text-slate-100" : "mt-3 text-3xl font-semibold tracking-tight text-[#1a1814]"}>{value}</div>
+        <div className={dark ? "mt-4 flex items-center gap-2 border-t border-white/6 pt-3" : "mt-4 flex items-center gap-2 border-t border-[#eee7dd] pt-3"}>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tagClass}`}>{tag}</span>
+          <span className={dark ? "text-xs font-medium text-slate-600" : "text-xs font-medium text-[#9c9890]"}>{meta}</span>
+        </div>
+      </div>
     </div>
   );
+  return href ? <Link href={href} className="block">{content}</Link> : content;
 }
 
-function ProgressRow({ dark, border, txt, muted, label, value, pct, color }: any) {
+function Card({ dark, title, rightTag, action, children, href }: any) {
+  const content = (
+    <div className={dark ? "rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-white/6" : "rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className={dark ? "text-lg font-semibold tracking-tight text-slate-100" : "text-lg font-semibold tracking-tight text-[#1a1814]"}>{title}</div>
+        {action ? action : rightTag ? <span className={dark ? "rounded-full border border-white/8 bg-white/6 px-2.5 py-1 text-[11px] font-bold text-slate-500" : "rounded-full bg-[#f1ece4] px-2.5 py-1 text-[11px] font-bold text-[#5b564d]"}>{rightTag}</span> : null}
+      </div>
+      {children}
+    </div>
+  );
+  return href ? <Link href={href} className="block">{content}</Link> : content;
+}
+
+function ProgressRow({ dark, label, value, width, fill }: any) {
   return (
     <div className="mb-4 last:mb-0">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className={`text-xs font-medium ${muted}`}>{label}</span>
-        <span className={`text-xs font-semibold ${txt}`}>{value}</span>
+        <span className={dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"}>{label}</span>
+        <span className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>{value}</span>
       </div>
-      <div className={`h-1.5 overflow-hidden rounded-full ${dark ? "bg-white/8" : "bg-[#efe8de]"}`}>
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${progressWidthClass(pct)}`}
-          style={{ backgroundColor: color }}
-        />
+      <div className={dark ? "h-2 overflow-hidden rounded-full bg-white/8" : "h-2 overflow-hidden rounded-full bg-[#eee7dd]"}>
+        <div className={`h-full rounded-full ${fill} ${progressWidthClass(width)}`} />
       </div>
     </div>
   );
 }
 
-function MiniStat({ dark, border, txt, muted, label, value, valueColor }: any) {
+function MiniStat({ dark, label, value, valueClass }: any) {
   return (
-    <div className={`rounded-xl border ${border} ${dark ? "bg-white/3" : "bg-[#f5f2ed]"} px-4 py-3`}>
-      <p className={`text-[10px] font-bold uppercase tracking-widest ${muted}`}>{label}</p>
-      <p className="mt-1 text-2xl font-semibold" style={{ color: valueColor }}>
-        {value}
-      </p>
+    <div className={dark ? "rounded-xl border border-white/6 bg-white/3 px-4 py-3" : "rounded-xl bg-[#f5f2ed] px-4 py-3"}>
+      <div className={dark ? "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600" : "text-[11px] font-bold uppercase tracking-[0.08em] text-[#9c9890]"}>{label}</div>
+      <div className={`mt-1 text-2xl font-semibold tracking-tight ${valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")}`}>{value}</div>
     </div>
   );
 }
 
-function StoreRow({ dark, border, txt, muted, label, value, valueColor, icon, iconBg }: any) {
+function StoreRow({ dark, label, value, valueClass, icon, iconBg }: any) {
   return (
-    <div className={`flex items-center justify-between border-b ${border} py-3.5 last:border-b-0`}>
+    <div className={dark ? "flex items-center justify-between border-b border-white/6 py-3 last:border-b-0" : "flex items-center justify-between border-b border-[#eee7dd] py-3 last:border-b-0"}>
       <div>
-        <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${muted}`}>{label}</p>
-        <p className="mt-0.5 text-2xl font-semibold" style={{ color: valueColor }}>{value}</p>
+        <div className={dark ? "text-sm font-medium text-slate-500" : "text-sm font-medium text-[#5d584f]"}>{label}</div>
+        <div className={`text-xl font-semibold tracking-tight ${valueClass ?? (dark ? "text-slate-100" : "text-[#1a1814]")}`}>{value}</div>
       </div>
-      <div className={`grid h-10 w-10 place-items-center rounded-xl text-lg ${iconBg}`}>
-        {icon}
-      </div>
+      {icon ? <div className={`grid h-11 w-11 place-items-center rounded-xl ${iconBg ?? ""}`}><span className="text-lg">{icon}</span></div> : null}
     </div>
+  );
+}
+
+function QuickAction({ dark, href, title, subtitle, iconBg, iconColor, icon }: any) {
+  return (
+    <Link href={href} className={dark ? "mb-3 flex items-center gap-3 rounded-xl border border-white/7 bg-white/4 p-4 transition hover:border-white/14 hover:bg-white/8 last:mb-0" : "mb-3 flex items-center gap-3 rounded-xl border border-[#e0dbd2] bg-white p-4 transition hover:border-[#6b655d] hover:bg-[#faf8f4] last:mb-0"}>
+      <div className={`grid h-10 w-10 place-items-center rounded-xl ${iconBg}`}><span className={`text-base ${iconColor}`}>{icon}</span></div>
+      <div className="min-w-0 flex-1">
+        <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>{title}</div>
+        <div className={dark ? "mt-0.5 text-xs font-medium text-slate-600" : "mt-0.5 text-xs font-medium text-[#8b857c]"}>{subtitle}</div>
+      </div>
+      <span className={dark ? "text-lg text-slate-600" : "text-lg text-[#9c9890]"}>›</span>
+    </Link>
   );
 }
