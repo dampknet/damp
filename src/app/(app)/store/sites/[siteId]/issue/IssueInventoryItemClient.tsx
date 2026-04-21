@@ -42,8 +42,11 @@ export default function IssueInventoryItemClient({
   const [bucket, setBucket] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const scanBuffer = useRef("");
-  const lastKeyTime = useRef(0);
+  const scanBuffer       = useRef("");   // accumulates keystrokes within one burst
+  const assembledScan    = useRef("");   // accumulates across multiple bursts for multi-part QR
+  const lastKeyTime      = useRef(0);   // time of last keystroke (detects burst boundaries)
+  const lastEnterTime    = useRef(0);   // time of last Enter (detects inter-burst gap)
+  const assembleTimer    = useRef<ReturnType<typeof setTimeout> | null>(null); // flush timer
 
   // ─────────────────────────────────────────────────────────────────
   // SMART UNIVERSAL BARCODE / QR-CODE PARSER
@@ -309,25 +312,85 @@ export default function IssueInventoryItemClient({
     setIsSearching(false);
   };
 
-  // ✅ SYBLE SCANNER LISTENER
+  // ✅ SYBLE SCANNER LISTENER — MULTI-BURST ASSEMBLER
+  //
+  // Problem: the Syble gun splits long QR codes (like Rohde & Schwarz angle-bracket
+  // format) into multiple rapid bursts, each terminated by Enter. So what should
+  // be one scan arrives as e.g.:
+  //   burst 1 → "<Rohde &"         Enter
+  //   burst 2 → " Schwarz><2501…>" Enter
+  //   burst 3 → "<UHF AMPLIFIER>"  Enter
+  //   … etc.
+  //
+  // Fix: after each Enter, check if the assembled string so far looks "complete"
+  // (balanced angle-brackets, or no angle-brackets at all). If incomplete, append
+  // and keep waiting. A 400 ms silence after the last Enter flushes whatever we
+  // have accumulated so far.
   useEffect(() => {
+    const isComplete = (s: string): boolean => {
+      // If it contains angle-bracket QR data, wait until brackets are balanced
+      if (s.includes("<") || s.includes(">")) {
+        const opens  = (s.match(/</g) ?? []).length;
+        const closes = (s.match(/>/g) ?? []).length;
+        // R&S format typically has ≥5 bracket pairs; treat as complete when balanced
+        // and we have at least the first two fields (manufacturer + model/serial)
+        return opens >= 2 && opens === closes;
+      }
+      // No angle-brackets → single-burst scan, always complete
+      return true;
+    };
+
+    const flush = () => {
+      const full = assembledScan.current.trim();
+      assembledScan.current = "";
+      scanBuffer.current    = "";
+      if (full.length > 3) {
+        console.log("[Scanner] Flushing assembled scan:", full);
+        handleLocalScanMatch(full);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 100) scanBuffer.current = "";
-      lastKeyTime.current = currentTime;
+      const now = Date.now();
+
+      // If there's been a long gap (>600 ms) since any keystroke, start fresh
+      if (now - lastKeyTime.current > 600) {
+        scanBuffer.current    = "";
+        assembledScan.current = "";
+      }
+      lastKeyTime.current = now;
 
       if (e.key === "Enter") {
-        if (scanBuffer.current.length > 3) {
-          e.preventDefault();
-          handleLocalScanMatch(scanBuffer.current);
-          scanBuffer.current = "";
+        // Clear any pending flush timer — we'll decide below
+        if (assembleTimer.current) clearTimeout(assembleTimer.current);
+
+        const burst = scanBuffer.current;
+        scanBuffer.current = "";
+
+        if (burst.length === 0) return;
+        e.preventDefault();
+
+        // Append this burst to the assembled scan
+        assembledScan.current += burst;
+        lastEnterTime.current  = now;
+
+        if (isComplete(assembledScan.current)) {
+          // Balanced — fire immediately
+          flush();
+        } else {
+          // Not yet complete — wait up to 400 ms for the next burst
+          assembleTimer.current = setTimeout(flush, 400);
         }
       } else if (e.key.length === 1) {
         scanBuffer.current += e.key;
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (assembleTimer.current) clearTimeout(assembleTimer.current);
+    };
   }, [bucket, items]);
 
   // ✅ CAMERA SCANNER EFFECT
