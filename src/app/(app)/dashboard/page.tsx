@@ -8,24 +8,26 @@ function percent(part: number, total: number) {
 }
 
 function formatRelative(date: Date) {
-  const diffMs = Date.now() - date.getTime();
-  const mins = Math.floor(diffMs / (1000 * 60));
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffMs  = Date.now() - date.getTime();
+  const mins    = Math.floor(diffMs / (1000 * 60));
+  const hours   = Math.floor(diffMs / (1000 * 60 * 60));
+  const days    = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins  < 1)  return "just now";
+  if (mins  < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return "yesterday";
+  if (days  === 1) return "yesterday";
   return `${days}d ago`;
 }
 
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
-  const role = profile?.role ?? "VIEWER";
+  const role    = profile?.role ?? "VIEWER";
 
-  // Generate dynamic date label: e.g., "April 2026"
-  const dateLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const dateLabel = new Date().toLocaleString("en-US", {
+    month: "long",
+    year:  "numeric",
+  });
 
   const [
     sites,
@@ -40,6 +42,7 @@ export default async function DashboardPage() {
     received,
     notReceived,
     recentActivityRaw,
+    inventorySites,   // ✅ NEW — for the store card
   ] = await Promise.all([
     prisma.site.count(),
     prisma.site.count({ where: { status: "ACTIVE" } }),
@@ -56,23 +59,45 @@ export default async function DashboardPage() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
+    // ✅ Fetch inventory sites with item counts
+    prisma.inventorySite.findMany({
+      where:   { isDeleted: false },
+      orderBy: { name: "asc" },
+      select: {
+        id:   true,
+        name: true,
+        _count: { select: { items: { where: { isDeleted: false } } } },
+      },
+    }),
   ]);
 
-  const activePct = percent(sitesActive, sites);
-  const airPct = percent(airSites, sites);
-  const knetPct = percent(knetSites, sites);
-  const receivedPct = percent(received, storeTotal);
+  const activePct    = percent(sitesActive, sites);
+  const airPct       = percent(airSites, sites);
+  const knetPct      = percent(knetSites, sites);
+  const receivedPct  = percent(received, storeTotal);
   const assetUtilPct = assets > 0 ? 100 : 0;
 
   const displayName =
     profile?.fullName?.trim() || profile?.email?.split("@")[0] || "User";
 
   const recentActivity = recentActivityRaw.map((item) => ({
-    id: item.id,
-    title: item.title,
-    details: item.details ?? null,
-    actorEmail: item.actorEmail ?? null,
+    id:             item.id,
+    title:          item.title,
+    details:        item.details ?? null,
+    actorEmail:     item.actorEmail ?? null,
     createdAtLabel: formatRelative(item.createdAt),
+  }));
+
+  // ✅ Total items across all inventory sites
+  const totalInventoryItems = inventorySites.reduce(
+    (sum, s) => sum + s._count.items,
+    0
+  );
+
+  const inventorySiteCards = inventorySites.map((s) => ({
+    id:        s.id,
+    name:      s.name,
+    itemCount: s._count.items,
   }));
 
   return (
@@ -98,7 +123,9 @@ export default async function DashboardPage() {
         knetPct,
         receivedPct,
         assetUtilPct,
+        totalInventoryItems,   // ✅ NEW
       }}
+      inventorySiteCards={inventorySiteCards}  // ✅ NEW
       recentActivity={recentActivity}
     />
   );

@@ -16,122 +16,100 @@ export default async function SiteRestockLogPage({
 }) {
   const { siteId } = await params;
   const sp = (await searchParams) ?? {};
-  const q = (sp.q ?? "").trim();
+  const q  = (sp.q ?? "").trim();
 
-  const profile = await getCurrentProfile();
-  const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const profile  = await getCurrentProfile();
+  const role     = profile?.role ?? "VIEWER";
+  const canEdit  = role === "ADMIN" || role === "EDITOR";
 
   const site = await prisma.inventorySite.findUnique({
-    where: { id: siteId },
-    select: {
-      id: true,
-      name: true,
-      location: true,
-      description: true,
-    },
+    where:  { id: siteId },
+    select: { id: true, name: true, location: true, description: true },
   });
-
   if (!site) return notFound();
 
   const rawRestocks = await prisma.inventoryRestock.findMany({
     where: {
       inventorySiteId: siteId,
-      ...(q
-        ? {
-            OR: [
-              { supplier: { contains: q, mode: "insensitive" } },
-              { receivedBy: { contains: q, mode: "insensitive" } },
-              { note: { contains: q, mode: "insensitive" } },
-              {
-                inventoryItem: {
-                  name: { contains: q, mode: "insensitive" },
-                },
+      ...(q ? {
+        OR: [
+          { supplier:    { contains: q, mode: "insensitive" } },
+          { receivedBy:  { contains: q, mode: "insensitive" } },
+          { note:        { contains: q, mode: "insensitive" } },
+          { inventoryItem: { name:     { contains: q, mode: "insensitive" } } },
+          { inventoryItem: { itemCode: { contains: q, mode: "insensitive" } } },
+          {
+            inventoryItem: {
+              instances: {
+                some: { entityCode: { contains: q, mode: "insensitive" } },
               },
-              {
-                inventoryItem: {
-                  stockNumber: { contains: q, mode: "insensitive" },
-                },
-              },
-              // ✅ Updated: Search through individual unit serials
-              {
-                inventoryItem: {
-                  instances: {
-                    some: { serialNumber: { contains: q, mode: "insensitive" } }
-                  }
-                }
-              }
-            ],
-          }
-        : {}),
+            },
+          },
+        ],
+      } : {}),
     },
     orderBy: { dateReceived: "desc" },
     select: {
-      id: true,
+      id:           true,
       quantityAdded: true,
-      dateBought: true,
+      dateBought:   true,
       dateReceived: true,
-      supplier: true,
-      receivedBy: true,
-      note: true,
+      supplier:     true,
+      receivedBy:   true,
+      note:         true,
       inventoryItem: {
         select: {
-          id: true,
-          name: true,
+          id:       true,
+          name:     true,
           itemType: true,
-          stockNumber: true,
-          unit: true,
-          // ✅ Updated: Fetch unit instances to replace old column
+          itemCode: true,
+          unit:     true,
           instances: {
-            select: { serialNumber: true }
-          }
+            select:  { entityCode: true },
+            take:    3,
+            orderBy: { createdAt: "asc" },
+          },
         },
       },
     },
   });
 
-  // ✅ Mapping to keep your existing Client UI logic working perfectly
-  const restocks = rawRestocks.map(row => ({
+  const restocks = rawRestocks.map((row) => ({
     ...row,
     inventoryItem: {
       ...row.inventoryItem,
-      serialNumber: row.inventoryItem.instances.map(i => i.serialNumber).join(", ") || "-"
-    }
+      entityCodePreview:
+        row.inventoryItem.instances.map((i) => i.entityCode).join(", ") || "-",
+    },
   }));
 
-  const totalRestocks = await prisma.inventoryRestock.count({
-    where: { inventorySiteId: siteId },
-  });
-
-  const totalQuantityAdded = restocks.reduce(
-    (sum, row) => sum + row.quantityAdded,
-    0
-  );
+  const totalRestocks      = await prisma.inventoryRestock.count({ where: { inventorySiteId: siteId } });
+  const totalQuantityAdded = restocks.reduce((sum, r) => sum + r.quantityAdded, 0);
 
   const exportRows = restocks.map((row, index) => ({
-    No: index + 1,
-    Item: row.inventoryItem.name,
-    Type: row.inventoryItem.itemType,
-    "Stock No": row.inventoryItem.stockNumber ?? "",
-    "Quantity Added": `${row.quantityAdded}${row.inventoryItem.unit ? ` ${row.inventoryItem.unit}` : ""}`,
-    "Date Bought": row.dateBought?.toISOString() ?? "",
+    No:              index + 1,
+    Item:            row.inventoryItem.name,
+    Type:            row.inventoryItem.itemType,
+    "Item Code":     row.inventoryItem.itemCode ?? "",
+    "Quantity Added":`${row.quantityAdded}${row.inventoryItem.unit ? ` ${row.inventoryItem.unit}` : ""}`,
+    "Date Bought":   row.dateBought?.toISOString() ?? "",
     "Date Received": row.dateReceived.toISOString(),
-    Supplier: row.supplier ?? "",
-    "Received By": row.receivedBy ?? "",
-    Note: row.note ?? "",
+    Supplier:        row.supplier ?? "",
+    "Received By":   row.receivedBy ?? "",
+    Note:            row.note ?? "",
   }));
 
   const exportCols = [
-    { key: "No", label: "No" },
-    { key: "Item", label: "Item" },
-    { key: "Type", label: "Type" },
-    { key: "Stock No", label: "Stock No" },
+    { key: "No",             label: "No" },
+    { key: "Item",           label: "Item" },
+    { key: "Type",           label: "Type" },
+    { key: "Item Code",      label: "Item Code" },
     { key: "Quantity Added", label: "Quantity Added" },
-    { key: "Date Bought", label: "Date Bought" },
-    { key: "Date Received", label: "Date Received" },
-    { key: "Supplier", label: "Supplier" },
-    { key: "Received By", label: "Received By" },
-    { key: "Note", label: "Note" },
+    { key: "Date Bought",    label: "Date Bought" },
+    { key: "Date Received",  label: "Date Received" },
+    { key: "Supplier",       label: "Supplier" },
+    { key: "Received By",    label: "Received By" },
+    { key: "Note",           label: "Note" },
   ];
 
   return (

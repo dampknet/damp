@@ -29,7 +29,7 @@ export default async function InventorySitePage({
           name:         true,
           itemType:     true,
           description:  true,
-          itemCode:     true,       // ✅ replaces stockNumber
+          itemCode:     true,
           manufacturer: true,
           model:        true,
           quantity:     true,
@@ -40,7 +40,7 @@ export default async function InventorySitePage({
           instances: {
             select: {
               id:         true,
-              entityCode: true,     // ✅ replaces serialNumber
+              entityCode: true,
               status:     true,
               condition:  true,
             },
@@ -52,30 +52,40 @@ export default async function InventorySitePage({
 
   if (!site) return notFound();
 
-  // Derive condition from first instance, fallback to NEW
   const itemsWithCondition = site.items.map((item) => ({
     ...item,
     condition: item.instances[0]?.condition ?? "NEW",
   }));
 
   const summary = {
-    totalItems:     String(site.items.length),
-    materialCount:  String(site.items.filter((i) =>
-      i.itemType === "GENERAL" ||
-      i.itemType === "ACCESSORIES" ||
-      i.itemType === "TOOLS_AND_PARTS" ||
-      i.itemType === "CABLES_AND_ELECTRONICS"
-    ).length),
-    equipmentCount: String(site.items.filter((i) =>
-      i.itemType === "EQUIPMENT" ||
-      i.itemType === "COOLING_INFRASTRUCTURE"
-    ).length),
-    lowStockCount:  String(site.items.filter((i) =>
-      i.status === "LOW_STOCK" || i.status === "OUT_OF_STOCK"
-    ).length),
-    checkedOutCount: String(site.items.filter((i) =>
-      i.status === "CHECKED_OUT"
-    ).length),
+    totalItems: String(site.items.length),
+
+    // ✅ Equipment ONLY — matches the store dashboard count exactly
+    equipmentCount: String(
+      site.items.filter((i) => i.itemType === "EQUIPMENT").length
+    ),
+
+    // ✅ Everything else = "Other Items"
+    materialCount: String(
+      site.items.filter(
+        (i) =>
+          i.itemType === "ACCESSORIES" ||
+          i.itemType === "TOOLS_AND_PARTS" ||
+          i.itemType === "GENERAL" ||
+          i.itemType === "COOLING_INFRASTRUCTURE" ||
+          i.itemType === "CABLES_AND_ELECTRONICS"
+      ).length
+    ),
+
+    lowStockCount: String(
+      site.items.filter(
+        (i) => i.status === "LOW_STOCK" || i.status === "OUT_OF_STOCK"
+      ).length
+    ),
+
+    checkedOutCount: String(
+      site.items.filter((i) => i.status === "CHECKED_OUT").length
+    ),
   };
 
   return (

@@ -6,6 +6,11 @@ import { logActivity } from "@/lib/activity";
 import type { InventoryItemStatus, InventoryItemType } from "@prisma/client";
 import EditInventoryItemClient from "./EditInventoryItemClient";
 
+const VALID_TYPES = [
+  "EQUIPMENT","ACCESSORIES","TOOLS_AND_PARTS",
+  "GENERAL","COOLING_INFRASTRUCTURE","CABLES_AND_ELECTRONICS",
+];
+
 export default async function EditInventoryItemPage({
   params,
 }: {
@@ -25,25 +30,28 @@ export default async function EditInventoryItemPage({
   });
   if (!site) return notFound();
 
+  // ✅ Capture before server action closure
+  const siteName = site.name;
+
   const item = await prisma.inventoryItem.findFirst({
     where:  { id: itemId, inventorySiteId: siteId },
     select: {
-      id:              true,
-      itemType:        true,
-      name:            true,
-      description:     true,
-      itemCode:        true,
-      manufacturer:    true,
-      model:           true,
-      quantity:        true,
-      uncountable:     true,
-      unit:            true,
-      reorderLevel:    true,
+      id:               true,
+      itemType:         true,
+      name:             true,
+      description:      true,
+      itemCode:         true,
+      manufacturer:     true,
+      model:            true,
+      quantity:         true,
+      uncountable:      true,
+      unit:             true,
+      reorderLevel:     true,
       targetStockLevel: true,
-      status:          true,
+      status:           true,
       instances: {
-        select: { condition: true },
-        take:   1,
+        select:  { condition: true },
+        take:    1,
         orderBy: { createdAt: "asc" },
       },
     },
@@ -55,22 +63,25 @@ export default async function EditInventoryItemPage({
     condition: item.instances[0]?.condition ?? "NEW",
   };
 
+  // ✅ Capture item name for logging
+  const originalName   = safeItem.name;
+  const originalItemId = safeItem.id;
+
   async function updateInventoryItem(formData: FormData) {
     "use server";
 
-    const itemTypeRaw        = String(formData.get("itemType")        ?? "").trim();
-    const name               = String(formData.get("name")            ?? "").trim();
-    const description        = String(formData.get("description")     ?? "").trim();
-    const itemCode           = String(formData.get("itemCode")        ?? "").trim();
-    const manufacturer       = String(formData.get("manufacturer")    ?? "").trim();
-    const model              = String(formData.get("model")           ?? "").trim();
-    const quantityRaw        = String(formData.get("quantity")        ?? "").trim();
-    const unit               = String(formData.get("unit")            ?? "").trim();
-    const reorderLevelRaw    = String(formData.get("reorderLevel")    ?? "").trim();
-    const targetStockRaw     = String(formData.get("targetStockLevel") ?? "").trim();
-    const statusRaw          = String(formData.get("status")          ?? "AVAILABLE").trim();
+    const itemTypeRaw     = String(formData.get("itemType")         ?? "").trim();
+    const name            = String(formData.get("name")             ?? "").trim();
+    const description     = String(formData.get("description")      ?? "").trim();
+    const itemCode        = String(formData.get("itemCode")         ?? "").trim();
+    const manufacturer    = String(formData.get("manufacturer")     ?? "").trim();
+    const model           = String(formData.get("model")            ?? "").trim();
+    const quantityRaw     = String(formData.get("quantity")         ?? "").trim();
+    const unit            = String(formData.get("unit")             ?? "").trim();
+    const reorderRaw      = String(formData.get("reorderLevel")     ?? "").trim();
+    const targetStockRaw  = String(formData.get("targetStockLevel") ?? "").trim();
+    const statusRaw       = String(formData.get("status")           ?? "AVAILABLE").trim();
 
-    const VALID_TYPES = ["EQUIPMENT","ACCESSORIES","TOOLS_AND_PARTS","GENERAL","COOLING_INFRASTRUCTURE","CABLES_AND_ELECTRONICS"];
     const itemType = VALID_TYPES.includes(itemTypeRaw) ? itemTypeRaw : "GENERAL";
 
     if (!name) {
@@ -78,8 +89,8 @@ export default async function EditInventoryItemPage({
     }
 
     const quantity    = quantityRaw   === "" ? 0    : Number(quantityRaw);
-    const reorder     = reorderLevelRaw === "" ? 0  : Number(reorderLevelRaw);
-    const targetStock = targetStockRaw  === "" ? null : Number(targetStockRaw);
+    const reorder     = reorderRaw    === "" ? 0    : Number(reorderRaw);
+    const targetStock = targetStockRaw === "" ? null : Number(targetStockRaw);
 
     const validStatuses = ["AVAILABLE","LOW_STOCK","OUT_OF_STOCK","CHECKED_OUT","INACTIVE"];
     const preferredStatus = validStatuses.includes(statusRaw) ? (statusRaw as InventoryItemStatus) : null;
@@ -90,10 +101,10 @@ export default async function EditInventoryItemPage({
       preferredStatus,
     });
 
-    // If item code changed, check it's not taken by another item
+    // Check item code uniqueness if changed
     if (itemCode && itemCode !== safeItem.itemCode) {
       const existing = await prisma.inventoryItem.findFirst({
-        where: { itemCode, NOT: { id: itemId } },
+        where:  { itemCode, NOT: { id: itemId } },
         select: { id: true },
       });
       if (existing) {
@@ -105,24 +116,24 @@ export default async function EditInventoryItemPage({
       const updated = await prisma.inventoryItem.update({
         where: { id: itemId },
         data: {
-          itemType:        itemType as InventoryItemType,
+          itemType:         itemType as InventoryItemType,
           name,
-          description:     description  || null,
-          itemCode:        itemCode      || null,
-          manufacturer:    manufacturer  || null,
-          model:           model         || null,
-          quantity:        Math.trunc(quantity),
-          unit:            unit           || null,
-          reorderLevel:    Math.trunc(reorder),
+          description:      description    || null,
+          itemCode:         itemCode       || null,
+          manufacturer:     manufacturer   || null,
+          model:            model          || null,
+          quantity:         Math.trunc(quantity),
+          unit:             unit           || null,
+          reorderLevel:     Math.trunc(reorder),
           targetStockLevel: targetStock === null ? null : Math.trunc(targetStock),
-          status:          finalStatus,
+          status:           finalStatus,
         },
       });
 
       await logActivity({
         type:       "INVENTORY_ITEM_UPDATED",
         title:      `Updated: ${updated.name}`,
-        details:    `Site: ${site.name}. Code: ${updated.itemCode ?? "—"}. Status: ${updated.status}.`,
+        details:    `Site: ${siteName}. Code: ${updated.itemCode ?? "—"}. Status: ${updated.status}.`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
         entityId:   updated.id,

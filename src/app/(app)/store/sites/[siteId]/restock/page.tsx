@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
+import { generateItemCode } from "@/lib/inventory-upload";
 import RestockInventoryItemClient from "./RestockInventoryItemClient";
 
 export default async function RestockInventoryItemPage({
@@ -12,9 +13,9 @@ export default async function RestockInventoryItemPage({
 }) {
   const { siteId } = await params;
 
-  const profile  = await getCurrentProfile();
-  const role     = profile?.role ?? "VIEWER";
-  const canEdit  = role === "ADMIN" || role === "EDITOR";
+  const profile = await getCurrentProfile();
+  const role    = profile?.role ?? "VIEWER";
+  const canEdit = role === "ADMIN" || role === "EDITOR";
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
@@ -24,20 +25,23 @@ export default async function RestockInventoryItemPage({
   });
   if (!site) return notFound();
 
+  // ✅ Capture before server action closure
+  const siteName = site.name;
+
   const rawItems = await prisma.inventoryItem.findMany({
     where:   { inventorySiteId: siteId, isDeleted: false, status: { not: "INACTIVE" } },
     orderBy: { name: "asc" },
     select: {
-      id:              true,
-      name:            true,
-      itemType:        true,
-      itemCode:        true,
-      quantity:        true,
-      uncountable:     true,
-      unit:            true,
-      reorderLevel:    true,
+      id:               true,
+      name:             true,
+      itemType:         true,
+      itemCode:         true,
+      quantity:         true,
+      uncountable:      true,
+      unit:             true,
+      reorderLevel:     true,
       targetStockLevel: true,
-      status:          true,
+      status:           true,
       instances: {
         select:  { entityCode: true },
         take:    3,
@@ -108,35 +112,41 @@ export default async function RestockInventoryItemPage({
       preferredStatus: item.status === "INACTIVE" ? "INACTIVE" : null,
     });
 
+    // ✅ Capture primitives for closure
+    const capturedItemId   = item.id;
+    const capturedItemName = item.name;
+    const capturedItemCode = item.itemCode;
+    const capturedUnit     = item.unit;
+
     try {
       const result = await prisma.$transaction(async (tx) => {
         const restock = await tx.inventoryRestock.create({
           data: {
-            inventoryItemId: item.id,
+            inventoryItemId: capturedItemId,
             inventorySiteId: siteId,
             quantityAdded:   Math.trunc(quantityAdded),
             dateBought,
             dateReceived,
-            supplier:        supplier    || null,
-            receivedBy:      receivedBy  || null,
-            note:            note        || null,
+            supplier:        supplier   || null,
+            receivedBy:      receivedBy || null,
+            note:            note       || null,
           },
         });
 
         const updated = await tx.inventoryItem.update({
-          where: { id: item.id },
+          where: { id: capturedItemId },
           data:  { quantity: nextQty, status: nextStatus },
         });
 
-        // Generate entity code slots for the restocked quantity
+        // Generate entity code slots for restocked units
         const existingCount = await tx.assetInstance.count({
-          where: { inventoryItemId: item.id },
+          where: { inventoryItemId: capturedItemId },
         });
 
         await tx.assetInstance.createMany({
           data: Array.from({ length: Math.trunc(quantityAdded) }).map((_, i) => ({
-            inventoryItemId: item.id,
-            entityCode:      `${item.itemCode ?? item.id.slice(-6)}-${String(existingCount + i + 1).padStart(2, "0")}`,
+            inventoryItemId: capturedItemId,
+            entityCode:      `${capturedItemCode ?? capturedItemId.slice(-6)}-${String(existingCount + i + 1).padStart(2, "0")}`,
             status:          "AVAILABLE" as const,
             condition:       "USED" as const,
           })),
@@ -149,7 +159,7 @@ export default async function RestockInventoryItemPage({
       await logActivity({
         type:       "INVENTORY_RESTOCK_ADDED",
         title:      `Restock: ${result.updated.name}`,
-        details:    `+${Math.trunc(quantityAdded)}${result.updated.unit ? ` ${result.updated.unit}` : ""} at ${site.name}. New qty: ${result.updated.quantity}.`,
+        details:    `+${Math.trunc(quantityAdded)}${capturedUnit ? ` ${capturedUnit}` : ""} at ${siteName}. New qty: ${result.updated.quantity}.`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
         entityId:   result.updated.id,
