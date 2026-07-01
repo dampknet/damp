@@ -9,15 +9,15 @@ export default async function DeviceManagementPage({
   params: Promise<{ siteId: string; itemId: string }>;
 }) {
   const { siteId, itemId } = await params;
-  const profile = await getCurrentProfile();
-  const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const profile  = await getCurrentProfile();
+  const role     = profile?.role ?? "VIEWER";
+  const canEdit  = role === "ADMIN" || role === "EDITOR";
 
   const item = await prisma.inventoryItem.findFirst({
-    where: { 
-      id: itemId, 
+    where: {
+      id:              itemId,
       inventorySiteId: siteId,
-      isDeleted: false 
+      isDeleted:       false,
     },
     include: {
       instances: {
@@ -30,9 +30,9 @@ export default async function DeviceManagementPage({
   if (!item) return notFound();
 
   return (
-    <DeviceManagementClient 
-      item={item as any} 
-      canEdit={canEdit} 
+    <DeviceManagementClient
+      item={item as any}
+      canEdit={canEdit}
       role={role}
     />
   );

@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   const { instanceId } = await params;
   const profile = await getCurrentProfile();
-  
+
   if (!profile || (profile.role !== "ADMIN" && profile.role !== "EDITOR")) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
@@ -16,33 +16,31 @@ export async function PATCH(
   const json = await req.json();
 
   try {
-    // 1. If we are updating the serial number, check if it already exists elsewhere
-    if (json.serialNumber) {
+    // If updating entityCode, check for duplicates
+    if (json.entityCode) {
       const existing = await prisma.assetInstance.findFirst({
         where: {
-          serialNumber: json.serialNumber,
-          NOT: { id: instanceId } // Don't count this specific unit
-        }
+          entityCode: json.entityCode,
+          NOT: { id: instanceId },
+        },
       });
-
       if (existing) {
         return NextResponse.json(
-          { message: "This serial number is already assigned to another device." }, 
+          { message: "This entity code is already assigned to another unit." },
           { status: 400 }
         );
       }
     }
 
-    // 2. Perform the update (includes manufacturer/model if provided)
     const updated = await prisma.assetInstance.update({
       where: { id: instanceId },
       data: {
-        serialNumber: json.serialNumber,
-        condition: json.condition,
-        status: json.status,
-        // These are saved but not shown on your main table
+        entityCode:   json.entityCode,
+        serialNumber: json.serialNumber,   // optional real serial
+        condition:    json.condition,
+        status:       json.status,
         manufacturer: json.manufacturer,
-        model: json.model
+        model:        json.model,
       },
     });
 
@@ -50,7 +48,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error("PATCH Error:", error);
     return NextResponse.json(
-      { message: "Database error. Check if fields match schema." }, 
+      { message: "Database error. Check if fields match schema." },
       { status: 500 }
     );
   }

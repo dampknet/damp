@@ -63,6 +63,8 @@ enum ActivityType {
   SYSTEM_EVENT
   STORE_ITEM_STATUS_CHANGED
   STORE_ITEM_DELETED
+  WAREHOUSE_ISSUE_CREATED
+  WAREHOUSE_ISSUE_RETURNED
 }
 
 enum StoreStatus {
@@ -71,8 +73,19 @@ enum StoreStatus {
 }
 
 enum InventoryItemType {
-  MATERIAL
   EQUIPMENT
+  ACCESSORIES
+  TOOLS_AND_PARTS
+  GENERAL
+  COOLING_INFRASTRUCTURE
+  CABLES_AND_ELECTRONICS
+}
+
+enum EquipmentCondition {
+  NEW
+  UNUSED
+  USED
+  FAULTY
 }
 
 enum InventoryItemStatus {
@@ -83,17 +96,13 @@ enum InventoryItemStatus {
   INACTIVE
 }
 
-enum EquipmentCondition {
-  NEW
-  OLD
-  GOOD
-  FAULTY
-  DAMAGED
-  UNDER_REPAIR
-}
-
 enum InventoryIssueStatus {
   ISSUED
+  RETURNED
+}
+
+enum WarehouseIssueStatus {
+  OPEN
   RETURNED
 }
 
@@ -119,26 +128,21 @@ model Site {
   towerHeight     Int?
   gps             String?
   locationName    String?
-  
-  // FUEL TRACKING FIELDS
-  vrmId           String?         @unique // The 12-digit VRM Portal ID
-  fuelCapacity    Int?            @default(1000) // Total tank size in liters
-  fuelLevel       Float?          // Current percentage (0-100)
-  lastFuelUpdate  DateTime?       // Timestamp of last API sync
-
+  vrmId           String?         @unique
+  fuelCapacity    Int?            @default(1000)
+  fuelLevel       Float?
+  lastFuelUpdate  DateTime?
   txMux1Serial    String?
   txMux2Serial    String?
   txMux3Serial    String?
-
   isDeleted       Boolean         @default(false)
   deletedAt       DateTime?
   deletedByEmail  String?
   deleteReason    String?
-
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  assets          Asset[]
+  assets Asset[]
 
   @@unique([name, isDeleted])
   @@index([isDeleted])
@@ -146,14 +150,14 @@ model Site {
 }
 
 model ActivityLog {
-  id          String       @id @default(cuid())
-  type        ActivityType
-  title       String
-  details     String?
-  entityType  String?
-  entityId    String?
-  actorEmail  String?
-  createdAt   DateTime     @default(now())
+  id         String       @id @default(cuid())
+  type       ActivityType
+  title      String
+  details    String?
+  entityType String?
+  entityId   String?
+  actorEmail String?
+  createdAt  DateTime     @default(now())
 
   @@index([createdAt])
   @@index([type])
@@ -179,34 +183,34 @@ model Subcategory {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  category   Category @relation(fields: [categoryId], references: [id])
-  assets     Asset[]
+  category Category @relation(fields: [categoryId], references: [id])
+  assets   Asset[]
 
   @@unique([categoryId, name])
 }
 
 model Asset {
-  id            String      @id @default(cuid())
-  siteId        String
-  categoryId    String
-  subcategoryId String?
-  assetName     String
-  serialNumber  String?
-  manufacturer  String?
-  model         String?
-  partNumber    String?
-  status        AssetStatus @default(ACTIVE)
-  specs         Json        @default("{}")
-  isDeleted     Boolean     @default(false)
-  deletedAt     DateTime?
+  id             String      @id @default(cuid())
+  siteId         String
+  categoryId     String
+  subcategoryId  String?
+  assetName      String
+  serialNumber   String?
+  manufacturer   String?
+  model          String?
+  partNumber     String?
+  status         AssetStatus @default(ACTIVE)
+  specs          Json        @default("{}")
+  isDeleted      Boolean     @default(false)
+  deletedAt      DateTime?
   deletedByEmail String?
-  deleteReason  String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  deleteReason   String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  site          Site        @relation(fields: [siteId], references: [id])
-  category      Category    @relation(fields: [categoryId], references: [id])
-  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  site        Site         @relation(fields: [siteId], references: [id])
+  category    Category     @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
 
   @@index([siteId])
   @@index([categoryId])
@@ -236,22 +240,21 @@ model StoreItem {
 }
 
 model InventorySite {
-  id                 String              @id @default(cuid())
-  name               String
-  location           String?
-  description        String?
-  isDeleted          Boolean             @default(false)
-  deletedAt          DateTime?
-  deletedByEmail     String?
-  deleteReason       String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id             String    @id @default(cuid())
+  name           String
+  location       String?
+  description    String?
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  deletedByEmail String?
+  deleteReason   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  items              InventoryItem[]
-  restocks           InventoryRestock[]
-  materialIssues     MaterialIssue[]
-  equipmentCheckouts EquipmentCheckout[]
-  issues             InventoryIssue[]
+  items           InventoryItem[]
+  restocks        InventoryRestock[]
+  issues          InventoryIssue[]
+  warehouseIssues WarehouseIssue[]
 
   @@unique([name, isDeleted])
   @@index([isDeleted])
@@ -259,66 +262,64 @@ model InventorySite {
 }
 
 model InventoryItem {
-  id              String            @id @default(cuid())
-  inventorySiteId String
-  itemType        InventoryItemType
-  name            String
-  description     String?
-  stockNumber     String?
-  manufacturer    String?
-  model           String?
-  quantity        Int               @default(0)
-  unit            String?
-  reorderLevel    Int               @default(0)
+  id               String              @id @default(cuid())
+  inventorySiteId  String
+  itemType         InventoryItemType
+  itemCode         String?             @unique
+  name             String
+  description      String?
+  manufacturer     String?
+  model            String?
+  quantity         Int                 @default(0)
+  uncountable      Boolean             @default(false)
+  unit             String?
+  reorderLevel     Int                 @default(0)
   targetStockLevel Int?
-  status          InventoryItemStatus @default(AVAILABLE)
-  
-  isDeleted       Boolean           @default(false)
-  deletedAt       DateTime?
-  deletedByEmail  String?
-  deleteReason    String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  status           InventoryItemStatus @default(AVAILABLE)
+  isDeleted        Boolean             @default(false)
+  deletedAt        DateTime?
+  deletedByEmail   String?
+  deleteReason     String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  // NEW RELATION: Individual units/serials
+  inventorySite   InventorySite      @relation(fields: [inventorySiteId], references: [id])
   instances       AssetInstance[]
-
-  inventorySite   InventorySite     @relation(fields: [inventorySiteId], references: [id])
   restocks        InventoryRestock[]
-  materialIssues  MaterialIssue[]
-  equipmentCheckouts EquipmentCheckout[]
   issues          InventoryIssue[]
+  warehouseIssues WarehouseIssue[]
 
   @@index([inventorySiteId])
   @@index([itemType])
+  @@index([itemCode])
   @@index([status])
   @@index([name])
-  @@index([stockNumber])
   @@index([isDeleted])
   @@index([deletedAt])
 }
 
-// NEW MODEL: Deep Tracking for individual units
 model AssetInstance {
   id              String              @id @default(cuid())
   inventoryItemId String
-  serialNumber    String              @unique
+  entityCode      String              @unique
+  serialNumber    String?
   model           String?
   manufacturer    String?
-  status          InventoryItemStatus @default(AVAILABLE)
   condition       EquipmentCondition  @default(NEW)
-  
+  status          InventoryItemStatus @default(AVAILABLE)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
-  inventoryItem   InventoryItem       @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem       InventoryItem        @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  warehouseIssueLines WarehouseIssueLine[]
 
   @@index([inventoryItemId])
+  @@index([entityCode])
   @@index([serialNumber])
 }
 
 model InventoryRestock {
-  id              String        @id @default(cuid())
+  id              String    @id @default(cuid())
   inventoryItemId String
   inventorySiteId String
   quantityAdded   Int
@@ -327,74 +328,28 @@ model InventoryRestock {
   supplier        String?
   receivedBy      String?
   note            String?
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime  @default(now())
 
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  inventorySite   InventorySite @relation(fields: [inventorySiteId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id])
 
   @@index([inventoryItemId])
   @@index([inventorySiteId])
   @@index([dateReceived])
 }
 
-model MaterialIssue {
-  id              String        @id @default(cuid())
-  inventoryItemId String
-  inventorySiteId String
-  requesterName   String
-  requestDate     DateTime
-  authorizedBy    String
-  projectPurpose  String
-  quantityIssued  Int
-  issuedBy        String?
-  remarks         String?
-  createdAt       DateTime      @default(now())
-
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  inventorySite   InventorySite @relation(fields: [inventorySiteId], references: [id])
-
-  @@index([inventoryItemId])
-  @@index([inventorySiteId])
-  @@index([requestDate])
-}
-
-model EquipmentCheckout {
-  id              String             @id @default(cuid())
-  inventoryItemId String
-  inventorySiteId String
-  requesterName   String
-  takenAt         DateTime
-  returnedAt      DateTime?
-  takenBy         String
-  authorizedBy    String
-  purpose         String
-  statusBefore    EquipmentCondition
-  statusAfter     EquipmentCondition?
-  receivedBy      String?
-  remarks         String?
-  createdAt       DateTime           @default(now())
-
-  inventoryItem   InventoryItem      @relation(fields: [inventoryItemId], references: [id])
-  inventorySite   InventorySite      @relation(fields: [inventorySiteId], references: [id])
-
-  @@index([inventoryItemId])
-  @@index([inventorySiteId])
-  @@index([takenAt])
-  @@index([returnedAt])
-}
-
 model InventoryIssue {
-  id                 String              @id @default(cuid())
+  id                 String               @id @default(cuid())
   inventoryItemId    String
   inventorySiteId    String
   itemType           InventoryItemType
-  quantity           Int                 @default(1)
+  quantity           Int                  @default(1)
   requesterName      String
   requesterContact   String?
   department         String?
   purpose            String
   authorizedBy       String
-  issuedAt           DateTime            @default(now())
+  issuedAt           DateTime             @default(now())
   expectedReturnDate DateTime?
   conditionAtIssue   EquipmentCondition?
   returnedBy         String?
@@ -403,15 +358,55 @@ model InventoryIssue {
   returnCondition    EquipmentCondition?
   returnNote         String?
   status             InventoryIssueStatus @default(ISSUED)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
-  inventoryItem      InventoryItem       @relation(fields: [inventoryItemId], references: [id])
-  inventorySite      InventorySite       @relation(fields: [inventorySiteId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id])
 
   @@index([inventoryItemId])
   @@index([inventorySiteId])
   @@index([status])
   @@index([issuedAt])
   @@index([returnedAt])
+}
+
+model WarehouseIssue {
+  id               String               @id @default(cuid())
+  inventorySiteId  String
+  inventoryItemId  String
+  quantityTaken    Int                  @default(1)
+  takenBy          String
+  takenByContact   String?
+  authorizedBy     String?
+  purpose          String
+  takenAt          DateTime             @default(now())
+  expectedReturnAt DateTime?
+  returnedBy       String?
+  returnedAt       DateTime?
+  returnNote       String?
+  status           WarehouseIssueStatus @default(OPEN)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  inventorySite InventorySite        @relation(fields: [inventorySiteId], references: [id])
+  inventoryItem InventoryItem        @relation(fields: [inventoryItemId], references: [id])
+  lines         WarehouseIssueLine[]
+
+  @@index([inventorySiteId])
+  @@index([inventoryItemId])
+  @@index([status])
+  @@index([takenAt])
+}
+
+model WarehouseIssueLine {
+  id               String @id @default(cuid())
+  warehouseIssueId String
+  assetInstanceId  String
+
+  warehouseIssue WarehouseIssue @relation(fields: [warehouseIssueId], references: [id], onDelete: Cascade)
+  assetInstance  AssetInstance  @relation(fields: [assetInstanceId], references: [id])
+
+  @@index([warehouseIssueId])
+  @@index([assetInstanceId])
 }

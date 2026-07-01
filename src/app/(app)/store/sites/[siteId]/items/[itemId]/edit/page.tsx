@@ -3,11 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
-import type {
-  EquipmentCondition,
-  InventoryItemStatus,
-  InventoryItemType,
-} from "@prisma/client";
+import type { InventoryItemStatus, InventoryItemType } from "@prisma/client";
 import EditInventoryItemClient from "./EditInventoryItemClient";
 
 export default async function EditInventoryItemPage({
@@ -18,186 +14,122 @@ export default async function EditInventoryItemPage({
   const { siteId, itemId } = await params;
 
   const profile = await getCurrentProfile();
-  const role = profile?.role ?? "VIEWER";
+  const role    = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
   const site = await prisma.inventorySite.findUnique({
-    where: { id: siteId },
+    where:  { id: siteId },
     select: { id: true, name: true, location: true },
   });
-
   if (!site) return notFound();
 
   const item = await prisma.inventoryItem.findFirst({
-    where: {
-      id: itemId,
-      inventorySiteId: siteId,
-    },
+    where:  { id: itemId, inventorySiteId: siteId },
     select: {
-      id: true,
-      itemType: true,
-      name: true,
-      description: true,
-      stockNumber: true,
-      manufacturer: true,
-      model: true,
-      quantity: true,
-      unit: true,
-      reorderLevel: true,
+      id:              true,
+      itemType:        true,
+      name:            true,
+      description:     true,
+      itemCode:        true,
+      manufacturer:    true,
+      model:           true,
+      quantity:        true,
+      uncountable:     true,
+      unit:            true,
+      reorderLevel:    true,
       targetStockLevel: true,
-      status: true,
-      // ❌ REMOVED condition: true from here because it doesn't exist in the DB for this table
+      status:          true,
       instances: {
-        select: { serialNumber: true }
-      }
+        select: { condition: true },
+        take:   1,
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
-
   if (!item) return notFound();
 
-  const safeSite = site;
-  // ✅ Map data for the client component. Providing a default "GOOD" condition.
   const safeItem = {
     ...item,
-    condition: "GOOD",
-    serialNumber: item.instances.map(i => i.serialNumber).join(", ") || null
+    condition: item.instances[0]?.condition ?? "NEW",
   };
 
   async function updateInventoryItem(formData: FormData) {
     "use server";
 
-    const itemTypeRaw = String(formData.get("itemType") ?? "MATERIAL").trim();
-    const name = String(formData.get("name") ?? "").trim();
-    const description = String(formData.get("description") ?? "").trim();
-    const stockNumber = String(formData.get("stockNumber") ?? "").trim();
-    const manufacturer = String(formData.get("manufacturer") ?? "").trim();
-    const model = String(formData.get("model") ?? "").trim();
-    const serialNumber = String(formData.get("serialNumber") ?? "").trim();
-    const quantityRaw = String(formData.get("quantity") ?? "").trim();
-    const unit = String(formData.get("unit") ?? "").trim();
-    const reorderLevelRaw = String(formData.get("reorderLevel") ?? "").trim();
-    const targetStockLevelRaw = String(formData.get("targetStockLevel") ?? "").trim();
-    const statusRaw = String(formData.get("status") ?? "AVAILABLE").trim();
-    const conditionRaw = String(formData.get("condition") ?? "").trim();
+    const itemTypeRaw        = String(formData.get("itemType")        ?? "").trim();
+    const name               = String(formData.get("name")            ?? "").trim();
+    const description        = String(formData.get("description")     ?? "").trim();
+    const itemCode           = String(formData.get("itemCode")        ?? "").trim();
+    const manufacturer       = String(formData.get("manufacturer")    ?? "").trim();
+    const model              = String(formData.get("model")           ?? "").trim();
+    const quantityRaw        = String(formData.get("quantity")        ?? "").trim();
+    const unit               = String(formData.get("unit")            ?? "").trim();
+    const reorderLevelRaw    = String(formData.get("reorderLevel")    ?? "").trim();
+    const targetStockRaw     = String(formData.get("targetStockLevel") ?? "").trim();
+    const statusRaw          = String(formData.get("status")          ?? "AVAILABLE").trim();
 
-    const itemType = itemTypeRaw === "EQUIPMENT" ? "EQUIPMENT" : "MATERIAL";
+    const VALID_TYPES = ["EQUIPMENT","ACCESSORIES","TOOLS_AND_PARTS","GENERAL","COOLING_INFRASTRUCTURE","CABLES_AND_ELECTRONICS"];
+    const itemType = VALID_TYPES.includes(itemTypeRaw) ? itemTypeRaw : "GENERAL";
 
     if (!name) {
-      redirect(
-        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`
-      );
+      redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`);
     }
 
-    const quantity = quantityRaw === "" ? 0 : Number(quantityRaw);
-    if (!Number.isFinite(quantity) || quantity < 0) {
-      redirect(
-        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Quantity must be a valid number")}`
-      );
-    }
+    const quantity    = quantityRaw   === "" ? 0    : Number(quantityRaw);
+    const reorder     = reorderLevelRaw === "" ? 0  : Number(reorderLevelRaw);
+    const targetStock = targetStockRaw  === "" ? null : Number(targetStockRaw);
 
-    const reorderLevel = reorderLevelRaw === "" ? 0 : Number(reorderLevelRaw);
-    if (!Number.isFinite(reorderLevel) || reorderLevel < 0) {
-      redirect(
-        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Reorder level must be a valid number")}`
-      );
-    }
-
-    const targetStockLevel =
-      targetStockLevelRaw === "" ? null : Number(targetStockLevelRaw);
-
-    if (
-      targetStockLevelRaw !== "" &&
-      (!Number.isFinite(targetStockLevel) || Number(targetStockLevel) < 0)
-    ) {
-      redirect(
-        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Target stock level must be a valid number")}`
-      );
-    }
-
-    let preferredStatus: InventoryItemStatus | null = null;
-    if (
-      statusRaw === "AVAILABLE" ||
-      statusRaw === "LOW_STOCK" ||
-      statusRaw === "OUT_OF_STOCK" ||
-      statusRaw === "CHECKED_OUT" ||
-      statusRaw === "INACTIVE"
-    ) {
-      preferredStatus = statusRaw as InventoryItemStatus;
-    }
+    const validStatuses = ["AVAILABLE","LOW_STOCK","OUT_OF_STOCK","CHECKED_OUT","INACTIVE"];
+    const preferredStatus = validStatuses.includes(statusRaw) ? (statusRaw as InventoryItemStatus) : null;
 
     const finalStatus = getAutoInventoryStatus({
-      quantity: Math.trunc(quantity),
-      reorderLevel: Math.trunc(reorderLevel),
+      quantity:        Math.trunc(quantity),
+      reorderLevel:    Math.trunc(reorder),
       preferredStatus,
     });
 
-    let condition: EquipmentCondition | null = null;
-    if (
-        conditionRaw === "GOOD" ||
-        conditionRaw === "FAULTY" ||
-        conditionRaw === "DAMAGED" ||
-        conditionRaw === "UNDER_REPAIR" ||
-        conditionRaw === "NEW" ||
-        conditionRaw === "OLD"
-    ) {
-        condition = conditionRaw as EquipmentCondition;
-    } else {
-        condition = "GOOD";
+    // If item code changed, check it's not taken by another item
+    if (itemCode && itemCode !== safeItem.itemCode) {
+      const existing = await prisma.inventoryItem.findFirst({
+        where: { itemCode, NOT: { id: itemId } },
+        select: { id: true },
+      });
+      if (existing) {
+        redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(`Item code ${itemCode} is already in use`)}`);
+      }
     }
 
     try {
-      const beforeSummary = `Before → Name: ${safeItem.name}, Type: ${safeItem.itemType}, Qty: ${safeItem.quantity}${safeItem.unit ? ` ${safeItem.unit}` : ""}, Status: ${safeItem.status}`;
-
-      const updatedItem = await prisma.inventoryItem.update({
+      const updated = await prisma.inventoryItem.update({
         where: { id: itemId },
         data: {
-          itemType: itemType as InventoryItemType,
+          itemType:        itemType as InventoryItemType,
           name,
-          description: description || null,
-          stockNumber: stockNumber || null,
-          manufacturer: manufacturer || null,
-          model: model || null,
-          quantity: Math.trunc(quantity),
-          unit: unit || null,
-          reorderLevel: Math.trunc(reorderLevel),
-          targetStockLevel:
-            targetStockLevel === null ? null : Math.trunc(targetStockLevel),
-          status: finalStatus,
-          // ❌ REMOVED condition from update data as it's not in the main model
+          description:     description  || null,
+          itemCode:        itemCode      || null,
+          manufacturer:    manufacturer  || null,
+          model:           model         || null,
+          quantity:        Math.trunc(quantity),
+          unit:            unit           || null,
+          reorderLevel:    Math.trunc(reorder),
+          targetStockLevel: targetStock === null ? null : Math.trunc(targetStock),
+          status:          finalStatus,
         },
       });
 
-      // ✅ FIX: Use local 'condition' variable for logging
-      const afterSummary = `After → Name: ${updatedItem.name}, Type: ${updatedItem.itemType}, Qty: ${updatedItem.quantity}${updatedItem.unit ? ` ${updatedItem.unit}` : ""}, Status: ${updatedItem.status}, Condition: ${condition}`;
-
       await logActivity({
-        type: "INVENTORY_ITEM_UPDATED",
-        title: `Inventory item updated: ${updatedItem.name}`,
-        details: `${beforeSummary}. ${afterSummary}. Site: ${safeSite.name}.`,
+        type:       "INVENTORY_ITEM_UPDATED",
+        title:      `Updated: ${updated.name}`,
+        details:    `Site: ${site.name}. Code: ${updated.itemCode ?? "—"}. Status: ${updated.status}.`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
-        entityId: updatedItem.id,
+        entityId:   updated.id,
       });
-
-      if (updatedItem.status === "LOW_STOCK") {
-        await logActivity({
-          type: "INVENTORY_LOW_STOCK",
-          title: `Low stock detected: ${updatedItem.name}`,
-          details: `${updatedItem.name} at ${safeSite.name} is low in stock.`,
-          actorEmail: profile?.email ?? null,
-          entityType: "INVENTORY_ITEM",
-          entityId: updatedItem.id,
-        });
-      }
     } catch (e) {
       console.error(e);
-      redirect(
-        `/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(
-          "Could not update inventory item"
-        )}`
-      );
+      redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Could not update inventory item")}`);
     }
 
     redirect(`/store/sites/${siteId}`);
@@ -205,7 +137,7 @@ export default async function EditInventoryItemPage({
 
   return (
     <EditInventoryItemClient
-      site={safeSite}
+      site={site}
       item={safeItem as any}
       action={updateInventoryItem}
     />
