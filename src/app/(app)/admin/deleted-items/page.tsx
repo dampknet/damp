@@ -11,64 +11,59 @@ export default async function DeletedItemsPage() {
 
   const [sites, assets, inventoryItems, storeItems] = await Promise.all([
     prisma.site.findMany({
-      where: { isDeleted: true },
+      where:   { isDeleted: true },
       orderBy: [{ deletedAt: "desc" }],
       select: {
-        id: true,
-        name: true,
-        deletedAt: true,
+        id:             true,
+        name:           true,
+        deletedAt:      true,
         deletedByEmail: true,
-        deleteReason: true,
+        deleteReason:   true,
       },
     }),
 
     prisma.asset.findMany({
-      where: { isDeleted: true },
+      where:   { isDeleted: true },
       orderBy: [{ deletedAt: "desc" }],
       select: {
-        id: true,
-        assetName: true,
-        serialNumber: true,
-        deletedAt: true,
+        id:             true,
+        assetName:      true,
+        serialNumber:   true,
+        deletedAt:      true,
         deletedByEmail: true,
-        deleteReason: true,
-        site: {
-          select: { name: true },
-        },
+        deleteReason:   true,
+        site: { select: { name: true } },
       },
     }),
 
     prisma.inventoryItem.findMany({
-      where: { isDeleted: true },
+      where:   { isDeleted: true },
       orderBy: [{ deletedAt: "desc" }],
       select: {
-        id: true,
-        name: true,
-        itemType: true,
-        stockNumber: true,
-        // ✅ serialNumber is removed. We use instances instead.
-        instances: {
-          select: { id: true }
-        },
-        deletedAt: true,
+        id:             true,
+        name:           true,
+        itemType:       true,
+        itemCode:       true,   // ✅ replaces stockNumber
+        deletedAt:      true,
         deletedByEmail: true,
-        deleteReason: true,
-        inventorySite: {
-          select: { name: true },
+        deleteReason:   true,
+        instances: {
+          select: { id: true },
         },
+        inventorySite: { select: { name: true } },
       },
     }),
 
     prisma.storeItem.findMany({
-      where: { isDeleted: true },
+      where:   { isDeleted: true },
       orderBy: [{ deletedAt: "desc" }],
       select: {
-        id: true,
-        itemNo: true,
-        description: true,
-        deletedAt: true,
+        id:             true,
+        itemNo:         true,
+        description:    true,
+        deletedAt:      true,
         deletedByEmail: true,
-        deleteReason: true,
+        deleteReason:   true,
       },
     }),
   ]);
@@ -76,50 +71,51 @@ export default async function DeletedItemsPage() {
   return (
     <DeletedItemsClient
       sites={sites.map((x) => ({
-        id: x.id,
-        label: x.name,
-        subLabel: "Site",
-        deletedAt: x.deletedAt?.toISOString() ?? null,
+        id:             x.id,
+        label:          x.name,
+        subLabel:       "Site",
+        deletedAt:      x.deletedAt?.toISOString() ?? null,
         deletedByEmail: x.deletedByEmail ?? null,
-        deleteReason: x.deleteReason ?? null,
-        entityType: "SITE" as const,
+        deleteReason:   x.deleteReason  ?? null,
+        entityType:     "SITE" as const,
       }))}
+
       assets={assets.map((x) => ({
-        id: x.id,
+        id:    x.id,
         label: x.assetName,
         subLabel: x.site?.name
           ? `Asset • ${x.site.name}${x.serialNumber ? ` • ${x.serialNumber}` : ""}`
           : `Asset${x.serialNumber ? ` • ${x.serialNumber}` : ""}`,
-        deletedAt: x.deletedAt?.toISOString() ?? null,
+        deletedAt:      x.deletedAt?.toISOString() ?? null,
         deletedByEmail: x.deletedByEmail ?? null,
-        deleteReason: x.deleteReason ?? null,
-        entityType: "ASSET" as const,
+        deleteReason:   x.deleteReason  ?? null,
+        entityType:     "ASSET" as const,
       }))}
+
       inventoryItems={inventoryItems.map((x) => {
-        // Construct a subLabel that shows how many units were tracked
-        const unitCount = x.instances?.length || 0;
-        const trackingInfo = unitCount > 0 ? ` • ${unitCount} units` : "";
-        
+        const unitCount    = x.instances?.length ?? 0;
+        const unitSuffix   = unitCount > 0 ? ` • ${unitCount} unit${unitCount !== 1 ? "s" : ""}` : "";
+        const codeSuffix   = x.itemCode ? ` • ${x.itemCode}` : unitSuffix;
+
         return {
-          id: x.id,
+          id:    x.id,
           label: x.name,
-          subLabel: `${x.itemType} • ${x.inventorySite.name}${
-            x.stockNumber ? ` • ${x.stockNumber}` : trackingInfo
-          }`,
-          deletedAt: x.deletedAt?.toISOString() ?? null,
+          subLabel: `${x.itemType} • ${x.inventorySite.name}${codeSuffix}`,
+          deletedAt:      x.deletedAt?.toISOString() ?? null,
           deletedByEmail: x.deletedByEmail ?? null,
-          deleteReason: x.deleteReason ?? null,
-          entityType: "INVENTORY_ITEM" as const,
+          deleteReason:   x.deleteReason  ?? null,
+          entityType:     "INVENTORY_ITEM" as const,
         };
       })}
+
       storeItems={storeItems.map((x) => ({
-        id: x.id,
-        label: `Item #${x.itemNo}`,
-        subLabel: x.description,
-        deletedAt: x.deletedAt?.toISOString() ?? null,
+        id:             x.id,
+        label:          `Item #${x.itemNo}`,
+        subLabel:       x.description,
+        deletedAt:      x.deletedAt?.toISOString() ?? null,
         deletedByEmail: x.deletedByEmail ?? null,
-        deleteReason: x.deleteReason ?? null,
-        entityType: "STORE_ITEM" as const,
+        deleteReason:   x.deleteReason  ?? null,
+        entityType:     "STORE_ITEM" as const,
       }))}
     />
   );
