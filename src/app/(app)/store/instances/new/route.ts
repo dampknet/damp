@@ -5,24 +5,43 @@ export async function POST(req: Request) {
   const json = await req.json();
   const { itemId, ...data } = json;
 
+  if (!itemId) {
+    return NextResponse.json({ message: "itemId is required" }, { status: 400 });
+  }
+
+  if (!data.entityCode) {
+    return NextResponse.json({ message: "entityCode is required" }, { status: 400 });
+  }
+
   try {
+    // Check entityCode uniqueness first
+    const existing = await prisma.assetInstance.findFirst({
+      where: { entityCode: data.entityCode },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { message: "This entity code is already assigned to another unit." },
+        { status: 400 }
+      );
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create the new asset instance
       const newInstance = await tx.assetInstance.create({
         data: {
           inventoryItemId: itemId,
-          serialNumber: data.serialNumber,
-          model: data.model,
-          manufacturer: data.manufacturer,
-          status: "AVAILABLE",
-          condition: "NEW",
-        }
+          entityCode:      data.entityCode,   // ✅ required field
+          model:           data.model        ?? null,
+          manufacturer:    data.manufacturer ?? null,
+          status:          "AVAILABLE",
+          condition:       (data.condition ?? "NEW") as any,
+        },
       });
 
-      // 2. Increment the total quantity of the main item
+      // 2. Increment the total quantity on the parent item
       await tx.inventoryItem.update({
         where: { id: itemId },
-        data: { quantity: { increment: 1 } }
+        data:  { quantity: { increment: 1 } },
       });
 
       return newInstance;
@@ -30,6 +49,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json({ message: "Duplicate Serial or DB Error" }, { status: 400 });
+    console.error("[INSTANCE_NEW_ERROR]", error);
+    return NextResponse.json(
+      { message: "Could not create instance. Check entity code uniqueness." },
+      { status: 400 }
+    );
   }
 }
