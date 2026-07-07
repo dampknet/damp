@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 
@@ -25,7 +25,9 @@ export default function NewInventoryItemClient({
   const dark         = mode === "dark";
   const searchParams = useSearchParams();
   const error        = searchParams.get("error");
-  const [itemType, setItemType] = useState("EQUIPMENT");
+
+  const [itemType,     setItemType]     = useState("EQUIPMENT");
+  const [uncountable,  setUncountable]  = useState(false);
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
@@ -68,7 +70,6 @@ export default function NewInventoryItemClient({
           }>
             Add Inventory Item
           </h1>
-
           <p className={dark
             ? "mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-400"
             : "mt-3 max-w-2xl text-sm font-medium leading-6 text-[#857f76]"
@@ -91,7 +92,7 @@ export default function NewInventoryItemClient({
 
           <form action={action} className="mt-6 space-y-5">
 
-            {/* Row 1 — Type + Name */}
+            {/* Row 1 — Category + Name */}
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Item Category" dark={dark}>
                 <select name="itemType" value={itemType}
@@ -132,28 +133,94 @@ export default function NewInventoryItemClient({
               </Field>
             </div>
 
-            {/* Row 3 — Quantity + Unit */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Quantity" dark={dark}>
-                <input name="quantity" type="number" min="0" defaultValue="0"
-                  required title="Quantity" className={inputCls} />
-              </Field>
-              <Field label="Unit" dark={dark}>
-                <input name="unit" placeholder="e.g. pcs, rolls, boxes"
-                  title="Unit" className={inputCls} />
-              </Field>
+            {/* Row 3 — Quantity toggle + Quantity field + Unit */}
+            <div className="space-y-3">
+              {/* N/A checkbox */}
+              <label className={`flex items-center gap-3 cursor-pointer w-fit rounded-xl border px-4 py-3 transition ${
+                uncountable
+                  ? dark
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : "border-emerald-300 bg-emerald-50"
+                  : dark
+                    ? "border-white/10 bg-white/5"
+                    : "border-[#ddd5c9] bg-white"
+              }`}>
+                <input
+                  type="checkbox"
+                  name="uncountable"
+                  checked={uncountable}
+                  onChange={(e) => setUncountable(e.target.checked)}
+                  title="Quantity not applicable"
+                  className="h-4 w-4 rounded accent-emerald-500"
+                />
+                <div>
+                  <div className={`text-sm font-semibold ${
+                    uncountable
+                      ? dark ? "text-emerald-300" : "text-emerald-700"
+                      : dark ? "text-slate-200" : "text-[#1a1814]"
+                  }`}>
+                    Quantity not applicable (N/A)
+                  </div>
+                  <div className={`text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
+                    Tick for items like clamps, brackets — items without a trackable count. Will never show as low stock.
+                  </div>
+                </div>
+              </label>
+
+              {/* Quantity + Unit — hidden when uncountable */}
+              {!uncountable && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Quantity" dark={dark}>
+                    <input name="quantity" type="number" min="0" defaultValue="0"
+                      required title="Quantity" className={inputCls} />
+                  </Field>
+                  <Field label="Unit" dark={dark}>
+                    <input name="unit" placeholder="e.g. pcs, rolls, boxes"
+                      title="Unit" className={inputCls} />
+                  </Field>
+                </div>
+              )}
+
+              {/* When uncountable, still send unit for reference */}
+              {uncountable && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className={`flex items-center rounded-xl border px-3 py-2.5 ${
+                    dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-[#f5f2ed]"
+                  }`}>
+                    <span className={`text-sm font-bold ${dark ? "text-emerald-300" : "text-emerald-700"}`}>
+                      N/A — quantity not tracked
+                    </span>
+                    <input type="hidden" name="quantity" value="0" />
+                  </div>
+                  <Field label="Unit (optional reference)" dark={dark}>
+                    <input name="unit" placeholder="e.g. pcs, sets"
+                      title="Unit" className={inputCls} />
+                  </Field>
+                </div>
+              )}
             </div>
 
             {/* Row 4 — Reorder + Target + Condition */}
             <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Reorder Level" dark={dark}>
-                <input name="reorderLevel" type="number" min="0" defaultValue="0"
-                  title="Reorder Level" className={inputCls} />
-              </Field>
-              <Field label="Target Stock Level" dark={dark}>
-                <input name="targetStockLevel" type="number" min="0"
-                  placeholder="optional" title="Target Stock Level" className={inputCls} />
-              </Field>
+              {/* Hide reorder level for uncountable items — not relevant */}
+              {!uncountable ? (
+                <>
+                  <Field label="Reorder Level" dark={dark}>
+                    <input name="reorderLevel" type="number" min="0" defaultValue="0"
+                      title="Reorder Level" className={inputCls} />
+                  </Field>
+                  <Field label="Target Stock Level" dark={dark}>
+                    <input name="targetStockLevel" type="number" min="0"
+                      placeholder="optional" title="Target Stock Level" className={inputCls} />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <input type="hidden" name="reorderLevel"    value="0" />
+                  <input type="hidden" name="targetStockLevel" value="" />
+                  <div className="md:col-span-2" /> {/* spacer */}
+                </>
+              )}
               <Field label="Initial Condition" dark={dark}>
                 <select name="condition" defaultValue="NEW"
                   title="Condition" className={inputCls}>
@@ -186,7 +253,9 @@ export default function NewInventoryItemClient({
   );
 }
 
-function Field({ label, children, dark }: { label: string; children: React.ReactNode; dark: boolean }) {
+function Field({ label, children, dark }: {
+  label: string; children: React.ReactNode; dark: boolean;
+}) {
   return (
     <label className="block">
       <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>

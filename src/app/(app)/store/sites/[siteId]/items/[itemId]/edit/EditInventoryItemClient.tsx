@@ -25,20 +25,20 @@ export default function EditInventoryItemClient({
 }: {
   site: { id: string; name: string; location: string | null };
   item: {
-    id:              string;
-    itemType:        ItemType;
-    name:            string;
-    description:     string | null;
-    itemCode:        string | null;
-    manufacturer:    string | null;
-    model:           string | null;
-    quantity:        number;
-    uncountable:     boolean;
-    unit:            string | null;
-    reorderLevel:    number;
+    id:               string;
+    itemType:         ItemType;
+    name:             string;
+    description:      string | null;
+    itemCode:         string | null;
+    manufacturer:     string | null;
+    model:            string | null;
+    quantity:         number;
+    uncountable:      boolean;
+    unit:             string | null;
+    reorderLevel:     number;
     targetStockLevel: number | null;
-    status:          "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
-    condition:       "NEW" | "UNUSED" | "USED" | "FAULTY";
+    status:           "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "CHECKED_OUT" | "INACTIVE";
+    condition:        "NEW" | "UNUSED" | "USED" | "FAULTY";
   };
   action: (formData: FormData) => void;
 }) {
@@ -46,7 +46,10 @@ export default function EditInventoryItemClient({
   const dark         = mode === "dark";
   const searchParams = useSearchParams();
   const error        = searchParams.get("error");
-  const [itemType, setItemType] = useState<ItemType>(item.itemType);
+
+  const [itemType,    setItemType]    = useState<ItemType>(item.itemType);
+  // ✅ Pre-populate uncountable from the existing item
+  const [uncountable, setUncountable] = useState<boolean>(item.uncountable);
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
@@ -142,31 +145,93 @@ export default function EditInventoryItemClient({
               </Field>
             </div>
 
-            {/* Row 3 — Quantity + Unit */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Quantity" dark={dark}>
-                <input name="quantity" type="number" min="0"
-                  defaultValue={item.quantity} required
-                  title="Quantity" className={inputCls} />
-              </Field>
-              <Field label="Unit" dark={dark}>
-                <input name="unit" defaultValue={item.unit ?? ""}
-                  placeholder="e.g. pcs, rolls" title="Unit" className={inputCls} />
-              </Field>
+            {/* Row 3 — N/A checkbox + Quantity + Unit */}
+            <div className="space-y-3">
+              {/* N/A checkbox — pre-ticked if item.uncountable */}
+              <label className={`flex items-center gap-3 cursor-pointer w-fit rounded-xl border px-4 py-3 transition ${
+                uncountable
+                  ? dark
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : "border-emerald-300 bg-emerald-50"
+                  : dark
+                    ? "border-white/10 bg-white/5"
+                    : "border-[#ddd5c9] bg-white"
+              }`}>
+                <input
+                  type="checkbox"
+                  name="uncountable"
+                  checked={uncountable}
+                  onChange={(e) => setUncountable(e.target.checked)}
+                  title="Quantity not applicable"
+                  className="h-4 w-4 rounded accent-emerald-500"
+                />
+                <div>
+                  <div className={`text-sm font-semibold ${
+                    uncountable
+                      ? dark ? "text-emerald-300" : "text-emerald-700"
+                      : dark ? "text-slate-200" : "text-[#1a1814]"
+                  }`}>
+                    Quantity not applicable (N/A)
+                  </div>
+                  <div className={`text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
+                    Items like clamps, brackets — no trackable count. Will never show as low stock.
+                  </div>
+                </div>
+              </label>
+
+              {/* Quantity + Unit — hidden when uncountable */}
+              {!uncountable ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Quantity" dark={dark}>
+                    <input name="quantity" type="number" min="0"
+                      defaultValue={item.quantity} required
+                      title="Quantity" className={inputCls} />
+                  </Field>
+                  <Field label="Unit" dark={dark}>
+                    <input name="unit" defaultValue={item.unit ?? ""}
+                      placeholder="e.g. pcs, rolls" title="Unit" className={inputCls} />
+                  </Field>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className={`flex items-center rounded-xl border px-3 py-2.5 ${
+                    dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-[#f5f2ed]"
+                  }`}>
+                    <span className={`text-sm font-bold ${dark ? "text-emerald-300" : "text-emerald-700"}`}>
+                      N/A — quantity not tracked
+                    </span>
+                    <input type="hidden" name="quantity" value="0" />
+                  </div>
+                  <Field label="Unit (optional reference)" dark={dark}>
+                    <input name="unit" defaultValue={item.unit ?? ""}
+                      placeholder="e.g. pcs, sets" title="Unit" className={inputCls} />
+                  </Field>
+                </div>
+              )}
             </div>
 
             {/* Row 4 — Reorder + Target + Status */}
             <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Reorder Level" dark={dark}>
-                <input name="reorderLevel" type="number" min="0"
-                  defaultValue={item.reorderLevel}
-                  title="Reorder Level" className={inputCls} />
-              </Field>
-              <Field label="Target Stock Level" dark={dark}>
-                <input name="targetStockLevel" type="number" min="0"
-                  defaultValue={item.targetStockLevel ?? ""}
-                  placeholder="optional" title="Target Stock Level" className={inputCls} />
-              </Field>
+              {!uncountable ? (
+                <>
+                  <Field label="Reorder Level" dark={dark}>
+                    <input name="reorderLevel" type="number" min="0"
+                      defaultValue={item.reorderLevel}
+                      title="Reorder Level" className={inputCls} />
+                  </Field>
+                  <Field label="Target Stock Level" dark={dark}>
+                    <input name="targetStockLevel" type="number" min="0"
+                      defaultValue={item.targetStockLevel ?? ""}
+                      placeholder="optional" title="Target Stock Level" className={inputCls} />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <input type="hidden" name="reorderLevel"     value="0" />
+                  <input type="hidden" name="targetStockLevel" value="" />
+                  <div className="md:col-span-2" />
+                </>
+              )}
               <Field label="Status" dark={dark}>
                 <select name="status" defaultValue={item.status}
                   title="Status" className={inputCls}>

@@ -19,7 +19,6 @@ export default async function IssueInventoryItemPage({
     where:  { id: siteId },
     select: { id: true, name: true, location: true },
   });
-
   if (!site) return notFound();
 
   const rawItems = await prisma.inventoryItem.findMany({
@@ -29,17 +28,32 @@ export default async function IssueInventoryItemPage({
       isDeleted:       false,
     },
     orderBy: { name: "asc" },
-    include: {
+    select: {
+      id:           true,
+      name:         true,
+      itemType:     true,
+      itemCode:     true,
+      quantity:     true,
+      uncountable:  true,
+      unit:         true,
+      reorderLevel: true,
+      status:       true,
       instances: {
         select: {
           id:         true,
-          entityCode: true,   // ✅ replaces serialNumber
+          entityCode: true,
           condition:  true,
           status:     true,
         },
       },
     },
   });
+
+  // ✅ Derive item-level condition from first instance (fallback NEW)
+  const items = rawItems.map((item) => ({
+    ...item,
+    condition: item.instances[0]?.condition ?? "NEW",
+  }));
 
   async function issueItemsAction(formData: FormData) {
     "use server";
@@ -55,7 +69,6 @@ export default async function IssueInventoryItemPage({
     try {
       await prisma.$transaction(async (tx) => {
         for (const entry of bucket) {
-          // 1. Create the warehouse issue record
           await tx.warehouseIssue.create({
             data: {
               inventoryItemId:  entry.id,
@@ -69,7 +82,6 @@ export default async function IssueInventoryItemPage({
               expectedReturnAt: entry.expectedReturnDate
                 ? new Date(entry.expectedReturnDate)
                 : null,
-              // Link specific entities as issue lines
               lines: entry.entityCodes?.length > 0 ? {
                 create: entry.entityCodes.map((code: string) => ({
                   assetInstance: {
@@ -80,13 +92,11 @@ export default async function IssueInventoryItemPage({
             },
           });
 
-          // 2. Decrement quantity
           await tx.inventoryItem.update({
             where: { id: entry.id },
             data:  { quantity: { decrement: entry.quantity } },
           });
 
-          // 3. Mark individual units as CHECKED_OUT
           if (entry.entityCodes?.length > 0) {
             await tx.assetInstance.updateMany({
               where: { entityCode: { in: entry.entityCodes } },
@@ -113,7 +123,7 @@ export default async function IssueInventoryItemPage({
   return (
     <IssueInventoryItemClient
       site={site}
-      items={rawItems as any}
+      items={items as any}
       action={issueItemsAction}
     />
   );

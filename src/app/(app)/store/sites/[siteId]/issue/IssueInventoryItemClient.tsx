@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { X, Trash2, Loader2, QrCode, ArrowLeft } from "lucide-react";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type InstanceRow = {
   id:         string;
@@ -17,127 +15,127 @@ type InstanceRow = {
 };
 
 type ItemRow = {
-  id:          string;
-  name:        string;
-  itemType:    string;
-  itemCode:    string | null;
-  quantity:    number;
-  uncountable: boolean;
-  unit:        string | null;
+  id:           string;
+  name:         string;
+  itemType:     string;
+  itemCode:     string | null;
+  quantity:     number;
+  uncountable:  boolean;
+  unit:         string | null;
   reorderLevel: number;
-  status:      string;
-  instances:   InstanceRow[];
+  status:       string;
+  condition:    string;  // ✅ item-level condition from DB
+  instances:    InstanceRow[];
 };
 
-// ─── Entity code matching helpers ────────────────────────────────────────────
+// ─── Canonicalise: strip site prefix, uppercase ───────────────────────────────
 
-const TYPE_SEGMENTS = ["EQUIP", "ACCESS", "TO/PA", "GEN", "COOL", "CA/EL"];
+const SITE_PREFIXES = ["KNET-", "BAAT-", "TSEA-", "GBC-", "KANDA-", "BAATSONA-", "TSEADDO-"];
+const TYPE_SEGS     = ["EQUIP-", "ACCESS-", "TO/PA-", "GEN-", "COOL-", "CA/EL-"];
 
-function stripSitePrefix(code: string): string {
-  const upper = code.toUpperCase();
-  for (const seg of TYPE_SEGMENTS) {
-    const idx = upper.indexOf(seg);
-    if (idx > 0) return code.slice(idx);
+function canonicalise(raw: string): string {
+  let s = raw.trim().toUpperCase();
+  for (const prefix of SITE_PREFIXES) {
+    if (s.startsWith(prefix)) { s = s.slice(prefix.length); break; }
   }
-  return code;
+  const hasTypeSeg = TYPE_SEGS.some((seg) => s.startsWith(seg));
+  if (!hasTypeSeg) {
+    for (const seg of TYPE_SEGS) {
+      const idx = s.indexOf(seg);
+      if (idx > 0) { s = s.slice(idx); break; }
+    }
+  }
+  return s;
 }
 
-function matchEntityCode(scanned: string, dbCode: string): boolean {
-  const s = scanned.trim().toLowerCase();
-  const d = dbCode.trim().toLowerCase();
+function matchCode(scanned: string, code: string): boolean {
+  const s = canonicalise(scanned);
+  const d = canonicalise(code);
   if (!s || !d || s.length < 3 || d.length < 3) return false;
-
-  // Exact
   if (s === d) return true;
-
-  // Strip prefix from both
-  const sStripped = stripSitePrefix(s);
-  const dStripped = stripSitePrefix(d);
-  if (sStripped === dStripped) return true;
-
-  // Suffix containment
-  if (d.endsWith(s) || d.includes(`-${s}`)) return true;
-  if (s.endsWith(d) || s.includes(`-${d}`)) return true;
-
+  if (d.endsWith(s) || s.endsWith(d)) return true;
   return false;
 }
-
-// ─── Condition badge colour ───────────────────────────────────────────────────
 
 function conditionColor(c: string) {
   if (c === "NEW")    return "bg-blue-600";
   if (c === "UNUSED") return "bg-sky-600";
   if (c === "USED")   return "bg-amber-600";
-  return "bg-rose-600"; // FAULTY
+  return "bg-rose-600";
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function IssueInventoryItemClient({
-  site,
-  items,
-  action,
+  site, items, action,
 }: {
   site:   { id: string; name: string; location: string | null };
   items:  ItemRow[];
   action: (formData: FormData) => void;
 }) {
-  const { mode }       = useThemeMode();
-  const dark           = mode === "dark";
-  const searchParams   = useSearchParams();
-  const error          = searchParams.get("error");
+  const { mode }     = useThemeMode();
+  const dark         = mode === "dark";
+  const searchParams = useSearchParams();
+  const error        = searchParams.get("error");
 
-  const [bucket,        setBucket]        = useState<any[]>([]);
-  const [isSearching,   setIsSearching]   = useState(false);
+  const [bucket,         setBucket]         = useState<any[]>([]);
+  const [isSearching,    setIsSearching]    = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
 
-  // Multi-burst assembler refs (handles Syble gun splitting long QR codes)
   const scanBuffer    = useRef("");
   const assembledScan = useRef("");
   const lastKeyTime   = useRef(0);
   const assembleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── SCAN MATCH ──────────────────────────────────────────────────────────────
+  // Priority:
+  //   1. Match against a specific AssetInstance entityCode → add that unit
+  //   2. Match against an InventoryItem itemCode → add as bulk (qty editable)
+
   const handleScanMatch = (rawScan: string) => {
+    const scanned   = rawScan.replace(/\r\n|\r|\n/g, "").trim();
+    const canonical = canonicalise(scanned);
+    console.log("[SCAN] raw:", JSON.stringify(scanned), "→ canonical:", canonical);
+
     setIsSearching(true);
-    const scanned = rawScan.replace(/\r\n|\r|\n/g, "").trim();
 
-    // Duplicate check
-    const alreadyIn = bucket.some((b) =>
-      b.entityCodes?.some((ec: string) => matchEntityCode(scanned, ec))
-    );
-    if (alreadyIn) {
-      alert("This unit is already in your issue bucket.");
-      setIsSearching(false);
-      return;
-    }
-
-    // Find matching instance across all items
+    // ── Pass 1: match a specific instance entity code ──────────────────────────
     let foundInstance: InstanceRow | null = null;
-    let foundItem:     ItemRow    | null = null;
+    let foundItemForInstance: ItemRow | null = null;
 
     outer:
     for (const item of items) {
       for (const ins of item.instances) {
-        if (matchEntityCode(scanned, ins.entityCode)) {
-          foundInstance = ins;
-          foundItem     = item;
+        if (matchCode(scanned, ins.entityCode)) {
+          foundInstance        = ins;
+          foundItemForInstance = item;
           break outer;
         }
       }
     }
 
-    if (foundInstance && foundItem) {
+    if (foundInstance && foundItemForInstance) {
+      // Duplicate entity code check
+      const alreadyIn = bucket.some((b) =>
+        b.entityCodes?.some((ec: string) => matchCode(scanned, ec))
+      );
+      if (alreadyIn) {
+        alert("This unit is already in your issue bucket.");
+        setIsSearching(false);
+        return;
+      }
+
       setBucket((prev) => {
-        const existing = prev.find((b) => b.id === foundItem!.id);
+        const existing = prev.find((b) => b.id === foundItemForInstance!.id);
         if (existing) {
           return prev.map((b) =>
-            b.id === foundItem!.id
+            b.id === foundItemForInstance!.id
               ? {
                   ...b,
                   quantity:    b.quantity + 1,
                   entityCodes: [...b.entityCodes, foundInstance!.entityCode],
                   conditions:  [...b.conditions, { code: foundInstance!.entityCode, condition: foundInstance!.condition }],
+                  isBulk:      false,
                 }
               : b
           );
@@ -145,28 +143,67 @@ export default function IssueInventoryItemClient({
         return [
           ...prev,
           {
-            id:               foundItem!.id,
-            name:             foundItem!.name,
-            itemType:         foundItem!.itemType,
-            quantity:         1,
-            entityCodes:      [foundInstance!.entityCode],
-            conditions:       [{ code: foundInstance!.entityCode, condition: foundInstance!.condition }],
-            expectedReturnDate: "",
+            id:                 foundItemForInstance!.id,
+            name:               foundItemForInstance!.name,
+            itemType:           foundItemForInstance!.itemType,
+            quantity:           1,
+            entityCodes:        [foundInstance!.entityCode],
+            conditions:         [{ code: foundInstance!.entityCode, condition: foundInstance!.condition }],
+            returnable:         true,   // ✅ defaults to returnable
+            isBulk:             false,
           },
         ];
       });
-    } else {
-      console.warn("[Scanner] No match. Scanned:", scanned);
-      console.warn("[Scanner] DB codes:", items.flatMap((i) => i.instances.map((ins) => ins.entityCode)));
-      alert(
-        `No unit found for: ${scanned}\n\nMake sure the entity code exists in the database.\nCheck console (F12) to see all registered codes.`
-      );
+
+      setIsSearching(false);
+      return;
     }
 
+    // ── Pass 2: match an item code (bulk/consumable) ──────────────────────────
+    const foundBulkItem = items.find(
+      (item) => item.itemCode && matchCode(scanned, item.itemCode)
+    );
+
+    if (foundBulkItem) {
+      // Duplicate item check
+      const alreadyIn = bucket.some((b) => b.id === foundBulkItem.id);
+      if (alreadyIn) {
+        alert(`${foundBulkItem.name} is already in your bucket. Adjust the quantity directly.`);
+        setIsSearching(false);
+        return;
+      }
+
+      setBucket((prev) => [
+        ...prev,
+        {
+          id:                 foundBulkItem.id,
+          name:               foundBulkItem.name,
+          itemType:           foundBulkItem.itemType,
+          quantity:           1,
+          entityCodes:        [],
+          conditions:         [],
+          returnable:         false,  // ✅ bulk defaults to non-returnable
+          isBulk:             true,
+          bulkCondition:      foundBulkItem.condition,  // ✅ from item DB record
+          availableQty:       foundBulkItem.uncountable ? null : foundBulkItem.quantity,
+          unit:               foundBulkItem.unit,
+        },
+      ]);
+
+      setIsSearching(false);
+      return;
+    }
+
+    // ── No match ─────────────────────────────────────────────────────────────
+    console.warn("[SCAN] No match for canonical:", canonical);
+    alert(
+      `No item found for: ${scanned}\nLooking for: ${canonical}\n\nCheck F12 console for registered codes.`
+    );
     setIsSearching(false);
   };
 
-  // ─── SYBLE GUN MULTI-BURST ASSEMBLER ─────────────────────────────────────────
+  // ─── SYBLE GUN ASSEMBLER ─────────────────────────────────────────────────────
+
   useEffect(() => {
     const isComplete = (s: string) => {
       if (s.includes("<") || s.includes(">")) {
@@ -199,12 +236,8 @@ export default function IssueInventoryItemClient({
         if (burst.length === 0) return;
         e.preventDefault();
         assembledScan.current += burst;
-
-        if (isComplete(assembledScan.current)) {
-          flush();
-        } else {
-          assembleTimer.current = setTimeout(flush, 400);
-        }
+        if (isComplete(assembledScan.current)) flush();
+        else assembleTimer.current = setTimeout(flush, 400);
       } else if (e.key.length === 1) {
         scanBuffer.current += e.key;
       }
@@ -217,7 +250,8 @@ export default function IssueInventoryItemClient({
     };
   }, [bucket, items]);
 
-  // ─── CAMERA SCANNER ───────────────────────────────────────────────────────────
+  // ─── CAMERA SCANNER ──────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (isCameraActive) {
       const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
@@ -231,6 +265,7 @@ export default function IssueInventoryItemClient({
   }, [isCameraActive, bucket, items]);
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
+
   return (
     <div className={dark
       ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200"
@@ -246,15 +281,12 @@ export default function IssueInventoryItemClient({
             : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"
           } />
 
-          {/* Top bar */}
+          {/* Header */}
           <div className="flex flex-col gap-3">
-            <Link
-              href={`/store/sites/${site.id}`}
-              className={dark
-                ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-              }
-            >
+            <Link href={`/store/sites/${site.id}`} className={dark
+              ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
+              : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
+            }>
               <ArrowLeft size={16} /> Back to {site.name} Inventory
             </Link>
 
@@ -266,7 +298,6 @@ export default function IssueInventoryItemClient({
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Issue Smart Bucket
               </div>
-
               <div className="flex items-center gap-3">
                 {isSearching && (
                   <div className="flex items-center gap-2 text-xs font-bold text-sky-500 animate-pulse">
@@ -290,9 +321,10 @@ export default function IssueInventoryItemClient({
           }>
             Issue Inventory Items
           </h1>
-
           <p className={dark ? "mt-2 text-sm text-slate-500" : "mt-2 text-sm text-[#8b857c]"}>
-            Scan barcodes on items (e.g. <span className="font-mono">EQUIP-004-01</span>) to add them to the bucket. The site prefix is ignored automatically.
+            Scan any barcode — entity codes (e.g. <span className="font-mono">EQUIP-004-01</span>) pull specific units,
+            item codes (e.g. <span className="font-mono">CA/EL-013</span>) pull bulk items with editable quantity.
+            Site prefix stripped automatically.
           </p>
 
           {error && (
@@ -302,7 +334,6 @@ export default function IssueInventoryItemClient({
             }>{error}</div>
           )}
 
-          {/* Camera view */}
           {isCameraActive && (
             <div className="mt-6 overflow-hidden rounded-2xl border-2 border-dashed border-sky-500/50 bg-sky-500/5 p-4">
               <div id="reader" className="mx-auto max-w-sm" />
@@ -319,7 +350,8 @@ export default function IssueInventoryItemClient({
                   dark ? "bg-white/5 text-slate-500" : "bg-slate-100 text-slate-500"
                 }`}>
                   <th className="px-6 py-4">Item</th>
-                  <th className="px-6 py-4 text-center">Scanned Units</th>
+                  <th className="px-6 py-4 text-center">Units / Type</th>
+                  <th className="px-6 py-4 text-center">Condition</th>
                   <th className="px-6 py-4 text-center">Qty</th>
                   <th className="px-6 py-4 text-center">Return Date</th>
                   <th className="px-6 py-4" />
@@ -328,7 +360,7 @@ export default function IssueInventoryItemClient({
               <tbody className="divide-y divide-slate-500/10">
                 {bucket.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">
+                    <td colSpan={6} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">
                       Point scanner at barcode or use camera...
                     </td>
                   </tr>
@@ -337,47 +369,89 @@ export default function IssueInventoryItemClient({
                   <tr key={b.id} className="hover:bg-sky-500/5 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-bold text-sm text-sky-500">{b.name}</div>
-                      <div className="text-[10px] opacity-40 uppercase font-black">{b.itemType}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {b.conditions.map((c: any) => (
-                          <span
-                            key={c.code}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black text-white ${conditionColor(c.condition)}`}
-                          >
-                            <span className="font-mono">{c.code}</span>
-                            <button
-                              type="button"
-                              title={`Remove ${c.code}`}
-                              onClick={() => {
-                                const filtered = b.conditions.filter((x: any) => x.code !== c.code);
-                                setBucket((prev) =>
-                                  filtered.length
-                                    ? prev.map((i) =>
-                                        i.id === b.id
-                                          ? { ...i, conditions: filtered, entityCodes: filtered.map((f: any) => f.code), quantity: filtered.length }
-                                          : i
-                                      )
-                                    : prev.filter((i) => i.id !== b.id)
-                                );
-                              }}
-                            >
-                              <X size={10} />
-                            </button>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] opacity-40 uppercase font-black">{b.itemType}</span>
+                        {b.isBulk && (
+                          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase text-amber-400">
+                            Bulk
                           </span>
-                        ))}
+                        )}
                       </div>
+                      {b.isBulk && b.availableQty !== null && (
+                        <div className="mt-0.5 text-[10px] text-slate-500">
+                          {b.availableQty} {b.unit || "pcs"} available
+                        </div>
+                      )}
                     </td>
+
+                    {/* Units column — entity codes for tracked, or empty for bulk */}
+                    <td className="px-6 py-4">
+                      {b.isBulk ? (
+                        <span className={`text-[11px] italic ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
+                          Bulk item — set qty →
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {b.conditions.map((c: any) => (
+                            <span
+                              key={c.code}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black text-white ${conditionColor(c.condition)}`}
+                            >
+                              <span className="font-mono">{c.code}</span>
+                              <button
+                                type="button"
+                                title={`Remove ${c.code}`}
+                                onClick={() => {
+                                  const filtered = b.conditions.filter((x: any) => x.code !== c.code);
+                                  setBucket((prev) =>
+                                    filtered.length
+                                      ? prev.map((i) =>
+                                          i.id === b.id
+                                            ? { ...i, conditions: filtered, entityCodes: filtered.map((f: any) => f.code), quantity: filtered.length }
+                                            : i
+                                        )
+                                      : prev.filter((i) => i.id !== b.id)
+                                  );
+                                }}
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Condition — colour badge for tracked units, dropdown for bulk */}
                     <td className="px-6 py-4 text-center">
-                      {/* For non-equipment (bulk), allow manual qty edit */}
-                      {b.itemType !== "EQUIPMENT" && b.itemType !== "COOLING_INFRASTRUCTURE" ? (
+                      {b.isBulk ? (
+                        // Bulk: static badge from item's existing condition
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black text-white ${conditionColor(b.bulkCondition ?? "USED")}`}>
+                          {b.bulkCondition ?? "USED"}
+                        </span>
+                      ) : (
+                        // Tracked: show distinct badges per unit condition
+                        <div className="flex flex-wrap justify-center gap-1">
+                          {[...new Set(b.conditions.map((c: any) => c.condition))].map((cond: any) => (
+                            <span key={cond}
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black text-white ${conditionColor(cond)}`}>
+                              {cond}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Qty — always editable for bulk, fixed for tracked */}
+                    <td className="px-6 py-4 text-center">
+                      {b.isBulk || (b.itemType !== "EQUIPMENT" && b.itemType !== "COOLING_INFRASTRUCTURE") ? (
                         <input
                           type="number"
                           min="1"
+                          max={b.availableQty ?? undefined}
                           value={b.quantity}
-                          title="Adjust Quantity"
-                          aria-label="Adjust Quantity"
+                          title="Quantity"
+                          aria-label="Quantity"
                           onChange={(e) =>
                             setBucket((prev) =>
                               prev.map((i) => i.id === b.id ? { ...i, quantity: Number(e.target.value) } : i)
@@ -389,21 +463,32 @@ export default function IssueInventoryItemClient({
                         <span className="font-mono font-bold text-sm">{b.quantity}</span>
                       )}
                     </td>
+
+                    {/* Returnable checkbox — applies to all item types */}
                     <td className="px-6 py-4 text-center">
-                      {(b.itemType === "EQUIPMENT" || b.itemType === "COOLING_INFRASTRUCTURE") && (
+                      <label className="inline-flex flex-col items-center gap-1 cursor-pointer">
                         <input
-                          type="date"
-                          title="Expected Return Date"
-                          aria-label="Expected Return Date"
+                          type="checkbox"
+                          title="Mark as returnable"
+                          aria-label="Returnable"
+                          checked={b.returnable ?? false}
                           onChange={(e) =>
                             setBucket((prev) =>
-                              prev.map((i) => i.id === b.id ? { ...i, expectedReturnDate: e.target.value } : i)
+                              prev.map((i) => i.id === b.id ? { ...i, returnable: e.target.checked } : i)
                             )
                           }
-                          className="bg-transparent text-xs font-bold outline-none border-b border-slate-500/20"
+                          className="h-4 w-4 rounded accent-emerald-500"
                         />
-                      )}
+                        <span className={`text-[9px] font-black uppercase ${
+                          (b.returnable ?? false)
+                            ? dark ? "text-emerald-400" : "text-emerald-700"
+                            : dark ? "text-slate-600" : "text-[#b0a79b]"
+                        }`}>
+                          {(b.returnable ?? false) ? "Yes" : "No"}
+                        </span>
+                      </label>
                     </td>
+
                     <td className="px-6 py-4 text-right">
                       <button
                         type="button"
@@ -421,43 +506,50 @@ export default function IssueInventoryItemClient({
             </table>
           </div>
 
-          {/* Manual add for bulk/non-trackable items */}
-          <div className="mt-6">
+          {/* Manual add dropdown — for items that can't be scanned */}
+          <div className="mt-4">
             <select
               title="Manual Add"
               aria-label="Manual Add"
               className={`w-full rounded-xl border px-4 py-3 text-sm font-medium outline-none ${
-                dark
-                  ? "border-white/10 bg-white/5 text-slate-100"
-                  : "border-[#ddd5c9] bg-white text-slate-900"
+                dark ? "border-white/10 bg-white/5 text-slate-100" : "border-[#ddd5c9] bg-white text-slate-900"
               }`}
               onChange={(e) => {
                 const found = items.find((i) => i.id === e.target.value);
                 if (found) {
+                  if (bucket.some((b) => b.id === found.id)) {
+                    alert(`${found.name} is already in your bucket.`);
+                    e.target.value = "";
+                    return;
+                  }
                   setBucket((prev) => [
                     ...prev,
                     {
-                      id:               found.id,
-                      name:             found.name,
-                      itemType:         found.itemType,
-                      quantity:         1,
-                      entityCodes:      [],
-                      conditions:       [],
-                      expectedReturnDate: "",
+                      id:                 found.id,
+                      name:               found.name,
+                      itemType:           found.itemType,
+                      quantity:           1,
+                      entityCodes:        [],
+                      conditions:         [],
+                      returnable:         false,  // ✅ manual adds default non-returnable
+                      isBulk:             true,
+                      bulkCondition:      found.condition,  // ✅ from item DB record
+                      availableQty:       found.uncountable ? null : found.quantity,
+                      unit:               found.unit,
                     },
                   ]);
                   e.target.value = "";
                 }
               }}
             >
-              <option value="">Manual Add (for bulk items)...</option>
-              {items
-                .filter((i) => i.itemType !== "EQUIPMENT" && i.itemType !== "COOLING_INFRASTRUCTURE")
-                .map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} {i.itemCode ? `· ${i.itemCode}` : ""} ({i.uncountable ? "N/A" : `${i.quantity}`} {i.unit || "pcs"} available)
-                  </option>
-                ))}
+              <option value="">+ Manual Add (select any item)...</option>
+              {items.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name} {i.itemCode ? `· ${i.itemCode}` : ""}
+                  {" — "}
+                  {i.uncountable ? "N/A" : `${i.quantity}`} {i.unit || "pcs"}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -480,18 +572,15 @@ export default function IssueInventoryItemClient({
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Requester Name" dark={dark}>
-                  <input name="requesterName" required placeholder="Full Name" title="Requester Name"
-                    className={inputCls(dark)} />
+                  <input name="requesterName" required placeholder="Full Name" title="Requester Name" className={inputCls(dark)} />
                 </Field>
                 <Field label="Contact" dark={dark}>
-                  <input name="requesterContact" required placeholder="Phone Number" title="Contact"
-                    className={inputCls(dark)} />
+                  <input name="requesterContact" required placeholder="Phone Number" title="Contact" className={inputCls(dark)} />
                 </Field>
               </div>
               <div className="mt-4">
                 <Field label="Department" dark={dark}>
-                  <input name="department" placeholder="Team/Department" title="Department"
-                    className={inputCls(dark)} />
+                  <input name="department" placeholder="Team/Department" title="Department" className={inputCls(dark)} />
                 </Field>
               </div>
             </section>
@@ -505,35 +594,27 @@ export default function IssueInventoryItemClient({
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Authorized By" dark={dark}>
-                  <input name="authorizedBy" required placeholder="Approving Officer" title="Authorized By"
-                    className={inputCls(dark)} />
+                  <input name="authorizedBy" required placeholder="Approving Officer" title="Authorized By" className={inputCls(dark)} />
                 </Field>
               </div>
               <div className="mt-4">
                 <Field label="Purpose" dark={dark}>
-                  <textarea name="purpose" rows={4} required placeholder="Reason for issue..." title="Purpose"
-                    className={inputCls(dark)} />
+                  <textarea name="purpose" rows={4} required placeholder="Reason for issue..." title="Purpose" className={inputCls(dark)} />
                 </Field>
               </div>
             </section>
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button
-                type="submit"
-                className={dark
-                  ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90"
-                  : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"
-                }
-              >
+              <button type="submit" className={dark
+                ? "rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-8 py-3 text-sm font-bold text-white hover:opacity-90"
+                : "rounded-xl bg-[#1a1814] px-8 py-3 text-sm font-bold text-white hover:bg-[#2d2924]"
+              }>
                 Process Issue ({bucket.reduce((acc, b) => acc + b.quantity, 0)} units)
               </button>
-              <Link
-                href={`/store/sites/${site.id}`}
-                className={dark
-                  ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10"
-                  : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"
-                }
-              >
+              <Link href={`/store/sites/${site.id}`} className={dark
+                ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10"
+                : "rounded-xl border border-[#ddd5c9] bg-white px-4 py-3 text-sm font-medium text-[#1a1814] hover:bg-[#faf7f2]"
+              }>
                 Cancel
               </Link>
             </div>
@@ -543,8 +624,6 @@ export default function IssueInventoryItemClient({
     </div>
   );
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function inputCls(dark: boolean) {
   return dark

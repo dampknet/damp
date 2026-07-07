@@ -4,13 +4,31 @@ import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
 import { generateItemCode } from "@/lib/inventory-upload";
-import type { EquipmentCondition, InventoryItemStatus, InventoryItemType } from "@prisma/client";
+import type { EquipmentCondition, InventoryItemType } from "@prisma/client";
 import NewInventoryItemClient from "./NewInventoryItemClient";
 
 const VALID_TYPES = [
   "EQUIPMENT", "ACCESSORIES", "TOOLS_AND_PARTS",
   "GENERAL", "COOLING_INFRASTRUCTURE", "CABLES_AND_ELECTRONICS",
 ];
+
+// ✅ Module-level — not inside the page component, so it never gets serialized
+async function getSitePrefix(siteId: string): Promise<string> {
+  const sample = await prisma.inventoryItem.findFirst({
+    where:  { inventorySiteId: siteId, itemCode: { not: null } },
+    select: { itemCode: true },
+  });
+  if (sample?.itemCode) {
+    const parts = sample.itemCode.split("-");
+    if (parts.length >= 1) return parts[0];
+  }
+  // Fallback: derive from site name
+  const site = await prisma.inventorySite.findUnique({
+    where:  { id: siteId },
+    select: { name: true },
+  });
+  return (site?.name ?? "SITE").replace(/\s+/g, "").toUpperCase().slice(0, 4);
+}
 
 export default async function NewInventoryItemPage({
   params,
@@ -19,9 +37,9 @@ export default async function NewInventoryItemPage({
 }) {
   const { siteId } = await params;
 
-  const profile  = await getCurrentProfile();
-  const role     = profile?.role ?? "VIEWER";
-  const canEdit  = role === "ADMIN" || role === "EDITOR";
+  const profile = await getCurrentProfile();
+  const role    = profile?.role ?? "VIEWER";
+  const canEdit = role === "ADMIN" || role === "EDITOR";
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
@@ -31,33 +49,24 @@ export default async function NewInventoryItemPage({
   });
   if (!site) return notFound();
 
-  // Get site prefix from existing items
-  async function getSitePrefix(): Promise<string> {
-    const sample = await prisma.inventoryItem.findFirst({
-      where:  { inventorySiteId: siteId, itemCode: { not: null } },
-      select: { itemCode: true },
-    });
-    if (sample?.itemCode) {
-      const parts = sample.itemCode.split("-");
-      if (parts.length >= 1) return parts[0];
-    }
-    return site!.name.replace(/\s+/g, "").toUpperCase().slice(0, 4);
-  }
+  // Capture primitives for the server action closure
+  const siteName = site.name;
 
   async function createInventoryItem(formData: FormData) {
     "use server";
 
-    const itemTypeRaw    = String(formData.get("itemType")        ?? "EQUIPMENT").trim();
-    const name           = String(formData.get("name")            ?? "").trim();
-    const description    = String(formData.get("description")     ?? "").trim();
-    const itemCodeRaw    = String(formData.get("itemCode")        ?? "").trim();
-    const manufacturer   = String(formData.get("manufacturer")    ?? "").trim();
-    const model          = String(formData.get("model")           ?? "").trim();
-    const quantityRaw    = String(formData.get("quantity")        ?? "").trim();
-    const unit           = String(formData.get("unit")            ?? "").trim();
-    const reorderRaw     = String(formData.get("reorderLevel")    ?? "").trim();
-    const targetRaw      = String(formData.get("targetStockLevel") ?? "").trim();
-    const conditionRaw   = String(formData.get("condition")       ?? "NEW").trim();
+    const itemTypeRaw  = String(formData.get("itemType")         ?? "EQUIPMENT").trim();
+    const name         = String(formData.get("name")             ?? "").trim();
+    const description  = String(formData.get("description")      ?? "").trim();
+    const itemCodeRaw  = String(formData.get("itemCode")         ?? "").trim();
+    const manufacturer = String(formData.get("manufacturer")     ?? "").trim();
+    const model        = String(formData.get("model")            ?? "").trim();
+    const quantityRaw  = String(formData.get("quantity")         ?? "").trim();
+    const unit         = String(formData.get("unit")             ?? "").trim();
+    const reorderRaw   = String(formData.get("reorderLevel")     ?? "").trim();
+    const targetRaw    = String(formData.get("targetStockLevel") ?? "").trim();
+    const conditionRaw = String(formData.get("condition")        ?? "NEW").trim();
+    const uncountable  = formData.get("uncountable") === "on";
 
     const itemType = VALID_TYPES.includes(itemTypeRaw) ? itemTypeRaw : "GENERAL";
 
@@ -65,14 +74,14 @@ export default async function NewInventoryItemPage({
       redirect(`/store/sites/${siteId}/new?error=${encodeURIComponent("Item name is required")}`);
     }
 
-    const quantity    = quantityRaw === "" ? 0 : Number(quantityRaw);
-    const reorder     = reorderRaw  === "" ? 0 : Number(reorderRaw);
-    const targetStock = targetRaw   === "" ? null : Number(targetRaw);
+    const quantity    = uncountable ? 0 : (quantityRaw === "" ? 0 : Number(quantityRaw));
+    const reorder     = uncountable ? 0 : (reorderRaw  === "" ? 0 : Number(reorderRaw));
+    const targetStock = uncountable ? null : (targetRaw === "" ? null : Number(targetRaw));
 
     const finalStatus = getAutoInventoryStatus({
-      quantity:        Math.trunc(quantity),
-      reorderLevel:    Math.trunc(reorder),
-      preferredStatus: null,
+      quantity:     Math.trunc(quantity),
+      reorderLevel: Math.trunc(reorder),
+      uncountable,
     });
 
     const condition = (["NEW","UNUSED","USED","FAULTY"].includes(conditionRaw)
@@ -81,10 +90,9 @@ export default async function NewInventoryItemPage({
     // Resolve item code
     let itemCode = itemCodeRaw || null;
     if (!itemCode) {
-      const sitePrefix = await getSitePrefix();
-      itemCode = await generateItemCode({ itemType: itemType as InventoryItemType, sitePrefix });
+      const prefix = await getSitePrefix(siteId); // ✅ called as module function
+      itemCode = await generateItemCode({ itemType: itemType as InventoryItemType, sitePrefix: prefix });
     } else {
-      // Check uniqueness
       const existing = await prisma.inventoryItem.findFirst({
         where: { itemCode }, select: { id: true },
       });
@@ -101,19 +109,20 @@ export default async function NewInventoryItemPage({
             itemType:         itemType as InventoryItemType,
             itemCode,
             name,
-            description:      description  || null,
+            description:      description   || null,
             manufacturer:     manufacturer  || null,
             model:            model         || null,
             quantity:         Math.trunc(quantity),
-            unit:             unit           || null,
+            uncountable,
+            unit:             unit          || null,
             reorderLevel:     Math.trunc(reorder),
             targetStockLevel: targetStock === null ? null : Math.trunc(targetStock),
             status:           finalStatus,
           },
         });
 
-        // Create entity slots with generated entity codes
-        if (quantity > 0) {
+        // Only create entity slots for countable items with quantity > 0
+        if (!uncountable && quantity > 0) {
           await tx.assetInstance.createMany({
             data: Array.from({ length: Math.trunc(quantity) }).map((_, i) => ({
               inventoryItemId: created.id,
@@ -127,7 +136,7 @@ export default async function NewInventoryItemPage({
         await logActivity({
           type:       "INVENTORY_ITEM_CREATED",
           title:      `Created: ${created.name}`,
-          details:    `Code: ${itemCode}. Site: ${site!.name}. Qty: ${created.quantity}. Condition: ${condition}.`,
+          details:    `Code: ${itemCode}. Site: ${siteName}. ${uncountable ? "Quantity: N/A." : `Qty: ${created.quantity}.`} Condition: ${condition}.`,
           actorEmail: profile?.email ?? null,
           entityType: "INVENTORY_ITEM",
           entityId:   created.id,

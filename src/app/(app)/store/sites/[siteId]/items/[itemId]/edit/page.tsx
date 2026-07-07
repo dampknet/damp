@@ -63,24 +63,21 @@ export default async function EditInventoryItemPage({
     condition: item.instances[0]?.condition ?? "NEW",
   };
 
-  // ✅ Capture item name for logging
-  const originalName   = safeItem.name;
-  const originalItemId = safeItem.id;
-
   async function updateInventoryItem(formData: FormData) {
     "use server";
 
-    const itemTypeRaw     = String(formData.get("itemType")         ?? "").trim();
-    const name            = String(formData.get("name")             ?? "").trim();
-    const description     = String(formData.get("description")      ?? "").trim();
-    const itemCode        = String(formData.get("itemCode")         ?? "").trim();
-    const manufacturer    = String(formData.get("manufacturer")     ?? "").trim();
-    const model           = String(formData.get("model")            ?? "").trim();
-    const quantityRaw     = String(formData.get("quantity")         ?? "").trim();
-    const unit            = String(formData.get("unit")             ?? "").trim();
-    const reorderRaw      = String(formData.get("reorderLevel")     ?? "").trim();
-    const targetStockRaw  = String(formData.get("targetStockLevel") ?? "").trim();
-    const statusRaw       = String(formData.get("status")           ?? "AVAILABLE").trim();
+    const itemTypeRaw    = String(formData.get("itemType")         ?? "").trim();
+    const name           = String(formData.get("name")             ?? "").trim();
+    const description    = String(formData.get("description")      ?? "").trim();
+    const itemCode       = String(formData.get("itemCode")         ?? "").trim();
+    const manufacturer   = String(formData.get("manufacturer")     ?? "").trim();
+    const model          = String(formData.get("model")            ?? "").trim();
+    const quantityRaw    = String(formData.get("quantity")         ?? "").trim();
+    const unit           = String(formData.get("unit")             ?? "").trim();
+    const reorderRaw     = String(formData.get("reorderLevel")     ?? "").trim();
+    const targetStockRaw = String(formData.get("targetStockLevel") ?? "").trim();
+    const statusRaw      = String(formData.get("status")           ?? "AVAILABLE").trim();
+    const uncountable    = formData.get("uncountable") === "on";
 
     const itemType = VALID_TYPES.includes(itemTypeRaw) ? itemTypeRaw : "GENERAL";
 
@@ -88,9 +85,9 @@ export default async function EditInventoryItemPage({
       redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`);
     }
 
-    const quantity    = quantityRaw   === "" ? 0    : Number(quantityRaw);
-    const reorder     = reorderRaw    === "" ? 0    : Number(reorderRaw);
-    const targetStock = targetStockRaw === "" ? null : Number(targetStockRaw);
+    const quantity    = uncountable ? 0 : (quantityRaw   === "" ? 0    : Number(quantityRaw));
+    const reorder     = uncountable ? 0 : (reorderRaw    === "" ? 0    : Number(reorderRaw));
+    const targetStock = uncountable ? null : (targetStockRaw === "" ? null : Number(targetStockRaw));
 
     const validStatuses = ["AVAILABLE","LOW_STOCK","OUT_OF_STOCK","CHECKED_OUT","INACTIVE"];
     const preferredStatus = validStatuses.includes(statusRaw) ? (statusRaw as InventoryItemStatus) : null;
@@ -99,6 +96,7 @@ export default async function EditInventoryItemPage({
       quantity:        Math.trunc(quantity),
       reorderLevel:    Math.trunc(reorder),
       preferredStatus,
+      uncountable,
     });
 
     // Check item code uniqueness if changed
@@ -123,6 +121,7 @@ export default async function EditInventoryItemPage({
           manufacturer:     manufacturer   || null,
           model:            model          || null,
           quantity:         Math.trunc(quantity),
+          uncountable,
           unit:             unit           || null,
           reorderLevel:     Math.trunc(reorder),
           targetStockLevel: targetStock === null ? null : Math.trunc(targetStock),
@@ -133,7 +132,7 @@ export default async function EditInventoryItemPage({
       await logActivity({
         type:       "INVENTORY_ITEM_UPDATED",
         title:      `Updated: ${updated.name}`,
-        details:    `Site: ${siteName}. Code: ${updated.itemCode ?? "—"}. Status: ${updated.status}.`,
+        details:    `Site: ${siteName}. Code: ${updated.itemCode ?? "—"}. ${uncountable ? "Qty: N/A." : `Qty: ${updated.quantity}.`} Status: ${updated.status}.`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
         entityId:   updated.id,
