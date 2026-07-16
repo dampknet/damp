@@ -5,27 +5,23 @@ import IssueLogClient from "./IssueLogClient";
 
 type SearchParams = {
   q?:      string;
-  status?: "ALL" | "ISSUED" | "RETURNED";
-  type?:   "ALL" | "EQUIPMENT" | "ACCESSORIES" | "TOOLS_AND_PARTS" | "GENERAL" | "COOLING_INFRASTRUCTURE" | "CABLES_AND_ELECTRONICS";
+  status?: "ALL" | "OPEN" | "RETURNED";
 };
 
 export default async function SiteIssueLogPage({
   params,
   searchParams,
 }: {
-  params:       Promise<{ siteId: string }>;
+  params:        Promise<{ siteId: string }>;
   searchParams?: Promise<SearchParams>;
 }) {
   const { siteId } = await params;
   const sp         = (await searchParams) ?? {};
-
-  const profile  = await getCurrentProfile();
-  const role     = profile?.role ?? "VIEWER";
-  const canEdit  = role === "ADMIN" || role === "EDITOR";
-
-  const q      = (sp.q ?? "").trim();
-  const status = sp.status ?? "ALL";
-  const type   = sp.type   ?? "ALL";
+  const profile    = await getCurrentProfile();
+  const role       = profile?.role ?? "VIEWER";
+  const canEdit    = role === "ADMIN" || role === "EDITOR";
+  const q          = (sp.q ?? "").trim();
+  const status     = sp.status ?? "ALL";
 
   const site = await prisma.inventorySite.findUnique({
     where:  { id: siteId },
@@ -33,130 +29,91 @@ export default async function SiteIssueLogPage({
   });
   if (!site) return notFound();
 
-  const rawIssues = await prisma.inventoryIssue.findMany({
+  // Fetch all warehouse issues for this site
+  const rawIssues = await prisma.warehouseIssue.findMany({
     where: {
       inventorySiteId: siteId,
       AND: [
         q ? {
           OR: [
-            { requesterName:    { contains: q, mode: "insensitive" } },
-            { requesterContact: { contains: q, mode: "insensitive" } },
-            { purpose:          { contains: q, mode: "insensitive" } },
-            { authorizedBy:     { contains: q, mode: "insensitive" } },
-            { inventoryItem: { name:     { contains: q, mode: "insensitive" } } },
-            { inventoryItem: { itemCode: { contains: q, mode: "insensitive" } } },
+            { takenBy:        { contains: q, mode: "insensitive" } },
+            { takenByContact: { contains: q, mode: "insensitive" } },
+            { purpose:        { contains: q, mode: "insensitive" } },
+            { authorizedBy:   { contains: q, mode: "insensitive" } },
+            { groupId:        { contains: q, mode: "insensitive" } },
+            { inventoryItem:  { name:     { contains: q, mode: "insensitive" } } },
+            { inventoryItem:  { itemCode: { contains: q, mode: "insensitive" } } },
             {
-              inventoryItem: {
-                instances: {
-                  some: { entityCode: { contains: q, mode: "insensitive" } },
+              lines: {
+                some: {
+                  assetInstance: { entityCode: { contains: q, mode: "insensitive" } },
                 },
               },
             },
           ],
         } : {},
         status !== "ALL" ? { status } : {},
-        type   !== "ALL" ? { itemType: type } : {},
       ],
     },
-    orderBy: { issuedAt: "desc" },
+    orderBy: { takenAt: "desc" },
     select: {
-      id:                true,
-      itemType:          true,
-      quantity:          true,
-      requesterName:     true,
-      requesterContact:  true,
-      department:        true,
-      purpose:           true,
-      authorizedBy:      true,
-      issuedAt:          true,
-      expectedReturnDate: true,
-      conditionAtIssue:  true,
-      returnedBy:        true,
-      returnContact:     true,
-      returnedAt:        true,
-      returnCondition:   true,
-      returnNote:        true,
-      status:            true,
+      id:               true,
+      groupId:          true,
+      quantityTaken:    true,
+      takenBy:          true,
+      takenByContact:   true,
+      authorizedBy:     true,
+      purpose:          true,
+      takenAt:          true,
+      expectedReturnAt: true,
+      returnedAt:       true,
+      returnedBy:       true,
+      returnNote:       true,
+      status:           true,
       inventoryItem: {
         select: {
           id:       true,
           name:     true,
+          itemType: true,
           itemCode: true,
           unit:     true,
-          instances: {
-            select:  { entityCode: true },
-            take:    3,
-            orderBy: { createdAt: "asc" },
+        },
+      },
+      lines: {
+        select: {
+          id: true,
+          assetInstance: {
+            select: { id: true, entityCode: true, condition: true },
           },
         },
       },
     },
   });
 
-  const issues = rawIssues.map((issue) => ({
-    ...issue,
-    inventoryItem: {
-      ...issue.inventoryItem,
-      entityCodePreview:
-        issue.inventoryItem.instances.map((i) => i.entityCode).join(", ") || "-",
-    },
+  // ✅ Group by groupId — each trip is one card
+  const groupMap = new Map<string, typeof rawIssues>();
+  for (const issue of rawIssues) {
+    const key = issue.groupId ?? issue.id; // fallback to id if no groupId (old records)
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(issue);
+  }
+
+  const trips = Array.from(groupMap.entries()).map(([groupId, issues]) => ({
+    groupId,
+    takenBy:        issues[0].takenBy,
+    takenByContact: issues[0].takenByContact,
+    authorizedBy:   issues[0].authorizedBy,
+    purpose:        issues[0].purpose,
+    takenAt:        issues[0].takenAt,
+    // A trip is RETURNED only if ALL items are returned
+    status: issues.every((i) => i.status === "RETURNED") ? "RETURNED" : "OPEN",
+    items:  issues,
   }));
 
-  const [issuedCount, returnedCount, equipmentCount, othersCount] = await Promise.all([
-    prisma.inventoryIssue.count({ where: { inventorySiteId: siteId, status: "ISSUED" } }),
-    prisma.inventoryIssue.count({ where: { inventorySiteId: siteId, status: "RETURNED" } }),
-    prisma.inventoryIssue.count({ where: { inventorySiteId: siteId, itemType: "EQUIPMENT" } }),
-    prisma.inventoryIssue.count({
-      where: {
-        inventorySiteId: siteId,
-        itemType: { in: ["ACCESSORIES","TOOLS_AND_PARTS","GENERAL","COOLING_INFRASTRUCTURE","CABLES_AND_ELECTRONICS"] },
-      },
-    }),
+  const [openCount, returnedCount] = await Promise.all([
+    prisma.warehouseIssue.count({ where: { inventorySiteId: siteId, status: "OPEN" } }),
+    prisma.warehouseIssue.count({ where: { inventorySiteId: siteId, status: "RETURNED" } }),
   ]);
-
-  const exportRows = issues.map((issue, index) => ({
-    No:               index + 1,
-    Item:             issue.inventoryItem.name,
-    "Item Code":      issue.inventoryItem.itemCode ?? "",
-    "Entity Codes":   issue.inventoryItem.entityCodePreview,
-    Type:             issue.itemType,
-    Quantity:         `${issue.quantity}${issue.inventoryItem.unit ? ` ${issue.inventoryItem.unit}` : ""}`,
-    Requester:        issue.requesterName,
-    Contact:          issue.requesterContact ?? "",
-    Department:       issue.department ?? "",
-    Purpose:          issue.purpose,
-    "Authorized By":  issue.authorizedBy,
-    "Issued At":      issue.issuedAt.toISOString(),
-    "Expected Return": issue.expectedReturnDate?.toISOString() ?? "",
-    "Returned At":    issue.returnedAt?.toISOString() ?? "",
-    "Returned By":    issue.returnedBy ?? "",
-    Status:           issue.status,
-    "Condition At Issue": issue.conditionAtIssue ?? "",
-    "Return Condition":   issue.returnCondition ?? "",
-    "Return Note":        issue.returnNote ?? "",
-  }));
-
-  const exportCols = [
-    { key: "No",           label: "No" },
-    { key: "Item",         label: "Item" },
-    { key: "Item Code",    label: "Item Code" },
-    { key: "Entity Codes", label: "Entity Codes" },
-    { key: "Type",         label: "Type" },
-    { key: "Quantity",     label: "Quantity" },
-    { key: "Requester",    label: "Requester" },
-    { key: "Contact",      label: "Contact" },
-    { key: "Department",   label: "Department" },
-    { key: "Purpose",      label: "Purpose" },
-    { key: "Authorized By",  label: "Authorized By" },
-    { key: "Issued At",      label: "Issued At" },
-    { key: "Expected Return", label: "Expected Return" },
-    { key: "Returned At",    label: "Returned At" },
-    { key: "Returned By",    label: "Returned By" },
-    { key: "Status",         label: "Status" },
-    { key: "Condition At Issue", label: "Condition At Issue" },
-    { key: "Return Condition",   label: "Return Condition" },
-    { key: "Return Note",        label: "Return Note" },
-  ];
 
   return (
     <IssueLogClient
@@ -165,11 +122,8 @@ export default async function SiteIssueLogPage({
       site={site}
       q={q}
       status={status}
-      type={type}
-      summary={{ issuedCount, returnedCount, equipmentCount, othersCount }}
-      issues={issues as any}
-      exportRows={exportRows}
-      exportCols={exportCols}
+      summary={{ openCount, returnedCount }}
+      trips={trips as any}
     />
   );
 }

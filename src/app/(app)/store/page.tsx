@@ -41,10 +41,10 @@ export default async function StoreDashboardPage() {
         OR: [{ status: "LOW_STOCK" }, { status: "OUT_OF_STOCK" }],
       },
     }),
-    prisma.warehouseIssue.count({ where: { status: "OPEN" } }),
+    prisma.warehouseIssue.count({ where: { status: "OPEN", expectedReturnAt: { not: null } } }),
     prisma.storeItem.count(),
-    prisma.inventoryRestock.count(),
-    prisma.inventoryIssue.count(),
+    prisma.inventoryRestock.count(),                          // restockCount
+    prisma.warehouseIssue.count(),                           // issueCount ✅ was InventoryIssue
   ]);
 
   const siteCards = inventorySites.map((site) => ({

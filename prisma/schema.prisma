@@ -373,12 +373,14 @@ model InventoryIssue {
 
 model WarehouseIssue {
   id               String               @id @default(cuid())
+  groupId          String?              // ✅ NEW — links items from one trip
   inventorySiteId  String
   inventoryItemId  String
   quantityTaken    Int                  @default(1)
   takenBy          String
   takenByContact   String?
   authorizedBy     String?
+  conditionAtIssue String?
   purpose          String
   takenAt          DateTime             @default(now())
   expectedReturnAt DateTime?
@@ -393,6 +395,7 @@ model WarehouseIssue {
   inventoryItem InventoryItem        @relation(fields: [inventoryItemId], references: [id])
   lines         WarehouseIssueLine[]
 
+  @@index([groupId])
   @@index([inventorySiteId])
   @@index([inventoryItemId])
   @@index([status])
