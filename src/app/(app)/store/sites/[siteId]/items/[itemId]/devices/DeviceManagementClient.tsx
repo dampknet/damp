@@ -9,105 +9,68 @@ import { QrCode, X, Loader2, CheckCircle2, PlusCircle, ArrowLeft, Printer, Trash
 
 export default function DeviceManagementClient({ item, canEdit }: any) {
   const { mode } = useThemeMode();
-  const dark = mode === "dark";
-  const router = useRouter();
+  const dark     = mode === "dark";
+  const router   = useRouter();
 
-  const [localUnits, setLocalUnits]   = useState(item.instances);
-  const [loadingId, setLoadingId]     = useState<string | null>(null);
-  const [scanningId, setScanningId]   = useState<string | null>(null);
+  const [localUnits,  setLocalUnits]  = useState(item.instances);
+  const [loadingId,   setLoadingId]   = useState<string | null>(null);
+  const [deletingId,  setDeletingId]  = useState<string | null>(null); // ✅ per-row delete
+  const [scanningId,  setScanningId]  = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const hasPermission  = canEdit === true;
-  const scanBuffer     = useRef("");
-  const lastKeyTime    = useRef(0);
+  const hasPermission = canEdit === true;
+  const scanBuffer    = useRef("");
+  const lastKeyTime   = useRef(0);
 
   useEffect(() => { setLocalUnits(item.instances); }, [item.instances]);
 
-  // ─── Is this a placeholder entity code? ────────────────────────────────────
   const isPlaceholder = (code: string) =>
-    !code ||
-    code.startsWith("PENDING") ||
-    code.startsWith("IMPORT") ||
-    code.startsWith("RESTOCK");
+    !code || code.startsWith("PENDING") || code.startsWith("IMPORT") || code.startsWith("RESTOCK");
 
-  // ─── ENTITY CODE SCANNER PARSER ────────────────────────────────────────────
-  // Our barcodes encode entity codes like KNET-EQUIP-004-01.
-  // When scanning, we ignore the site prefix (e.g. "KNET-") so that
-  // "EQUIP-004-01" or "equip-004-01" both match KNET-EQUIP-004-01.
-  // We also do a full case-insensitive match as fallback.
-  const parseScannedCode = (text: string): string => {
-    return text
-      .replace(/\r\n/g, "")
-      .replace(/\r/g, "")
-      .replace(/\n/g, "")
-      .trim();
-  };
+  const parseScannedCode = (text: string): string =>
+    text.replace(/\r\n/g, "").replace(/\r/g, "").replace(/\n/g, "").trim();
 
-  // Strips the site prefix from an entity code for fuzzy matching
-  // e.g. "KNET-EQUIP-004-01" → "EQUIP-004-01"
   const stripSitePrefix = (code: string): string => {
-    // Entity codes look like PREFIX-TYPE-NNN-NN
-    // The site prefix is everything before the first type segment
-    // Type segments: EQUIP, ACCESS, TO/PA, GEN, COOL, CA/EL
     const typeSegments = ["EQUIP", "ACCESS", "TO/PA", "GEN", "COOL", "CA/EL"];
     const upper = code.toUpperCase();
     for (const seg of typeSegments) {
       const idx = upper.indexOf(seg);
-      if (idx > 0) return code.slice(idx); // drop everything before the type
+      if (idx > 0) return code.slice(idx);
     }
     return code;
   };
 
-  // Match a scanned string against a database entityCode
   const matchesEntityCode = (scanned: string, dbCode: string): boolean => {
     const s = scanned.trim().toLowerCase();
     const d = dbCode.trim().toLowerCase();
-
     if (!s || !d) return false;
-
-    // Exact match
     if (s === d) return true;
-
-    // Strip site prefix from both and compare
     const sStripped = stripSitePrefix(s);
     const dStripped = stripSitePrefix(d);
     if (sStripped === dStripped) return true;
-
-    // Scanned value is a suffix of the db code (e.g. "EQUIP-004-01" matches "KNET-EQUIP-004-01")
     if (d.endsWith(s) || d.includes(`-${s}`)) return true;
-
-    // DB code is a suffix of what was scanned
     if (s.endsWith(d) || s.includes(`-${d}`)) return true;
-
     return false;
   };
 
-  // ─── KEYBOARD (Syble gun) SCAN HANDLER ─────────────────────────────────────
+  // ─── KEYBOARD SCAN HANDLER ────────────────────────────────────────────────
   useEffect(() => {
     if (!hasPermission) return;
-
     const handleKeyDown = async (e: KeyboardEvent) => {
       const now = Date.now();
       if (now - lastKeyTime.current > 150) scanBuffer.current = "";
       lastKeyTime.current = now;
-
       if (e.key === "Enter") {
         const raw = scanBuffer.current.trim();
         scanBuffer.current = "";
-
         if (raw.length > 2) {
           e.preventDefault();
-          const code = parseScannedCode(raw);
-
-          // Find matching unit in localUnits
+          const code  = parseScannedCode(raw);
           const match = localUnits.find((u: any) => matchesEntityCode(code, u.entityCode));
-
           if (match && isPlaceholder(match.entityCode)) {
-            // Fill empty slot
             await updateUnit(match.id, { entityCode: code });
           } else if (!match) {
-            // No match — add as new
             await addNewInstance({ entityCode: code });
           } else {
             alert(`Entity code already registered: ${match.entityCode}`);
@@ -117,19 +80,14 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         scanBuffer.current += e.key;
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [localUnits, hasPermission]);
 
-  // ─── CAMERA SCAN HANDLER ───────────────────────────────────────────────────
+  // ─── CAMERA SCAN ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (scanningId && hasPermission) {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { fps: 15, qrbox: { width: 250, height: 150 } },
-        false
-      );
+      const scanner = new Html5QrcodeScanner("qr-reader", { fps: 15, qrbox: { width: 250, height: 150 } }, false);
       scanner.render(async (decodedText: string) => {
         const code = parseScannedCode(decodedText);
         await scanner.clear();
@@ -141,7 +99,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     }
   }, [scanningId, hasPermission]);
 
-  // ─── ADD NEW INSTANCE ───────────────────────────────────────────────────────
+  // ─── ADD NEW INSTANCE ─────────────────────────────────────────────────────
   async function addNewInstance(data: any) {
     if (!hasPermission) return;
     setIsAddingNew(true);
@@ -160,20 +118,16 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     finally   { setIsAddingNew(false); }
   }
 
-  // ─── UPDATE UNIT ────────────────────────────────────────────────────────────
+  // ─── UPDATE UNIT ──────────────────────────────────────────────────────────
   async function updateUnit(instanceId: string, updates: any) {
     if (!hasPermission) return;
     setLoadingId(instanceId);
-
     const payload = { ...updates };
-
-    // If entity code cleared, reset to placeholder
     if (payload.entityCode === "") {
-      payload.entityCode = `PENDING-${instanceId.slice(-5)}`;
+      payload.entityCode   = `PENDING-${instanceId.slice(-5)}`;
       payload.serialNumber = "";
-      payload.model = "";
+      payload.model        = "";
     }
-
     try {
       const res = await fetch(`/store/instances/${instanceId}`, {
         method:  "PATCH",
@@ -194,23 +148,44 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
     finally   { setLoadingId(null); }
   }
 
-  // ─── BULK DELETE ────────────────────────────────────────────────────────────
+  // ─── DELETE SINGLE INSTANCE ───────────────────────────────────────────────
+  async function deleteInstance(instanceId: string, entityCode: string) {
+    if (!hasPermission) return;
+    if (!confirm(`Delete unit "${entityCode}"?\nThis will reduce the quantity by 1.`)) return;
+
+    setDeletingId(instanceId);
+    try {
+      const res = await fetch(`/api/store/instances/bulk-delete`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ ids: [instanceId], itemId: item.id }),
+      });
+      if (res.ok) {
+        setLocalUnits((prev: any) => prev.filter((u: any) => u.id !== instanceId));
+        router.refresh();
+      } else {
+        alert("Failed to delete unit.");
+      }
+    } catch { alert("Network error deleting unit."); }
+    finally   { setDeletingId(null); }
+  }
+
+  // ─── BULK DELETE SELECTED ─────────────────────────────────────────────────
   const deleteSelected = async () => {
     if (!confirm(`Delete ${selectedIds.length} units? This will decrease total quantity.`)) return;
     try {
-      const res = await fetch(`/store/instances/bulk-delete`, {
+      const res = await fetch(`/api/store/instances/bulk-delete`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ ids: selectedIds, itemId: item.id }),
       });
       if (res.ok) { setSelectedIds([]); router.refresh(); }
+      else alert("Bulk delete failed.");
     } catch { alert("Delete failed."); }
   };
 
   const toggleSelect = (id: string) =>
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
 
   const inputClass = dark
     ? "w-full bg-transparent border-b border-white/10 focus:border-sky-500 outline-none font-mono text-sm py-1 text-white placeholder:text-slate-700"
@@ -237,12 +212,8 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
               ? "bg-slate-900 w-full max-w-md rounded-3xl p-6 relative border border-white/10"
               : "bg-white w-full max-w-md rounded-3xl p-6 relative border border-slate-200"
             }>
-              <button
-                onClick={() => setScanningId(null)}
-                title="Close Scanner"
-                aria-label="Close Scanner"
-                className="absolute right-4 top-4 p-2 opacity-50 hover:opacity-100"
-              >
+              <button onClick={() => setScanningId(null)} title="Close Scanner" aria-label="Close Scanner"
+                className="absolute right-4 top-4 p-2 opacity-50 hover:opacity-100">
                 <X size={24} />
               </button>
               <h2 className="text-xl font-bold mb-4 text-center">Camera Scan</h2>
@@ -254,10 +225,8 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         {/* Header */}
         <div className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
           <div className="header-nav">
-            <Link
-              href={`/store/sites/${item.inventorySiteId}`}
-              className="inline-flex items-center gap-2 text-sm font-bold opacity-60 hover:text-sky-500 mb-4"
-            >
+            <Link href={`/store/sites/${item.inventorySiteId}`}
+              className="inline-flex items-center gap-2 text-sm font-bold opacity-60 hover:text-sky-500 mb-4">
               <ArrowLeft size={16} /> Back
             </Link>
             <h1 className="text-4xl font-black tracking-tight">{item.name}</h1>
@@ -268,22 +237,16 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
 
           <div className="flex items-center gap-3 no-print">
             {selectedIds.length > 0 && (
-              <button
-                onClick={deleteSelected}
-                className="bg-rose-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2"
-              >
+              <button onClick={deleteSelected}
+                className="bg-rose-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2">
                 <Trash2 size={16} /> Delete ({selectedIds.length})
               </button>
             )}
-            <button
-              onClick={() => window.print()}
-              title="Print Labels"
-              aria-label="Print Labels"
+            <button onClick={() => window.print()} title="Print Labels" aria-label="Print Labels"
               className={dark
                 ? "flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm"
                 : "flex items-center gap-2 bg-white border border-slate-300 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm"
-              }
-            >
+              }>
               <Printer size={18} /> Print List
             </button>
             <div className={dark
@@ -314,13 +277,14 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                   <th className="px-6 py-4">Entity Code</th>
                   <th className="px-6 py-4">Item Code</th>
                   <th className="px-6 py-4">Model</th>
-                  <th className="px-6 py-4 w-32 text-right">Condition</th>
+                  <th className="px-6 py-4 text-center">Condition</th>
+                  {hasPermission && <th className="px-4 py-4 w-12 no-print" />} {/* ✅ delete col */}
                 </tr>
               </thead>
               <tbody className={dark ? "divide-y divide-white/5" : "divide-y divide-slate-200"}>
                 {localUnits.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">
+                    <td colSpan={6} className="px-6 py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">
                       No units yet — scan or add below
                     </td>
                   </tr>
@@ -328,19 +292,17 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                 {localUnits.map((unit: any, index: number) => {
                   const hasRealCode = !isPlaceholder(unit.entityCode);
                   const isSelected  = selectedIds.includes(unit.id);
+                  const isDeleting  = deletingId === unit.id;
 
                   return (
-                    <tr
-                      key={unit.id}
+                    <tr key={unit.id}
                       className={`${isSelected ? "bg-sky-500/10" : ""} ${
                         loadingId === unit.id ? "bg-sky-500/5 animate-pulse" : "hover:bg-sky-500/5"
                       } transition-colors`}
                     >
                       {/* Row number / checkbox */}
-                      <td
-                        className="px-6 py-5 text-center font-mono text-xs cursor-pointer"
-                        onClick={() => toggleSelect(unit.id)}
-                      >
+                      <td className="px-6 py-5 text-center font-mono text-xs cursor-pointer"
+                        onClick={() => toggleSelect(unit.id)}>
                         <div className={`w-6 h-6 rounded flex items-center justify-center border text-xs ${
                           isSelected
                             ? "bg-sky-500 border-sky-500 text-white"
@@ -350,7 +312,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                         </div>
                       </td>
 
-                      {/* Entity code — editable */}
+                      {/* Entity code */}
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-2">
                           <input
@@ -360,9 +322,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                             disabled={!hasPermission}
                             onChange={(e) =>
                               setLocalUnits((prev: any) =>
-                                prev.map((u: any) =>
-                                  u.id === unit.id ? { ...u, entityCode: e.target.value } : u
-                                )
+                                prev.map((u: any) => u.id === unit.id ? { ...u, entityCode: e.target.value } : u)
                               )
                             }
                             onBlur={(e) => updateUnit(unit.id, { entityCode: e.target.value })}
@@ -375,12 +335,9 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                               : hasRealCode
                               ? <CheckCircle2 className="text-emerald-500 no-print shrink-0" size={16} />
                               : (
-                                <button
-                                  onClick={() => setScanningId(unit.id)}
-                                  title="Camera Scan"
-                                  aria-label="Camera Scan"
-                                  className="text-sky-500 hover:scale-110 no-print shrink-0"
-                                >
+                                <button onClick={() => setScanningId(unit.id)}
+                                  title="Camera Scan" aria-label="Camera Scan"
+                                  className="text-sky-500 hover:scale-110 no-print shrink-0">
                                   <QrCode size={18} />
                                 </button>
                               )
@@ -388,7 +345,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                         </div>
                       </td>
 
-                      {/* Item code — display only (from parent item) */}
+                      {/* Item code */}
                       <td className="px-6 py-5">
                         <span className={`font-mono text-xs ${dark ? "text-slate-400" : "text-slate-500"}`}>
                           {item.itemCode || "—"}
@@ -404,9 +361,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                           disabled={!hasPermission}
                           onChange={(e) =>
                             setLocalUnits((prev: any) =>
-                              prev.map((u: any) =>
-                                u.id === unit.id ? { ...u, model: e.target.value } : u
-                              )
+                              prev.map((u: any) => u.id === unit.id ? { ...u, model: e.target.value } : u)
                             )
                           }
                           onBlur={(e) => updateUnit(unit.id, { model: e.target.value })}
@@ -416,17 +371,16 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                       </td>
 
                       {/* Condition */}
-                      <td className="px-6 py-5 text-right">
+                      <td className="px-6 py-5 text-center">
                         <select
                           value={unit.condition}
                           title={`Condition ${index + 1}`}
                           aria-label={`Condition ${index + 1}`}
                           disabled={!hasPermission}
                           onChange={(e) => updateUnit(unit.id, { condition: e.target.value })}
-                          className={`${
-                            dark
-                              ? "bg-slate-800 border-white/20 text-white"
-                              : "bg-white border-slate-400 text-slate-900"
+                          className={`${dark
+                            ? "bg-slate-800 border-white/20 text-white"
+                            : "bg-white border-slate-400 text-slate-900"
                           } no-print rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer border`}
                         >
                           <option value="NEW">NEW</option>
@@ -435,6 +389,27 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
                           <option value="FAULTY">FAULTY</option>
                         </select>
                       </td>
+
+                      {/* ✅ Per-row delete button */}
+                      {hasPermission && (
+                        <td className="px-4 py-5 text-center no-print">
+                          <button
+                            onClick={() => deleteInstance(unit.id, unit.entityCode)}
+                            disabled={isDeleting}
+                            title={`Delete ${unit.entityCode}`}
+                            aria-label={`Delete ${unit.entityCode}`}
+                            className={dark
+                              ? "rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30 transition-colors"
+                              : "rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 transition-colors"
+                            }
+                          >
+                            {isDeleting
+                              ? <Loader2 size={15} className="animate-spin" />
+                              : <Trash2 size={15} />
+                            }
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
