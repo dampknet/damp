@@ -191,7 +191,7 @@ export default function SettingsMenu({
             <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
 
             <Link
-              href="/admin/users"
+              href="/admin"
               className={`block px-5 py-3 text-sm font-medium transition ${
                 isDark
                   ? "text-slate-200 hover:bg-white/5"
