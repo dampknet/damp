@@ -413,3 +413,15 @@ model WarehouseIssueLine {
   @@index([warehouseIssueId])
   @@index([assetInstanceId])
 }
+
+model MqttConfig {
+  id               String   @id @default(cuid())
+  connectionName   String
+  clusterUrl       String
+  mqttPort         Int      @default(8883)
+  websocketPort    Int      @default(8884)
+  username         String
+  password         String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

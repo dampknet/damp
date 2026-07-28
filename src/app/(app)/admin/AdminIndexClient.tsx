@@ -51,6 +51,17 @@ export default function AdminIndexClient({
       hoverCl: dark ? "group-hover:text-emerald-400" : "group-hover:text-emerald-700",
     },
     {
+      href:    "/admin/mqtt",
+      emoji:   "📡",
+      label:   "HiveMQ Fuel Monitor",
+      sub:     "Configure MQTT connection for live fuel levels",
+      accent:  "bg-[linear-gradient(90deg,#1d5fa8,#06b6d4)]",
+      iconBg:  dark ? "border-sky-500/20 bg-sky-500/10"  : "border-sky-200 bg-sky-50",
+      tag:     "42 sites · Live fuel data",
+      tagCls:  dark ? "border-sky-500/20 bg-sky-500/10 text-sky-300" : "border-sky-200 bg-sky-50 text-sky-700",
+      hoverCl: dark ? "group-hover:text-sky-400" : "group-hover:text-sky-700",
+    },
+    {
       href:    "/activity",
       emoji:   "📋",
       label:   "Activity Audit Log",
