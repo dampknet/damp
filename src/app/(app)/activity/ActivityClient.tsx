@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import PrintExportButton from "@/components/PrintExportButton";
 import { useThemeMode } from "@/context/ThemeContext";
+import { FileText, Loader2, X } from "lucide-react";
 
 type IndicatorLabel =
   | "DOWN" | "UP" | "FAULT" | "UPDATED" | "SYSTEM" | "LOGIN"
@@ -26,60 +28,97 @@ type ActivityItem = {
   entityId:    string;
 };
 
-type ActionOption = { value: string; label: string };
+type ActionOption  = { value: string; label: string };
+type InventorySite = { id: string; name: string };
 
-// Badge colour per label
 const BADGE_COLOR: Record<IndicatorLabel, string> = {
-  UP:        "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-  CREATED:   "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-  RETURNED:  "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-  RESTOCK:   "border-green-500/30  bg-green-500/10  text-green-400",
-  IMPORT:    "border-blue-500/30   bg-blue-500/10   text-blue-400",
-  UPDATED:   "border-blue-500/30   bg-blue-500/10   text-blue-400",
-  LOGIN:     "border-sky-500/30    bg-sky-500/10    text-sky-400",
-  UNIT:      "border-indigo-500/30 bg-indigo-500/10 text-indigo-400",
-  ISSUED:    "border-amber-500/30  bg-amber-500/10  text-amber-400",
-  "LOW STOCK":"border-orange-500/30 bg-orange-500/10 text-orange-400",
-  FAULT:     "border-orange-500/30 bg-orange-500/10 text-orange-400",
-  DOWN:      "border-red-500/30    bg-red-500/10    text-red-400",
-  OUT:       "border-red-500/30    bg-red-500/10    text-red-400",
-  DELETED:   "border-rose-500/30   bg-rose-500/10   text-rose-400",
-  SYSTEM:    "border-slate-500/30  bg-slate-500/10  text-slate-400",
+  UP:          "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+  CREATED:     "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+  RETURNED:    "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+  RESTOCK:     "border-green-500/30  bg-green-500/10  text-green-400",
+  IMPORT:      "border-blue-500/30   bg-blue-500/10   text-blue-400",
+  UPDATED:     "border-blue-500/30   bg-blue-500/10   text-blue-400",
+  LOGIN:       "border-sky-500/30    bg-sky-500/10    text-sky-400",
+  UNIT:        "border-indigo-500/30 bg-indigo-500/10 text-indigo-400",
+  ISSUED:      "border-amber-500/30  bg-amber-500/10  text-amber-400",
+  "LOW STOCK": "border-orange-500/30 bg-orange-500/10 text-orange-400",
+  FAULT:       "border-orange-500/30 bg-orange-500/10 text-orange-400",
+  DOWN:        "border-red-500/30    bg-red-500/10    text-red-400",
+  OUT:         "border-red-500/30    bg-red-500/10    text-red-400",
+  DELETED:     "border-rose-500/30   bg-rose-500/10   text-rose-400",
+  SYSTEM:      "border-slate-500/30  bg-slate-500/10  text-slate-400",
 };
 
 const BADGE_COLOR_LIGHT: Record<IndicatorLabel, string> = {
-  UP:        "border-emerald-200 bg-emerald-50 text-emerald-700",
-  CREATED:   "border-emerald-200 bg-emerald-50 text-emerald-700",
-  RETURNED:  "border-emerald-200 bg-emerald-50 text-emerald-700",
-  RESTOCK:   "border-green-200   bg-green-50   text-green-700",
-  IMPORT:    "border-blue-200    bg-blue-50    text-blue-700",
-  UPDATED:   "border-blue-200    bg-blue-50    text-blue-700",
-  LOGIN:     "border-sky-200     bg-sky-50     text-sky-700",
-  UNIT:      "border-indigo-200  bg-indigo-50  text-indigo-700",
-  ISSUED:    "border-amber-200   bg-amber-50   text-amber-700",
-  "LOW STOCK":"border-orange-200  bg-orange-50  text-orange-700",
-  FAULT:     "border-orange-200  bg-orange-50  text-orange-700",
-  DOWN:      "border-red-200     bg-red-50     text-red-700",
-  OUT:       "border-red-200     bg-red-50     text-red-700",
-  DELETED:   "border-rose-200    bg-rose-50    text-rose-700",
-  SYSTEM:    "border-slate-200   bg-slate-50   text-slate-600",
+  UP:          "border-emerald-200 bg-emerald-50 text-emerald-700",
+  CREATED:     "border-emerald-200 bg-emerald-50 text-emerald-700",
+  RETURNED:    "border-emerald-200 bg-emerald-50 text-emerald-700",
+  RESTOCK:     "border-green-200   bg-green-50   text-green-700",
+  IMPORT:      "border-blue-200    bg-blue-50    text-blue-700",
+  UPDATED:     "border-blue-200    bg-blue-50    text-blue-700",
+  LOGIN:       "border-sky-200     bg-sky-50     text-sky-700",
+  UNIT:        "border-indigo-200  bg-indigo-50  text-indigo-700",
+  ISSUED:      "border-amber-200   bg-amber-50   text-amber-700",
+  "LOW STOCK": "border-orange-200  bg-orange-50  text-orange-700",
+  FAULT:       "border-orange-200  bg-orange-50  text-orange-700",
+  DOWN:        "border-red-200     bg-red-50     text-red-700",
+  OUT:         "border-red-200     bg-red-50     text-red-700",
+  DELETED:     "border-rose-200    bg-rose-50    text-rose-700",
+  SYSTEM:      "border-slate-200   bg-slate-50   text-slate-600",
 };
 
 export default function ActivityClient({
-  q, type, period, actionOptions,
+  q, type, period, site, actionOptions,
   title, activities, exportRows, exportCols,
+  inventorySites,
 }: {
-  q:             string;
-  type:          string;
-  period:        "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
-  actionOptions: ActionOption[];
-  title:         string;
-  activities:    ActivityItem[];
-  exportRows:    Array<Record<string, string | number>>;
-  exportCols:    Array<{ key: string; label: string }>;
+  q:              string;
+  type:           string;
+  period:         "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
+  site:           string;
+  actionOptions:  ActionOption[];
+  title:          string;
+  activities:     ActivityItem[];
+  exportRows:     Array<Record<string, string | number>>;
+  exportCols:     Array<{ key: string; label: string }>;
+  inventorySites: InventorySite[];
 }) {
   const { mode } = useThemeMode();
-  const dark     = mode === "dark";
+  const dark      = mode === "dark";
+
+  // ── Report modal state ───────────────────────────────────────────────────
+  const [showReport,    setShowReport]    = useState(false);
+  const [reportPeriod,  setReportPeriod]  = useState("THIS_MONTH");
+  const [reportSite,    setReportSite]    = useState("ALL");
+  const [generating,    setGenerating]    = useState(false);
+
+  const handleGenerateReport = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/activity/report", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ period: reportPeriod, siteId: reportSite }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `DAMP-Report-${reportPeriod}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setShowReport(false);
+    } catch {
+      alert("Report generation failed. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const inputCls = dark
+    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
+    : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none";
 
   return (
     <div className={dark
@@ -113,6 +152,17 @@ export default function ActivityClient({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* ✅ Generate Report button */}
+              <button
+                onClick={() => setShowReport(true)}
+                className={dark
+                  ? "inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                  : "inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                }
+              >
+                <FileText size={16} /> Generate Report
+              </button>
+
               <PrintExportButton
                 title={title}
                 filename="activity-log.csv"
@@ -130,7 +180,7 @@ export default function ActivityClient({
 
           {/* ── FILTERS ── */}
           <div className="mt-6">
-            <form className="grid gap-3 md:grid-cols-[1fr_280px_160px_auto_auto]">
+            <form className="grid gap-3 md:grid-cols-[1fr_220px_160px_160px_auto_auto]">
               <input name="q" defaultValue={q}
                 placeholder="Search title, details, actor, entity..."
                 title="Search logs"
@@ -150,6 +200,20 @@ export default function ActivityClient({
                 <option value="">All Actions</option>
                 {actionOptions.map((item) => (
                   <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+
+              {/* ✅ Site filter */}
+              <select name="site" defaultValue={site}
+                aria-label="Filter by site" title="Filter by site"
+                className={dark
+                  ? "rounded-xl border border-white/10 bg-[#101720] px-3 py-2 text-sm text-slate-100"
+                  : "rounded-xl border border-[#e0dbd2] bg-white px-3 py-2 text-sm"
+                }
+              >
+                <option value="">All Sites</option>
+                {inventorySites.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
 
@@ -215,41 +279,23 @@ export default function ActivityClient({
                   <th className="px-5 py-3 font-semibold text-right">Entity</th>
                 </tr>
               </thead>
-
               <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-[#eee7dd]"}>
                 {activities.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className={dark
-                      ? "px-5 py-12 text-center text-slate-500"
-                      : "px-5 py-12 text-center text-[#8b857c]"
-                    }>
+                    <td colSpan={7} className={dark ? "px-5 py-12 text-center text-slate-500" : "px-5 py-12 text-center text-[#8b857c]"}>
                       No activity found
                     </td>
                   </tr>
                 ) : activities.map((a) => (
-                  <tr key={a.id} className={dark
-                    ? "hover:bg-white/5"
-                    : "hover:bg-[#fcfaf7] transition-colors"
-                  }>
-                    {/* No */}
-                    <td className={dark ? "px-5 py-4 font-medium text-slate-500" : "px-5 py-4 font-medium text-[#6b655d]"}>
-                      {a.no}
-                    </td>
-
-                    {/* Time */}
-                    <td className={dark ? "px-5 py-4 font-mono text-[12px] text-slate-400" : "px-5 py-4 font-mono text-[12px] text-[#5d584f]"}>
-                      {a.timeLabel}
-                    </td>
-
-                    {/* Status dot + badge */}
+                  <tr key={a.id} className={dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7] transition-colors"}>
+                    <td className={dark ? "px-5 py-4 font-medium text-slate-500" : "px-5 py-4 font-medium text-[#6b655d]"}>{a.no}</td>
+                    <td className={dark ? "px-5 py-4 font-mono text-[12px] text-slate-400" : "px-5 py-4 font-mono text-[12px] text-[#5d584f]"}>{a.timeLabel}</td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${dark ? BADGE_COLOR[a.indicator.label] : BADGE_COLOR_LIGHT[a.indicator.label]}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${a.indicator.color}`} />
                         {a.indicator.label}
                       </span>
                     </td>
-
-                    {/* Action type */}
                     <td className="px-5 py-4">
                       <span className={dark
                         ? "inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight text-slate-300"
@@ -258,8 +304,6 @@ export default function ActivityClient({
                         {a.typeLabel}
                       </span>
                     </td>
-
-                    {/* Title + details */}
                     <td className={dark ? "px-5 py-4 text-slate-100" : "px-5 py-4 text-[#1a1814]"}>
                       <div className="font-semibold text-sm">{a.reason}</div>
                       {a.details && (
@@ -268,19 +312,10 @@ export default function ActivityClient({
                         </div>
                       )}
                     </td>
-
-                    {/* Actor */}
-                    <td className={dark ? "px-5 py-4 text-xs text-slate-400" : "px-5 py-4 text-xs text-[#5d584f]"}>
-                      {a.actorEmail}
-                    </td>
-
-                    {/* Entity */}
+                    <td className={dark ? "px-5 py-4 text-xs text-slate-400" : "px-5 py-4 text-xs text-[#5d584f]"}>{a.actorEmail}</td>
                     <td className="px-5 py-4 text-right">
                       {a.href ? (
-                        <Link href={a.href} className={dark
-                          ? "text-xs font-bold text-sky-400 hover:underline"
-                          : "text-xs font-bold text-blue-700 hover:underline"
-                        }>
+                        <Link href={a.href} className={dark ? "text-xs font-bold text-sky-400 hover:underline" : "text-xs font-bold text-blue-700 hover:underline"}>
                           {a.entityLabel}
                         </Link>
                       ) : (
@@ -294,6 +329,115 @@ export default function ActivityClient({
           </div>
         </div>
       </div>
+
+      {/* ── GENERATE REPORT MODAL ── */}
+      {showReport && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.5)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowReport(false); }}
+        >
+          <div className={dark
+            ? "w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1923] shadow-2xl"
+            : "w-full max-w-md overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white shadow-2xl"
+          }>
+            <div className="h-1 bg-[linear-gradient(90deg,#2a7d52,#10b981)]" />
+            <div className="p-6">
+              {/* Modal header */}
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <div className={dark ? "text-base font-bold text-slate-100" : "text-base font-bold text-[#1a1814]"}>
+                    Generate Activity Report
+                  </div>
+                  <div className={dark ? "mt-1 text-xs text-slate-400" : "mt-1 text-xs text-[#8b857c]"}>
+                    Downloads a Word document (.docx) with a full summary for the selected period and site.
+                  </div>
+                </div>
+                <button onClick={() => setShowReport(false)} className={dark ? "text-slate-500 hover:text-slate-300" : "text-[#9c9890] hover:text-[#1a1814]"}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Period */}
+                <div>
+                  <label className={dark ? "mb-1.5 block text-xs font-semibold text-slate-300" : "mb-1.5 block text-xs font-semibold text-[#1a1814]"}>
+                    Period
+                  </label>
+                  <select
+                    value={reportPeriod}
+                    onChange={(e) => setReportPeriod(e.target.value)}
+                    title="Report period"
+                    className={inputCls}
+                  >
+                    <option value="TODAY">Today</option>
+                    <option value="THIS_WEEK">This Week</option>
+                    <option value="LAST_WEEK">Last Week</option>
+                    <option value="THIS_MONTH">This Month</option>
+                    <option value="THIS_YEAR">This Year</option>
+                  </select>
+                </div>
+
+                {/* Site */}
+                <div>
+                  <label className={dark ? "mb-1.5 block text-xs font-semibold text-slate-300" : "mb-1.5 block text-xs font-semibold text-[#1a1814]"}>
+                    Inventory Site
+                  </label>
+                  <select
+                    value={reportSite}
+                    onChange={(e) => setReportSite(e.target.value)}
+                    title="Report site"
+                    className={inputCls}
+                  >
+                    <option value="ALL">All Sites</option>
+                    {inventorySites.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* What's included */}
+                <div className={dark
+                  ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-400"
+                  : "rounded-xl border border-[#e7dfd4] bg-[#fffdf9] px-4 py-3 text-xs text-[#6b655d]"
+                }>
+                  <div className={dark ? "mb-1 font-semibold text-slate-300" : "mb-1 font-semibold text-[#1a1814]"}>Report includes:</div>
+                  <ul className="space-y-0.5 pl-3">
+                    {["Summary statistics", "User login counts per user", "All items issued (who, what, purpose)", "Restock operations"].map((item) => (
+                      <li key={item} className="list-disc">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={generating}
+                  className={dark
+                    ? "flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#2a7d52,#10b981)] py-2.5 text-sm font-bold text-white hover:opacity-95 disabled:opacity-50"
+                    : "flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#2a7d52] py-2.5 text-sm font-bold text-white hover:opacity-95 disabled:opacity-50"
+                  }
+                >
+                  {generating
+                    ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
+                    : <><FileText size={16} /> Generate & Download</>
+                  }
+                </button>
+                <button
+                  onClick={() => setShowReport(false)}
+                  className={dark
+                    ? "rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                    : "rounded-xl border border-[#ddd5c9] bg-white px-5 py-2.5 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                  }
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

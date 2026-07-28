@@ -5,6 +5,7 @@ type SearchParams = {
   q?:      string;
   type?:   string;
   period?: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
+  site?:   string;
 };
 
 function formatDate(date: Date) {
@@ -18,45 +19,36 @@ function activityIndicator(type: string, title: string) {
   const t          = type.toLowerCase();
   const titleLower = title.toLowerCase();
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
   if (t.includes("logout"))  return { color: "bg-violet-500", label: "SYSTEM"   as const };
   if (t.includes("login"))   return { color: "bg-sky-500",    label: "LOGIN"    as const };
 
-  // ── Site status ───────────────────────────────────────────────────────────
   if (titleLower.includes("active") || titleLower.includes("up"))
     return { color: "bg-emerald-500", label: "UP"   as const };
   if (titleLower.includes("down"))
     return { color: "bg-red-500",     label: "DOWN" as const };
 
-  // ── Warehouse issue (new) ─────────────────────────────────────────────────
   if (t.includes("warehouse_issue_created"))
     return { color: "bg-amber-500",   label: "ISSUED"    as const };
   if (t.includes("warehouse_issue_returned"))
     return { color: "bg-emerald-500", label: "RETURNED"  as const };
 
-  // ── Inventory movement ────────────────────────────────────────────────────
   if (t.includes("returned"))  return { color: "bg-emerald-500", label: "RETURNED"  as const };
   if (t.includes("issued"))    return { color: "bg-amber-500",   label: "ISSUED"    as const };
   if (t.includes("restock"))   return { color: "bg-green-500",   label: "RESTOCK"   as const };
   if (t.includes("import"))    return { color: "bg-blue-500",    label: "IMPORT"    as const };
 
-  // ── Stock alerts ──────────────────────────────────────────────────────────
-  if (t.includes("low_stock"))   return { color: "bg-orange-500", label: "LOW STOCK" as const };
-  if (t.includes("out_of_stock")) return { color: "bg-red-500",   label: "OUT"       as const };
+  if (t.includes("low_stock"))    return { color: "bg-orange-500", label: "LOW STOCK" as const };
+  if (t.includes("out_of_stock")) return { color: "bg-red-500",    label: "OUT"       as const };
 
-  // ── Store items ───────────────────────────────────────────────────────────
   if (t.includes("store_item_status"))  return { color: "bg-blue-500",  label: "UPDATED"  as const };
   if (t.includes("store_item_deleted")) return { color: "bg-rose-500",  label: "DELETED"  as const };
 
-  // ── Unit / serial tracking ────────────────────────────────────────────────
   if (t.includes("serial_updated") || titleLower.includes("unit updated"))
     return { color: "bg-indigo-500", label: "UNIT" as const };
 
-  // ── Fault ─────────────────────────────────────────────────────────────────
   if (t.includes("fault") || titleLower.includes("faulty"))
     return { color: "bg-orange-500", label: "FAULT" as const };
 
-  // ── Generic CRUD ──────────────────────────────────────────────────────────
   if (t.includes("deleted"))                   return { color: "bg-rose-500",    label: "DELETED"  as const };
   if (t.includes("created"))                   return { color: "bg-emerald-500", label: "CREATED"  as const };
   if (t.includes("updated") || t.includes("changed"))
@@ -96,13 +88,9 @@ function getPeriodStart(period: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR") {
   return null;
 }
 
-// ── ALL activity types that exist in your ActivityType enum ─────────────────
 const actionOptions = [
-  // Auth
   { value: "USER_LOGIN",  label: "User Login"  },
   { value: "USER_LOGOUT", label: "User Logout" },
-
-  // Sites
   { value: "SITE_CREATED",        label: "Site Created"         },
   { value: "SITE_UPDATED",        label: "Site Updated"         },
   { value: "SITE_STATUS_CHANGED", label: "Site Status Changed"  },
@@ -110,38 +98,24 @@ const actionOptions = [
   { value: "SITE_HEIGHT_UPDATED", label: "Site Height Updated"  },
   { value: "SITE_GPS_UPDATED",    label: "Site GPS Updated"     },
   { value: "SITE_DELETED",        label: "Site Deleted"         },
-
-  // Assets
   { value: "ASSET_CREATED",        label: "Asset Created"        },
   { value: "ASSET_UPDATED",        label: "Asset Updated"        },
   { value: "ASSET_DELETED",        label: "Asset Deleted"        },
   { value: "ASSET_STATUS_CHANGED", label: "Asset Status Changed" },
   { value: "ASSET_SERIAL_UPDATED", label: "Unit / Serial Updated"},
-
-  // Inventory items
   { value: "INVENTORY_ITEM_CREATED", label: "Inventory Item Created" },
   { value: "INVENTORY_ITEM_UPDATED", label: "Inventory Item Updated" },
   { value: "INVENTORY_ITEM_DELETED", label: "Inventory Item Deleted" },
-
-  // Inventory movement
-  { value: "INVENTORY_RESTOCK_ADDED",        label: "Restock Added"        },
-  { value: "INVENTORY_ITEM_ISSUED",          label: "Item Issued"          },
-  { value: "INVENTORY_EQUIPMENT_RETURNED",   label: "Equipment Returned"   },
-  { value: "INVENTORY_IMPORT",               label: "Inventory Import"     },
-
-  // Stock alerts
-  { value: "INVENTORY_LOW_STOCK",   label: "Low Stock Alert"    },
+  { value: "INVENTORY_RESTOCK_ADDED",      label: "Restock Added"      },
+  { value: "INVENTORY_ITEM_ISSUED",        label: "Item Issued"        },
+  { value: "INVENTORY_EQUIPMENT_RETURNED", label: "Equipment Returned" },
+  { value: "INVENTORY_IMPORT",             label: "Inventory Import"   },
+  { value: "INVENTORY_LOW_STOCK",    label: "Low Stock Alert"    },
   { value: "INVENTORY_OUT_OF_STOCK", label: "Out of Stock Alert" },
-
-  // Store (Central Stock)
   { value: "STORE_ITEM_STATUS_CHANGED", label: "Store Item Status Changed" },
   { value: "STORE_ITEM_DELETED",        label: "Store Item Deleted"        },
-
-  // ✅ NEW: Warehouse issue (borrow/return tracking)
-  { value: "WAREHOUSE_ISSUE_CREATED",  label: "Warehouse Issue Created"   },
-  { value: "WAREHOUSE_ISSUE_RETURNED", label: "Warehouse Item Returned"   },
-
-  // System
+  { value: "WAREHOUSE_ISSUE_CREATED",  label: "Warehouse Issue Created"  },
+  { value: "WAREHOUSE_ISSUE_RETURNED", label: "Warehouse Item Returned"  },
   { value: "SYSTEM_EVENT", label: "System Event" },
 ];
 
@@ -158,8 +132,18 @@ export default async function ActivityPage({
   const q      = (sp.q      ?? "").trim();
   const type   = (sp.type   ?? "").trim();
   const period = sp.period  ?? "ALL";
+  const site   = (sp.site   ?? "").trim();
 
   const periodStart = getPeriodStart(period);
+
+  // Fetch sites first so we can look up names for filtering
+  const inventorySites = await prisma.inventorySite.findMany({
+    where:   { isDeleted: false },
+    orderBy: { name: "asc" },
+    select:  { id: true, name: true },
+  });
+  const siteNameMap = Object.fromEntries(inventorySites.map((s) => [s.id, s.name]));
+  const selectedSiteName = site ? (siteNameMap[site] ?? "") : "";
 
   const activitiesRaw = await prisma.activityLog.findMany({
     where: {
@@ -173,8 +157,16 @@ export default async function ActivityPage({
             { entityId:   { contains: q, mode: "insensitive" } },
           ],
         } : {},
-        type        ? { type: type as any }            : {},
+        type        ? { type: type as any }               : {},
         periodStart ? { createdAt: { gte: periodStart } } : {},
+        // ✅ Site filter: match by entityId OR site name in title/details
+        site ? {
+          OR: [
+            { entityId: site },
+            { details:  { contains: selectedSiteName, mode: "insensitive" } },
+            { title:    { contains: selectedSiteName, mode: "insensitive" } },
+          ],
+        } : {},
       ],
     },
     orderBy: { createdAt: "desc" },
@@ -182,8 +174,8 @@ export default async function ActivityPage({
   });
 
   const title =
-    q || type || period !== "ALL"
-      ? `Activity Log${q      ? ` — "${q}"`                    : ""}${type   ? ` — ${getActionLabel(type)}`    : ""}${period !== "ALL" ? ` — ${period}` : ""}`
+    q || type || period !== "ALL" || site
+      ? `Activity Log${q      ? ` — "${q}"`                 : ""}${type   ? ` — ${getActionLabel(type)}` : ""}${period !== "ALL" ? ` — ${period}` : ""}${site ? ` — ${selectedSiteName}` : ""}`
       : "Activity Log";
 
   const activities = activitiesRaw.map((a, index) => ({
@@ -230,11 +222,13 @@ export default async function ActivityPage({
       q={q}
       type={type}
       period={period}
+      site={site}
       actionOptions={actionOptions}
       title={title}
       activities={activities}
       exportRows={exportRows}
       exportCols={exportCols}
+      inventorySites={inventorySites}
     />
   );
 }

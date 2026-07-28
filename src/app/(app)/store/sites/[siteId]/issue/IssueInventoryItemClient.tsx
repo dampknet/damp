@@ -173,7 +173,7 @@ export default function IssueInventoryItemClient({
             quantity:     1,
             entityCodes:  [foundInstance!.entityCode],
             conditions:   [{ code: foundInstance!.entityCode, condition: foundInstance!.condition }],
-            returnable:   true,
+            returnable:   false,  // ✅ default OFF — user ticks consciously
             isBulk:       false,
           },
         ];
