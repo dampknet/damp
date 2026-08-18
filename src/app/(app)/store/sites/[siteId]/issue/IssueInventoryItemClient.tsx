@@ -508,6 +508,112 @@ export default function IssueInventoryItemClient({
             </table>
           </div>
 
+          {/* Item code search */}
+          <div className="mt-4">
+            <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>
+              Search by item code or name
+            </div>
+            <div className="flex gap-2">
+              <input
+                id="item-code-search"
+                placeholder="Type item code e.g. KNET-ACCESS-007 or item name..."
+                className={`flex-1 rounded-xl border px-3 py-2.5 text-sm outline-none ${
+                  dark ? "border-white/10 bg-white/5 text-slate-100 placeholder:text-slate-500" : "border-[#ddd5c9] bg-white placeholder:text-slate-400"
+                }`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const val   = (e.target as HTMLInputElement).value.trim();
+                    if (!val) return;
+                    const found = items.find((i) =>
+                      (i.itemCode && matchCode(val, i.itemCode)) ||
+                      i.name.toLowerCase().includes(val.toLowerCase())
+                    );
+                    if (found) {
+                      if (bucket.some((b) => b.id === found.id)) {
+                        alert(`${found.name} is already in your bucket.`);
+                        return;
+                      }
+                      // Check if it has instances — use scanner flow
+                      if (found.instances.length > 0) {
+                        handleScanMatch(val);
+                      } else {
+                        setBucket((prev) => [
+                          ...prev,
+                          {
+                            id:            found.id,
+                            name:          found.name,
+                            itemType:      found.itemType,
+                            quantity:      1,
+                            entityCodes:   [],
+                            conditions:    [],
+                            returnable:    false,
+                            isBulk:        true,
+                            bulkCondition: found.condition,
+                            uncountable:   found.uncountable,
+                            availableQty:  found.uncountable ? null : found.quantity,
+                            unit:          found.unit,
+                          },
+                        ]);
+                      }
+                      (e.target as HTMLInputElement).value = "";
+                    } else {
+                      alert(`No item found for: ${val}`);
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.getElementById("item-code-search") as HTMLInputElement;
+                  const val   = input?.value.trim();
+                  if (!val) return;
+                  const found = items.find((i) =>
+                    (i.itemCode && matchCode(val, i.itemCode)) ||
+                    i.name.toLowerCase().includes(val.toLowerCase())
+                  );
+                  if (found) {
+                    if (bucket.some((b) => b.id === found.id)) {
+                      alert(`${found.name} is already in your bucket.`);
+                      return;
+                    }
+                    if (found.instances.length > 0) {
+                      handleScanMatch(val);
+                    } else {
+                      setBucket((prev) => [
+                        ...prev,
+                        {
+                          id:            found.id,
+                          name:          found.name,
+                          itemType:      found.itemType,
+                          quantity:      1,
+                          entityCodes:   [],
+                          conditions:    [],
+                          returnable:    false,
+                          isBulk:        true,
+                          bulkCondition: found.condition,
+                          uncountable:   found.uncountable,
+                          availableQty:  found.uncountable ? null : found.quantity,
+                          unit:          found.unit,
+                        },
+                      ]);
+                    }
+                    if (input) input.value = "";
+                  } else {
+                    alert(`No item found for: ${val}`);
+                  }
+                }}
+                className={dark
+                  ? "rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-600"
+                  : "rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-600"
+                }
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
           {/* Manual add */}
           <div className="mt-4">
             <select title="Manual Add" aria-label="Manual Add"

@@ -49,6 +49,7 @@ export default async function ReceiptPage({
       },
       lines: {
         select: {
+          id:            true,             // ✅ needed for per-line delete
           assetInstance: {
             select: { entityCode: true, condition: true },
           },
@@ -63,6 +64,8 @@ export default async function ReceiptPage({
 
   // Build receipt rows — one per entity for tracked, one per issue for bulk
   const receiptRows: {
+    issueId:     string;
+    lineId:      string | null;
     description: string;
     itemCode:    string;
     quantity:    number;
@@ -74,6 +77,8 @@ export default async function ReceiptPage({
     if (issue.lines.length > 0) {
       for (const line of issue.lines) {
         receiptRows.push({
+          issueId:     issue.id,
+          lineId:      line.id,            // ✅ specific line for tracked items
           description: issue.inventoryItem.name,
           itemCode:    line.assetInstance.entityCode,
           quantity:    1,
@@ -83,6 +88,8 @@ export default async function ReceiptPage({
       }
     } else {
       receiptRows.push({
+        issueId:     issue.id,
+        lineId:      null,                 // ✅ null for bulk — delete whole issue
         description: issue.inventoryItem.name,
         itemCode:    issue.inventoryItem.itemCode ?? "",
         quantity:    issue.quantityTaken,

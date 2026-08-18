@@ -206,6 +206,24 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* ✅ Issue Log — always visible */}
+              <Link href={`/store/sites/${site.id}/issues`}
+                className={dark
+                  ? "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10"
+                  : "rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#5b564d] hover:bg-[#f5f2ed]"
+                }>
+                Issue Log
+              </Link>
+
+              {/* ✅ Past Waybills — always visible */}
+              <Link href={`/store/sites/${site.id}/waybills`}
+                className={dark
+                  ? "rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 hover:bg-blue-500/20"
+                  : "rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                }>
+                📋 Past Waybills
+              </Link>
+
               {canEdit && (
                 <>
                   <Link href={`/store/sites/${site.id}/issue`}
