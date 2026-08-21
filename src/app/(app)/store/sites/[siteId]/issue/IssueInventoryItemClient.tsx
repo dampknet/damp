@@ -283,6 +283,77 @@ export default function IssueInventoryItemClient({
     }
   }, [isCameraActive, handleScanMatch]);
 
+  // ─── SEARCH FUNCTION — handles entity code, item code, name ─────────────
+  const doSearch = (val: string) => {
+    const currentItems  = itemsRef.current;
+    const currentBucket = bucketRef.current;
+
+    // Pass 1: match entity code across all instances
+    for (const item of currentItems) {
+      for (const ins of item.instances) {
+        if (matchCode(val, ins.entityCode)) {
+          // Found as entity — use scanner flow
+          handleScanMatch(val);
+          return;
+        }
+      }
+    }
+
+    // Pass 2: match item code
+    const byItemCode = currentItems.find(
+      (i) => i.itemCode && matchCode(val, i.itemCode)
+    );
+    if (byItemCode) {
+      if (currentBucket.some((b) => b.id === byItemCode.id)) {
+        alert(`${byItemCode.name} is already in your bucket.`);
+        return;
+      }
+      setBucket((prev) => [...prev, {
+        id:            byItemCode.id,
+        name:          byItemCode.name,
+        itemType:      byItemCode.itemType,
+        quantity:      1,
+        entityCodes:   [],
+        conditions:    [],
+        returnable:    false,
+        isBulk:        true,
+        bulkCondition: byItemCode.condition,
+        uncountable:   byItemCode.uncountable,
+        availableQty:  byItemCode.uncountable ? null : byItemCode.quantity,
+        unit:          byItemCode.unit,
+      }]);
+      return;
+    }
+
+    // Pass 3: match by name (partial, case-insensitive)
+    const byName = currentItems.find(
+      (i) => i.name.toLowerCase().includes(val.toLowerCase())
+    );
+    if (byName) {
+      if (currentBucket.some((b) => b.id === byName.id)) {
+        alert(`${byName.name} is already in your bucket.`);
+        return;
+      }
+      setBucket((prev) => [...prev, {
+        id:            byName.id,
+        name:          byName.name,
+        itemType:      byName.itemType,
+        quantity:      1,
+        entityCodes:   [],
+        conditions:    [],
+        returnable:    false,
+        isBulk:        true,
+        bulkCondition: byName.condition,
+        uncountable:   byName.uncountable,
+        availableQty:  byName.uncountable ? null : byName.quantity,
+        unit:          byName.unit,
+      }]);
+      return;
+    }
+
+    alert(`No item found for: "${val}"\nTry the item code, entity code, or part of the name.`);
+  };
+
   // ─── FORM SUBMIT — inject bucketData as hidden input ─────────────────────
   // ✅ Fix: don't use onSubmit fd.append — use a hidden input that holds JSON
 
@@ -508,106 +579,33 @@ export default function IssueInventoryItemClient({
             </table>
           </div>
 
-          {/* Item code search */}
+          {/* Item code / entity code / name search */}
           <div className="mt-4">
             <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>
-              Search by item code or name
+              Search by item code, entity code or name
             </div>
             <div className="flex gap-2">
               <input
                 id="item-code-search"
-                placeholder="Type item code e.g. KNET-ACCESS-007 or item name..."
+                placeholder="e.g. KNET-ACCESS-007, KNET-EQUIP-004-01, or lock nuts..."
                 className={`flex-1 rounded-xl border px-3 py-2.5 text-sm outline-none ${
                   dark ? "border-white/10 bg-white/5 text-slate-100 placeholder:text-slate-500" : "border-[#ddd5c9] bg-white placeholder:text-slate-400"
                 }`}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    const val   = (e.target as HTMLInputElement).value.trim();
-                    if (!val) return;
-                    const found = items.find((i) =>
-                      (i.itemCode && matchCode(val, i.itemCode)) ||
-                      i.name.toLowerCase().includes(val.toLowerCase())
-                    );
-                    if (found) {
-                      if (bucket.some((b) => b.id === found.id)) {
-                        alert(`${found.name} is already in your bucket.`);
-                        return;
-                      }
-                      // Check if it has instances — use scanner flow
-                      if (found.instances.length > 0) {
-                        handleScanMatch(val);
-                      } else {
-                        setBucket((prev) => [
-                          ...prev,
-                          {
-                            id:            found.id,
-                            name:          found.name,
-                            itemType:      found.itemType,
-                            quantity:      1,
-                            entityCodes:   [],
-                            conditions:    [],
-                            returnable:    false,
-                            isBulk:        true,
-                            bulkCondition: found.condition,
-                            uncountable:   found.uncountable,
-                            availableQty:  found.uncountable ? null : found.quantity,
-                            unit:          found.unit,
-                          },
-                        ]);
-                      }
-                      (e.target as HTMLInputElement).value = "";
-                    } else {
-                      alert(`No item found for: ${val}`);
-                    }
+                    const val = (e.target as HTMLInputElement).value.trim();
+                    if (val) { doSearch(val); (e.target as HTMLInputElement).value = ""; }
                   }
                 }}
               />
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => {
                   const input = document.getElementById("item-code-search") as HTMLInputElement;
                   const val   = input?.value.trim();
-                  if (!val) return;
-                  const found = items.find((i) =>
-                    (i.itemCode && matchCode(val, i.itemCode)) ||
-                    i.name.toLowerCase().includes(val.toLowerCase())
-                  );
-                  if (found) {
-                    if (bucket.some((b) => b.id === found.id)) {
-                      alert(`${found.name} is already in your bucket.`);
-                      return;
-                    }
-                    if (found.instances.length > 0) {
-                      handleScanMatch(val);
-                    } else {
-                      setBucket((prev) => [
-                        ...prev,
-                        {
-                          id:            found.id,
-                          name:          found.name,
-                          itemType:      found.itemType,
-                          quantity:      1,
-                          entityCodes:   [],
-                          conditions:    [],
-                          returnable:    false,
-                          isBulk:        true,
-                          bulkCondition: found.condition,
-                          uncountable:   found.uncountable,
-                          availableQty:  found.uncountable ? null : found.quantity,
-                          unit:          found.unit,
-                        },
-                      ]);
-                    }
-                    if (input) input.value = "";
-                  } else {
-                    alert(`No item found for: ${val}`);
-                  }
+                  if (val) { doSearch(val); if (input) input.value = ""; }
                 }}
-                className={dark
-                  ? "rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-600"
-                  : "rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-600"
-                }
+                className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-600"
               >
                 Add
               </button>
