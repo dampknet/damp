@@ -87,6 +87,7 @@ export default function WaybillsClient({
           ) : trips.map((trip) => {
             const date = new Date(trip.takenAt).toLocaleDateString("en-GB");
             const time = new Date(trip.takenAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+            // ✅ Non-returnable items = CLOSED immediately; only returnable ones keep OPEN
             const isOpen = trip.status === "OPEN";
 
             return (
@@ -109,7 +110,7 @@ export default function WaybillsClient({
                           ? dark ? "border-amber-500/30 bg-amber-500/10 text-amber-300" : "border-amber-200 bg-amber-50 text-amber-700"
                           : dark ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-emerald-200 bg-emerald-50 text-emerald-700"
                       }`}>
-                        {isOpen ? "OPEN" : "RETURNED"}
+                        {isOpen ? "OPEN" : "CLOSED"}
                       </span>
                     </div>
                     <div className={dark ? "mt-0.5 text-xs text-slate-500" : "mt-0.5 text-xs text-[#8b857c]"}>

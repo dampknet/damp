@@ -233,9 +233,36 @@ function TripCard({
                   </span>
                 )}
                 {isItemReturned && (
-                  <span className={dark ? "shrink-0 text-xs font-semibold text-emerald-400" : "shrink-0 text-xs font-semibold text-emerald-700"}>
-                    ✓ Returned
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={dark ? "text-xs font-semibold text-emerald-400" : "text-xs font-semibold text-emerald-700"}>
+                      ✓ Closed
+                    </span>
+                    {/* ✅ Download return receipt for already-returned items */}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const res  = await fetch(`/api/store/return-receipt?issueId=${item.id}`);
+                          if (!res.ok) throw new Error();
+                          const blob = await res.blob();
+                          const url  = URL.createObjectURL(blob);
+                          const a    = document.createElement("a");
+                          a.href     = url;
+                          a.download = `return-receipt-${item.id.slice(-6)}.docx`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          alert("Could not generate return receipt.");
+                        }
+                      }}
+                      className={dark
+                        ? "text-[10px] font-semibold text-slate-500 hover:text-sky-400 underline"
+                        : "text-[10px] font-semibold text-[#8b857c] hover:text-blue-700 underline"
+                      }
+                    >
+                      Return Receipt
+                    </button>
+                  </div>
                 )}
               </div>
             );

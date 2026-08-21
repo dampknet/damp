@@ -211,7 +211,7 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
                 )}
                 {isReturned && (
                   <span className={dark ? "shrink-0 text-xs font-semibold text-emerald-400" : "shrink-0 text-xs font-semibold text-emerald-700"}>
-                    ✓ Returned
+                    ✓ Closed
                   </span>
                 )}
                 {!isReturned && !isReturnable && (
