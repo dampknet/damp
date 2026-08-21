@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download, Loader2 } from "lucide-react";
 
 const CONDITIONS = ["NEW", "UNUSED", "USED", "FAULTY"] as const;
 
@@ -43,6 +44,26 @@ export default function ReturnItemClient({
   const dark         = mode === "dark";
   const searchParams = useSearchParams();
   const error        = searchParams.get("error");
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadReceipt = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/store/return-receipt?issueId=${issue.id}`);
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `return-receipt-${issue.takenBy.split(" ")[0]}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Could not download return receipt.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
@@ -216,6 +237,18 @@ export default function ReturnItemClient({
               >
                 Confirm Return ({units.length} unit{units.length !== 1 ? "s" : ""})
               </button>
+
+              {/* ✅ Download return receipt */}
+              <button type="button" onClick={handleDownloadReceipt} disabled={downloading}
+                className={dark
+                  ? "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-40"
+                  : "inline-flex items-center gap-2 rounded-xl border border-[#ddd5c9] bg-white px-5 py-3 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2] disabled:opacity-40"
+                }
+              >
+                {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                Return Receipt (.docx)
+              </button>
+
               <Link href={`/store/sites/${siteId}/issues`}
                 className={dark
                   ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10"

@@ -68,8 +68,20 @@ function TripCard({
   const isOpen       = trip.status === "OPEN";
   const itemCount    = trip.items.length;
   const totalUnits   = trip.items.reduce((sum, i) => sum + i.quantityTaken, 0);
-  const allReturned  = trip.items.every((i) => i.status === "RETURNED");
-  const someReturned = trip.items.some((i) => i.status === "RETURNED");
+
+  // ✅ Only count RETURNABLE items for status calculation
+  const returnableItems    = trip.items.filter((i) => !!i.expectedReturnAt);
+  const nonReturnableItems = trip.items.filter((i) => !i.expectedReturnAt);
+
+  // A trip is CLOSED if:
+  // - all returnable items are returned (or there are none)
+  const allReturnableDone  = returnableItems.length === 0 ||
+                             returnableItems.every((i) => i.status === "RETURNED");
+  const someReturnableDone = returnableItems.some((i) => i.status === "RETURNED");
+
+  const tripStatus = allReturnableDone ? "CLOSED"
+                   : someReturnableDone ? "PARTIAL"
+                   : "OPEN";
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -101,7 +113,8 @@ function TripCard({
       >
         {/* Status dot */}
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-          allReturned ? "bg-emerald-500" : someReturned ? "bg-amber-500" : "bg-red-400"
+          tripStatus === "CLOSED"  ? "bg-emerald-500" :
+          tripStatus === "PARTIAL" ? "bg-amber-500"   : "bg-red-400"
         }`} />
 
         {/* Main info */}
@@ -116,11 +129,13 @@ function TripCard({
               </span>
             )}
             <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-              allReturned
+              tripStatus === "CLOSED"
                 ? dark ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : dark ? "border-amber-500/30 bg-amber-500/10 text-amber-300" : "border-amber-200 bg-amber-50 text-amber-700"
+                : tripStatus === "PARTIAL"
+                ? dark ? "border-amber-500/30 bg-amber-500/10 text-amber-300"       : "border-amber-200 bg-amber-50 text-amber-700"
+                : dark ? "border-red-500/30 bg-red-500/10 text-red-300"             : "border-red-200 bg-red-50 text-red-700"
             }`}>
-              {allReturned ? "RETURNED" : someReturned ? "PARTIAL" : "OPEN"}
+              {tripStatus}
             </span>
           </div>
           <div className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>

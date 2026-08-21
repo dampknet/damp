@@ -103,7 +103,13 @@ export default async function GlobalIssueLogPage({
     takenAt:        issues[0].takenAt,
     siteName:       issues[0].inventorySite.name,
     siteId:         issues[0].inventorySite.id,
-    status:         issues.every((i) => i.status === "RETURNED") ? "RETURNED" : "OPEN",
+    status: (() => {
+      const returnable = issues.filter((i) => !!i.expectedReturnAt);
+      if (returnable.length === 0) return "CLOSED";
+      if (returnable.every((i) => i.status === "RETURNED")) return "CLOSED";
+      if (returnable.some((i) => i.status === "RETURNED")) return "PARTIAL";
+      return "OPEN";
+    })(),
     items:          issues,
   }));
 

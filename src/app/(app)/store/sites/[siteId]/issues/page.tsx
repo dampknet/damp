@@ -105,9 +105,15 @@ export default async function SiteIssueLogPage({
     authorizedBy:   issues[0].authorizedBy,
     purpose:        issues[0].purpose,
     takenAt:        issues[0].takenAt,
-    // A trip is RETURNED only if ALL items are returned
-    status: issues.every((i) => i.status === "RETURNED") ? "RETURNED" : "OPEN",
-    items:  issues,
+    // ✅ Only returnable items count — non-returnable are always "closed"
+    status: (() => {
+      const returnable = issues.filter((i) => !!i.expectedReturnAt);
+      if (returnable.length === 0) return "CLOSED";
+      if (returnable.every((i) => i.status === "RETURNED")) return "CLOSED";
+      if (returnable.some((i) => i.status === "RETURNED")) return "PARTIAL";
+      return "OPEN";
+    })(),
+    items: issues,
   }));
 
   const [openCount, returnedCount] = await Promise.all([
