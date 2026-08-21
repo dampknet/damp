@@ -121,7 +121,7 @@ export async function POST(req: Request) {
           dateReceived:  true,
           supplier:      true,
           receivedBy:    true,
-          notes:         true,
+          note:          true,
           inventoryItem: { select: { name: true, itemCode: true, unit: true } },
           inventorySite: { select: { name: true } },
         },
