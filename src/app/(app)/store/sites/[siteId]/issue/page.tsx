@@ -112,8 +112,11 @@ export default async function IssueInventoryItemPage({
               takenByContact:   requesterContact || null,
               authorizedBy:     authorizedBy || null,
               purpose,
-              status:           "OPEN",
-              conditionAtIssue: entry.bulkCondition ?? entry.conditions?.[0]?.condition ?? null, // ✅
+              conditionAtIssue: entry.bulkCondition ?? entry.conditions?.[0]?.condition ?? null,
+              // ✅ Non-returnable items = RETURNED immediately so they show as CLOSED in DB
+              status:      entry.returnable ? "OPEN"     : "RETURNED",
+              returnedAt:  entry.returnable ? null        : new Date(),
+              returnedBy:  entry.returnable ? null        : "Non-returnable",
               expectedReturnAt: entry.returnable ? new Date() : null,
               lines: Array.isArray(entry.entityCodes) && entry.entityCodes.length > 0
                 ? {
