@@ -87,21 +87,28 @@ export default async function IssueInventoryItemPage({
     const groupId = randomUUID();
     let dbError: string | null = null;
 
+    // ✅ Check for duplicates BEFORE the transaction to save time
+    for (const entry of bucket) {
+      if (!entry.uncountable && entry.returnable) {
+        const existingOpen = await prisma.warehouseIssue.findFirst({
+          where: { inventoryItemId: entry.id, status: "OPEN" },
+          select: { id: true },
+        });
+        if (existingOpen) {
+          dbError = `"${entry.name}" already has an open issue. Return it first.`;
+          break;
+        }
+      }
+    }
+
+    if (dbError) {
+      redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent(dbError)}`);
+    }
+
     try {
+      // ✅ 30 second timeout — enough for large bulk issues
       await prisma.$transaction(async (tx) => {
         for (const entry of bucket) {
-          // ✅ Only block duplicate open issues for countable tracked items
-          // Uncountable items (N/A qty) can always be issued multiple times
-          if (!entry.uncountable) {
-            const existingOpen = await tx.warehouseIssue.findFirst({
-              where: { inventoryItemId: entry.id, status: "OPEN" },
-              select: { id: true },
-            });
-            if (existingOpen) {
-              throw new Error(`"${entry.name}" already has an open issue. Return it first.`);
-            }
-          }
-
           await tx.warehouseIssue.create({
             data: {
               groupId,
@@ -144,6 +151,8 @@ export default async function IssueInventoryItemPage({
             });
           }
         }
+      }, {
+        timeout: 30000, // ✅ 30 seconds — handles large bulk issues
       });
 
       await logActivity({
