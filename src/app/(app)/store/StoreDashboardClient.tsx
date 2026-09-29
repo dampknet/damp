@@ -6,35 +6,27 @@ import { useState, useTransition, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { X, Plus } from "lucide-react";
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  EQUIPMENT:              "Equipment",
-  ACCESSORIES:            "Accessories",
-  TOOLS_AND_PARTS:        "Tools & Parts",
-  GENERAL:                "General",
-  COOLING_INFRASTRUCTURE: "Cooling",
-  CABLES_AND_ELECTRONICS: "Cables & Electronics",
-};
+import { ITEM_TYPE_LABEL } from "@/lib/item-types";
 
 const STATUS_STYLE: Record<string, { dark: string; light: string; dot: string }> = {
-  AVAILABLE:    { dark: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300", light: "border-emerald-200 bg-emerald-50 text-emerald-700",   dot: "bg-emerald-500" },
-  LOW_STOCK:    { dark: "border-amber-500/30 bg-amber-500/10 text-amber-300",       light: "border-amber-200 bg-amber-50 text-amber-700",           dot: "bg-amber-500"   },
-  OUT_OF_STOCK: { dark: "border-red-500/30 bg-red-500/10 text-red-300",             light: "border-red-200 bg-red-50 text-red-700",                 dot: "bg-red-500"     },
-  CHECKED_OUT:  { dark: "border-blue-500/30 bg-blue-500/10 text-blue-300",          light: "border-blue-200 bg-blue-50 text-blue-700",              dot: "bg-blue-500"    },
-  INACTIVE:     { dark: "border-slate-500/30 bg-slate-500/10 text-slate-400",       light: "border-slate-200 bg-slate-50 text-slate-600",           dot: "bg-slate-400"   },
+  AVAILABLE:    { dark: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300", light: "border-emerald-200 bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  LOW_STOCK:    { dark: "border-amber-500/30 bg-amber-500/10 text-amber-300",       light: "border-amber-200 bg-amber-50 text-amber-700",       dot: "bg-amber-500"   },
+  OUT_OF_STOCK: { dark: "border-red-500/30 bg-red-500/10 text-red-300",             light: "border-red-200 bg-red-50 text-red-700",             dot: "bg-red-500"     },
+  CHECKED_OUT:  { dark: "border-blue-500/30 bg-blue-500/10 text-blue-300",          light: "border-blue-200 bg-blue-50 text-blue-700",          dot: "bg-blue-500"    },
+  INACTIVE:     { dark: "border-slate-500/30 bg-slate-500/10 text-slate-400",       light: "border-slate-200 bg-slate-50 text-slate-600",       dot: "bg-slate-400"   },
 };
 
 type SiteCard = { id: string; name: string; location: string; itemCount: number };
 
 type Summary = {
-  totalInventoryItems:  number;
-  totalEquipment:       number;
-  totalAccessories:     number;
-  lowStockItems:        number;
-  checkedOutEquipment:  number;
-  centralStockCount:    number;
-  restockCount:         number;
-  issueCount:           number;
+  totalInventoryItems: number;
+  totalEquipment:      number;
+  totalOtherItems:     number;
+  lowStockItems:       number;
+  checkedOutEquipment: number;
+  centralStockCount:   number;
+  restockCount:        number;
+  issueCount:          number;
 };
 
 type SearchResult = {
@@ -73,12 +65,12 @@ function SummaryCard({ dark, label, value, sub, accent, href }: {
 export default function StoreDashboardClient({
   role, canEdit, email, summary, siteCards, createSiteAction,
 }: {
-  role:               string;
-  canEdit:            boolean;
-  email:              string | null;
-  summary:            Summary;
-  siteCards:          SiteCard[];
-  createSiteAction?:  (formData: FormData) => void;
+  role:              string;
+  canEdit:           boolean;
+  email:             string | null;
+  summary:           Summary;
+  siteCards:         SiteCard[];
+  createSiteAction?: (formData: FormData) => void;
 }) {
   const { mode }     = useThemeMode();
   const dark         = mode === "dark";
@@ -88,13 +80,12 @@ export default function StoreDashboardClient({
   const siteError   = searchParams.get("siteError");
   const siteSuccess = searchParams.get("siteSuccess");
 
-  const [q,           setQ]           = useState("");
-  const [results,     setResults]     = useState<SearchResult[] | null>(null);
-  const [searched,    setSearched]    = useState("");
+  const [q,           setQ]            = useState("");
+  const [results,     setResults]      = useState<SearchResult[] | null>(null);
+  const [searched,    setSearched]     = useState("");
   const [isPending,   startTransition] = useTransition();
-  const [showNewSite, setShowNewSite] = useState(false);
+  const [showNewSite, setShowNewSite]  = useState(false);
 
-  // Auto-close modal on success
   useEffect(() => {
     if (siteSuccess) setShowNewSite(false);
   }, [siteSuccess]);
@@ -137,7 +128,6 @@ export default function StoreDashboardClient({
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
 
-        {/* ── HEADER ── */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
@@ -185,6 +175,7 @@ export default function StoreDashboardClient({
                   <Plus size={16} /> New Inventory Site
                 </button>
               )}
+
               <Link href="/store/alerts" className={dark
                 ? "rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
                 : "rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100"
@@ -194,7 +185,6 @@ export default function StoreDashboardClient({
             </div>
           </div>
 
-          {/* Success / Error banners */}
           {siteSuccess && (
             <div className={dark
               ? "mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
@@ -212,7 +202,6 @@ export default function StoreDashboardClient({
             </div>
           )}
 
-          {/* ── GLOBAL SEARCH ── */}
           <div className="relative mt-8">
             <div className={dark
               ? "rounded-2xl border border-white/10 bg-white/5 p-5"
@@ -339,15 +328,13 @@ export default function StoreDashboardClient({
           </div>
         </section>
 
-        {/* ── SUMMARY CARDS ── */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard dark={dark} label="Inventory Items" value={String(summary.totalInventoryItems)} sub="all categories"        accent="bg-[#1d5fa8]" />
-          <SummaryCard dark={dark} label="Equipment"       value={String(summary.totalEquipment)}      sub="tracked equipment items" accent="bg-[#b08b2c]" />
-          <SummaryCard dark={dark} label="Accessories"     value={String(summary.totalAccessories)}    sub="accessories in stock"   accent="bg-[#2a7d52]" />
-          <SummaryCard dark={dark} label="Low Stock"       value={String(summary.lowStockItems)}       sub="needs attention"        accent="bg-[#c8611a]" href="/store/alerts" />
+          <SummaryCard dark={dark} label="Inventory Items" value={String(summary.totalInventoryItems)} sub="all categories"                 accent="bg-[#1d5fa8]" />
+          <SummaryCard dark={dark} label="Equipment"       value={String(summary.totalEquipment)}      sub="tracked equipment items"        accent="bg-[#b08b2c]" />
+          <SummaryCard dark={dark} label="Other Items"     value={String(summary.totalOtherItems)}     sub="accessories, tools, cables etc" accent="bg-[#2a7d52]" />
+          <SummaryCard dark={dark} label="Low Stock"       value={String(summary.lowStockItems)}       sub="needs attention"                accent="bg-[#c8611a]" href="/store/alerts" />
         </div>
 
-        {/* ── SITE CARDS ── */}
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {siteCards.map((site) => (
             <Link key={site.id} href={`/store/sites/${site.id}`} className="block">
@@ -373,13 +360,12 @@ export default function StoreDashboardClient({
           ))}
         </div>
 
-        {/* ── QUICK LINKS ── */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { href: "/store/restocks",  label: "Restock Log",  sub: `${summary.restockCount} restocks`,      accent: "bg-[#2a7d52]" },
-            { href: "/store/issues",    label: "Issue Log",    sub: `${summary.issueCount} issues`,          accent: "bg-[#c8611a]" },
-            { href: "/store/checkouts", label: "Checked Out",  sub: `${summary.checkedOutEquipment} open`,   accent: "bg-[#1d5fa8]" },
-            { href: "/store/alerts",    label: "Stock Alerts", sub: `${summary.lowStockItems} flagged`,      accent: "bg-[#b08b2c]" },
+            { href: "/store/restocks",  label: "Restock Log",  sub: `${summary.restockCount} restocks`,    accent: "bg-[#2a7d52]" },
+            { href: "/store/issues",    label: "Issue Log",    sub: `${summary.issueCount} issues`,        accent: "bg-[#c8611a]" },
+            { href: "/store/checkouts", label: "Checked Out",  sub: `${summary.checkedOutEquipment} open`, accent: "bg-[#1d5fa8]" },
+            { href: "/store/alerts",    label: "Stock Alerts", sub: `${summary.lowStockItems} flagged`,    accent: "bg-[#b08b2c]" },
           ].map((l) => (
             <Link key={l.href} href={l.href} className="block">
               <div className={dark
@@ -398,7 +384,6 @@ export default function StoreDashboardClient({
 
       </div>
 
-      {/* ── NEW INVENTORY SITE MODAL ── */}
       {showNewSite && createSiteAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.5)" }}
@@ -408,7 +393,6 @@ export default function StoreDashboardClient({
             ? "w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1923] shadow-2xl"
             : "w-full max-w-md overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white shadow-2xl"
           }>
-            {/* Modal top bar */}
             <div className={dark
               ? "flex items-center justify-between border-b border-white/10 px-6 py-4"
               : "flex items-center justify-between border-b border-[#eee7dd] px-6 py-4"
@@ -427,31 +411,24 @@ export default function StoreDashboardClient({
               </button>
             </div>
 
-            {/* Modal form */}
             <form action={createSiteAction} className="p-6 space-y-4">
               <div>
                 <label className={dark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-gray-600"}>
                   Site Name <span className="text-red-500">*</span>
                 </label>
-                <input name="name" required
-                  placeholder="e.g. Adjangotey Inventory"
-                  className={fieldCls} />
+                <input name="name" required placeholder="e.g. Adjangotey Inventory" className={fieldCls} />
               </div>
               <div>
                 <label className={dark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-gray-600"}>
                   Location
                 </label>
-                <input name="location"
-                  placeholder="e.g. Adjangotey, Accra"
-                  className={fieldCls} />
+                <input name="location" placeholder="e.g. Adjangotey, Accra" className={fieldCls} />
               </div>
               <div>
                 <label className={dark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-gray-600"}>
                   Description (optional)
                 </label>
-                <textarea name="description" rows={3}
-                  placeholder="Brief description of this inventory site…"
-                  className={fieldCls} />
+                <textarea name="description" rows={3} placeholder="Brief description of this inventory site…" className={fieldCls} />
               </div>
 
               <div className="flex gap-3 pt-2">

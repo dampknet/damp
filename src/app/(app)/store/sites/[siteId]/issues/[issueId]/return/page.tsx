@@ -2,52 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { generateItemCode, getSitePrefix } from "@/lib/inventory-upload";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import ReturnItemClient from "./ReturnItemClient";
 import type { EquipmentCondition, InventoryItemType } from "@prisma/client";
-
-async function getNextItemCode(
-  inventorySiteId: string,
-  itemType: InventoryItemType
-): Promise<string> {
-  const TYPE_PREFIX: Record<string, string> = {
-    EQUIPMENT:              "EQUIP",
-    ACCESSORIES:            "ACCESS",
-    TOOLS_AND_PARTS:        "TO/PA",
-    GENERAL:                "GEN",
-    COOLING_INFRASTRUCTURE: "COOL",
-    CABLES_AND_ELECTRONICS: "CA/EL",
-  };
-
-  const sample = await prisma.inventoryItem.findFirst({
-    where:  { inventorySiteId, itemCode: { not: null } },
-    select: { itemCode: true },
-  });
-
-  let sitePrefix = "KNET";
-  if (sample?.itemCode) {
-    const parts = sample.itemCode.split("-");
-    if (parts.length >= 1) sitePrefix = parts[0];
-  }
-
-  const typePrefix = TYPE_PREFIX[itemType] ?? "GEN";
-
-  const existing = await prisma.inventoryItem.findMany({
-    where:  { inventorySiteId, itemCode: { startsWith: `${sitePrefix}-${typePrefix}-` } },
-    select: { itemCode: true },
-  });
-
-  let maxNum = 0;
-  for (const item of existing) {
-    const parts = item.itemCode?.split("-") ?? [];
-    const num   = parseInt(parts[parts.length - 1], 10);
-    if (!isNaN(num) && num > maxNum) maxNum = num;
-  }
-
-  return `${sitePrefix}-${typePrefix}-${String(maxNum + 1).padStart(3, "0")}`;
-}
-
-const TRACKED_TYPES: InventoryItemType[] = ["EQUIPMENT", "COOLING_INFRASTRUCTURE"];
 
 export default async function ReturnItemPage({
   params,
@@ -55,8 +13,8 @@ export default async function ReturnItemPage({
   params: Promise<{ siteId: string; issueId: string }>;
 }) {
   const { siteId, issueId } = await params;
-  const profile  = await getCurrentProfile();
-  const canEdit  = profile?.role === "ADMIN" || profile?.role === "EDITOR";
+  const profile = await getCurrentProfile();
+  const canEdit = profile?.role === "ADMIN" || profile?.role === "EDITOR";
   if (!canEdit) redirect(`/store/sites/${siteId}/issues`);
 
   const issue = await prisma.warehouseIssue.findFirst({
@@ -93,13 +51,12 @@ export default async function ReturnItemPage({
 
   if (!issue) return notFound();
 
-  const isTracked = TRACKED_TYPES.includes(issue.inventoryItem.itemType as InventoryItemType);
+  const isTracked = issue.lines.length > 0;
 
-  // ✅ Capture all data as primitives BEFORE the server action closure
   const issuedItemId   = issue.inventoryItem.id;
   const issuedItemName = issue.inventoryItem.name;
   const issuedItemType = issue.inventoryItem.itemType as InventoryItemType;
-  const issuedItemCode = issue.inventoryItem.itemCode;  // ✅ was missing
+  const issuedItemCode = issue.inventoryItem.itemCode;
   const issuedMfr      = issue.inventoryItem.manufacturer;
   const issuedModel    = issue.inventoryItem.model;
   const issuedUnit     = issue.inventoryItem.unit;
@@ -114,7 +71,6 @@ export default async function ReturnItemPage({
     condition:  l.assetInstance.condition,
   }));
 
-  // Build units for the return form
   const units: { key: string; entityCode: string | null; currentCondition: string }[] =
     isTracked
       ? issuedLines.map((l) => ({
@@ -143,17 +99,15 @@ export default async function ReturnItemPage({
     let dbError: string | null = null;
 
     try {
+      const sitePrefix = isTracked ? await getSitePrefix(siteId) : "";
+
       await prisma.$transaction(async (tx) => {
-
         if (isTracked) {
-          // ── Per-entity migration ──────────────────────────────────────────
           for (const line of issuedLines) {
-            const newCondition = (String(
+            const newCondition = String(
               formData.get(`condition_${line.id}`) ?? "USED"
-            )) as EquipmentCondition;
+            ) as EquipmentCondition;
 
-            // Look for existing item at this site with same name that already
-            // has at least one instance with the new condition
             const existingItem = await tx.inventoryItem.findFirst({
               where: {
                 inventorySiteId: siteId,
@@ -161,11 +115,10 @@ export default async function ReturnItemPage({
                 isDeleted:       false,
                 instances:       { some: { condition: newCondition } },
               },
-              select: { id: true, quantity: true },
+              select: { id: true },
             });
 
             if (existingItem) {
-              // Move entity to existing item
               await tx.assetInstance.update({
                 where: { id: line.instanceId },
                 data: {
@@ -179,8 +132,7 @@ export default async function ReturnItemPage({
                 data:  { quantity: { increment: 1 } },
               });
             } else {
-              // Create new InventoryItem row for this condition
-              const newItemCode = await getNextItemCode(siteId, issuedItemType);
+              const newItemCode = await generateItemCode({ itemType: issuedItemType, sitePrefix });
 
               const newItem = await tx.inventoryItem.create({
                 data: {
@@ -198,7 +150,6 @@ export default async function ReturnItemPage({
                 },
               });
 
-              // Entity keeps its original entity code, moves to new item
               await tx.assetInstance.update({
                 where: { id: line.instanceId },
                 data: {
@@ -209,21 +160,18 @@ export default async function ReturnItemPage({
               });
             }
 
-            // Always decrement the source item
             await tx.inventoryItem.update({
               where: { id: issuedItemId },
               data:  { quantity: { decrement: 1 } },
             });
           }
         } else {
-          // ── Bulk: just restore quantity ───────────────────────────────────
           await tx.inventoryItem.update({
             where: { id: issuedItemId },
             data:  { quantity: { increment: issuedQty } },
           });
         }
 
-        // Mark issue as RETURNED
         await tx.warehouseIssue.update({
           where: { id: issueId },
           data: {
@@ -233,7 +181,7 @@ export default async function ReturnItemPage({
             returnNote: returnNote || null,
           },
         });
-      });
+      }, { timeout: 30000 });
 
       await logActivity({
         type:       "INVENTORY_EQUIPMENT_RETURNED",
@@ -243,7 +191,6 @@ export default async function ReturnItemPage({
         entityType: "INVENTORY_ITEM",
         entityId:   issuedItemId,
       });
-
     } catch (e) {
       if (isRedirectError(e)) throw e;
       console.error("[RETURN ERROR]", e);

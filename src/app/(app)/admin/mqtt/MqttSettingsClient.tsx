@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { ArrowLeft, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { ArrowLeft, Wifi, Loader2 } from "lucide-react";
 
 type MqttConfig = {
   id:             string;
@@ -23,10 +23,10 @@ export default function MqttSettingsClient({
   action: (formData: FormData) => void;
 }) {
   const { mode }     = useThemeMode();
-  const dark          = mode === "dark";
-  const searchParams  = useSearchParams();
-  const error         = searchParams.get("error");
-  const success       = searchParams.get("success");
+  const dark         = mode === "dark";
+  const searchParams = useSearchParams();
+  const error        = searchParams.get("error");
+  const success      = searchParams.get("success");
 
   const [testing,    setTesting]    = useState(false);
   const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
@@ -48,6 +48,10 @@ export default function MqttSettingsClient({
     }
   };
 
+  const codeCls = dark
+    ? "rounded bg-white/10 px-1 font-mono text-sky-400"
+    : "rounded bg-[#f0ece6] px-1 font-mono text-blue-700";
+
   return (
     <div className={dark
       ? "min-h-screen bg-[linear-gradient(135deg,#0d1117_0%,#0f1923_50%,#0d1117_100%)] text-slate-200"
@@ -55,7 +59,6 @@ export default function MqttSettingsClient({
     }>
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
 
-        {/* Header */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
@@ -69,7 +72,7 @@ export default function MqttSettingsClient({
             <ArrowLeft size={16} /> Back to Admin
           </Link>
 
-          <div className="flex items-center gap-4 mt-2">
+          <div className="mt-2 flex items-center gap-4">
             <div className={dark
               ? "flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10"
               : "flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50"
@@ -86,7 +89,6 @@ export default function MqttSettingsClient({
             </div>
           </div>
 
-          {/* Status banner */}
           {config ? (
             <div className={dark
               ? "mt-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-300"
@@ -119,7 +121,6 @@ export default function MqttSettingsClient({
           )}
         </section>
 
-        {/* Form */}
         <section className={dark
           ? "mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl"
           : "mt-5 overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm"
@@ -130,9 +131,7 @@ export default function MqttSettingsClient({
             </div>
           </div>
 
-          <form action={action} className="p-6 space-y-5">
-
-            {/* Connection Name */}
+          <form action={action} className="space-y-5 p-6">
             <Field label="Connection Name" dark={dark}>
               <input name="connectionName"
                 defaultValue={config?.connectionName ?? ""}
@@ -140,7 +139,6 @@ export default function MqttSettingsClient({
                 className={inputCls} />
             </Field>
 
-            {/* Cluster URL */}
             <Field label="HiveMQ Cluster URL" dark={dark} required>
               <input name="clusterUrl" required
                 defaultValue={config?.clusterUrl ?? ""}
@@ -148,7 +146,6 @@ export default function MqttSettingsClient({
                 className={inputCls} />
             </Field>
 
-            {/* Ports */}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Secure MQTT Port" dark={dark}>
                 <input name="mqttPort" type="number"
@@ -162,7 +159,6 @@ export default function MqttSettingsClient({
               </Field>
             </div>
 
-            {/* Credentials */}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Username" dark={dark} required>
                 <input name="username" required
@@ -178,7 +174,6 @@ export default function MqttSettingsClient({
               </Field>
             </div>
 
-            {/* Topic info */}
             <div className={dark
               ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-400"
               : "rounded-xl border border-[#e7dfd4] bg-[#fffdf9] px-4 py-3 text-xs text-[#6b655d]"
@@ -187,13 +182,9 @@ export default function MqttSettingsClient({
                 Topic format
               </div>
               The subscriber reads fuel data from{" "}
-              <code className={dark ? "rounded bg-white/10 px-1 font-mono text-sky-400" : "rounded bg-[#f0ece6] px-1 font-mono text-blue-700"}>
-                {"{siteName}/fuel"}
-              </code>{" "}
+              <code className={codeCls}>{"{siteName}/fuel"}</code>{" "}
               for each of your 42 sites. The site name in the topic must match the site name in the system. Payload is a plain number e.g.{" "}
-              <code className={dark ? "rounded bg-white/10 px-1 font-mono text-sky-400" : "rounded bg-[#f0ece6] px-1 font-mono text-blue-700"}>
-                67.5
-              </code>
+              <code className={codeCls}>67.5</code>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -232,7 +223,32 @@ export default function MqttSettingsClient({
           </form>
         </section>
 
-        
+        <section className={dark
+          ? "mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5"
+          : "mt-5 overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm"
+        }>
+          <div className={dark ? "border-b border-white/8 px-6 py-4" : "border-b border-[#eee7dd] px-6 py-4"}>
+            <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>
+              Subscriber Service
+            </div>
+          </div>
+          <div className="p-6">
+            <p className={dark ? "text-sm text-slate-400" : "text-sm text-[#6b655d]"}>
+              The MQTT subscriber runs as a separate Node.js service on the server. It connects to HiveMQ using the credentials above, subscribes to all site fuel topics, and writes readings directly to the database.
+            </p>
+            <div className={dark
+              ? "mt-4 rounded-xl border border-white/10 bg-[#0d1117] px-4 py-3 font-mono text-xs text-emerald-400"
+              : "mt-4 rounded-xl border border-[#e0dbd2] bg-[#f5f2ed] px-4 py-3 font-mono text-xs text-emerald-800"
+            }>
+              <div className="mb-1 opacity-60">Run the subscriber service on the server:</div>
+              <div>node mqtt-subscriber.js</div>
+            </div>
+            <p className={dark ? "mt-3 text-xs text-slate-500" : "mt-3 text-xs text-[#8b857c]"}>
+              Once running, fuel levels update automatically on the Sites dashboard.
+            </p>
+          </div>
+        </section>
+
       </div>
     </div>
   );

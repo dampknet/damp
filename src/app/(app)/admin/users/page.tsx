@@ -1,28 +1,36 @@
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
-import UsersTable from "./ui";
+import { prisma }             from "@/lib/prisma";
+import { requireMasterAdmin } from "@/lib/auth";
+import UsersTable             from "./ui";
 
 export default async function AdminUsersPage() {
-  const me = await getCurrentProfile();
-
-  if (!me) redirect("/auth/login");
-  if (me.role !== "ADMIN") redirect("/sites");
+  const me = await requireMasterAdmin();
 
   const users = await prisma.userProfile.findMany({
-    orderBy: [{ role: "asc" }, { email: "asc" }],
+    orderBy: [{ isMasterAdmin: "desc" }, { role: "asc" }, { email: "asc" }],
     select: {
-      id: true,
-      email: true,
-      fullName: true,
-      role: true,
+      id:              true,
+      email:           true,
+      fullName:        true,
+      role:            true,
+      isMasterAdmin:   true,
+      isSuspended:     true,
+      suspendReason:   true,
+      suspendedBy:     true,
+      lockedUntil:     true,
+      lastLoginAt:     true,
+      lastLoginIp:     true,
+      lastLoginMethod: true,
     },
   });
 
   return (
     <UsersTable
-      users={users}
-      currentEmail={me.email ?? null}
+      users={users.map((u) => ({
+        ...u,
+        lockedUntil: u.lockedUntil?.toISOString() ?? null,
+        lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+      }))}
+      currentUserId={me.id}
     />
   );
 }

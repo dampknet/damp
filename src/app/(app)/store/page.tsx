@@ -6,15 +6,15 @@ import { logActivity } from "@/lib/activity";
 import StoreDashboardClient from "./StoreDashboardClient";
 
 export default async function StoreDashboardPage() {
-  const profile  = await getCurrentProfile();
-  const role     = profile?.role ?? "VIEWER";
-  const canEdit  = role === "ADMIN" || role === "EDITOR";
+  const profile = await getCurrentProfile();
+  const role    = profile?.role ?? "VIEWER";
+  const canEdit = role === "ADMIN" || role === "EDITOR";
 
   const [
     inventorySites,
     totalInventoryItems,
     totalEquipment,
-    totalAccessories,
+    totalOtherItems,
     lowStockItems,
     checkedOutEquipment,
     centralStockCount,
@@ -33,18 +33,18 @@ export default async function StoreDashboardPage() {
     }),
     prisma.inventoryItem.count({ where: { isDeleted: false } }),
     prisma.inventoryItem.count({ where: { isDeleted: false, itemType: "EQUIPMENT" } }),
-    prisma.inventoryItem.count({ where: { isDeleted: false, itemType: "ACCESSORIES" } }),
+    prisma.inventoryItem.count({ where: { isDeleted: false, itemType: { not: "EQUIPMENT" } } }),
     prisma.inventoryItem.count({
       where: {
-        isDeleted: false,
-        uncountable: false,   // ✅ never count uncountable items as low stock
+        isDeleted:   false,
+        uncountable: false,
         OR: [{ status: "LOW_STOCK" }, { status: "OUT_OF_STOCK" }],
       },
     }),
     prisma.warehouseIssue.count({ where: { status: "OPEN", expectedReturnAt: { not: null } } }),
     prisma.storeItem.count(),
-    prisma.inventoryRestock.count(),                          // restockCount
-    prisma.warehouseIssue.count(),                           // issueCount ✅ was InventoryIssue
+    prisma.inventoryRestock.count(),
+    prisma.warehouseIssue.count(),
   ]);
 
   const siteCards = inventorySites.map((site) => ({
@@ -54,7 +54,6 @@ export default async function StoreDashboardPage() {
     itemCount: site._count.items,
   }));
 
-  // ── Server action: create a new inventory site ─────────────────────────────
   async function createInventorySite(formData: FormData) {
     "use server";
 
@@ -66,7 +65,6 @@ export default async function StoreDashboardPage() {
 
     if (!name) redirect("/store?siteError=Site+name+is+required");
 
-    // Check for duplicate name
     const existing = await prisma.inventorySite.findFirst({
       where: { name: { equals: name, mode: "insensitive" }, isDeleted: false },
     });
@@ -106,7 +104,7 @@ export default async function StoreDashboardPage() {
       summary={{
         totalInventoryItems,
         totalEquipment,
-        totalAccessories,
+        totalOtherItems,
         lowStockItems,
         checkedOutEquipment,
         centralStockCount,

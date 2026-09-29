@@ -79,6 +79,9 @@ enum InventoryItemType {
   GENERAL
   COOLING_INFRASTRUCTURE
   CABLES_AND_ELECTRONICS
+  ACCESSORIES_AND_PARTS
+  TOOLS_AND_MAINTENANCE
+  CABLES_AND_ELECTRICALS
 }
 
 enum EquipmentCondition {
@@ -107,12 +110,78 @@ enum WarehouseIssueStatus {
 }
 
 model UserProfile {
-  id        String   @id
-  email     String   @unique
-  fullName  String?
-  role      Role     @default(VIEWER)
+  id               String    @id @default(cuid())
+  email            String    @unique
+  fullName         String?
+  role             Role      @default(VIEWER)
+  isMasterAdmin    Boolean   @default(false)
+  passwordHash     String?
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  isSuspended      Boolean   @default(false)
+  suspendedAt      DateTime?
+  suspendedBy      String?
+  suspendReason    String?
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  lastLoginMethod  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([token])
 }
 
 model Site {
@@ -373,7 +442,7 @@ model InventoryIssue {
 
 model WarehouseIssue {
   id               String               @id @default(cuid())
-  groupId          String?              // ✅ NEW — links items from one trip
+  groupId          String?
   inventorySiteId  String
   inventoryItemId  String
   quantityTaken    Int                  @default(1)
@@ -415,13 +484,13 @@ model WarehouseIssueLine {
 }
 
 model MqttConfig {
-  id               String   @id @default(cuid())
-  connectionName   String
-  clusterUrl       String
-  mqttPort         Int      @default(8883)
-  websocketPort    Int      @default(8884)
-  username         String
-  password         String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id             String   @id @default(cuid())
+  connectionName String
+  clusterUrl     String
+  mqttPort       Int      @default(8883)
+  websocketPort  Int      @default(8884)
+  username       String
+  password       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

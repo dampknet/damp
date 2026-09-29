@@ -10,9 +10,9 @@ export default async function InventorySitePage({
 }) {
   const { siteId } = await params;
 
-  const profile  = await getCurrentProfile();
-  const role     = profile?.role ?? "VIEWER";
-  const canEdit  = role === "ADMIN" || role === "EDITOR";
+  const profile = await getCurrentProfile();
+  const role    = profile?.role ?? "VIEWER";
+  const canEdit = role === "ADMIN" || role === "EDITOR";
 
   const site = await prisma.inventorySite.findFirst({
     where:  { id: siteId, isDeleted: false },
@@ -58,34 +58,11 @@ export default async function InventorySitePage({
   }));
 
   const summary = {
-    totalItems: String(site.items.length),
-
-    // ✅ Equipment ONLY — matches the store dashboard count exactly
-    equipmentCount: String(
-      site.items.filter((i) => i.itemType === "EQUIPMENT").length
-    ),
-
-    // ✅ Everything else = "Other Items"
-    materialCount: String(
-      site.items.filter(
-        (i) =>
-          i.itemType === "ACCESSORIES" ||
-          i.itemType === "TOOLS_AND_PARTS" ||
-          i.itemType === "GENERAL" ||
-          i.itemType === "COOLING_INFRASTRUCTURE" ||
-          i.itemType === "CABLES_AND_ELECTRONICS"
-      ).length
-    ),
-
-    lowStockCount: String(
-      site.items.filter(
-        (i) => i.status === "LOW_STOCK" || i.status === "OUT_OF_STOCK"
-      ).length
-    ),
-
-    checkedOutCount: String(
-      site.items.filter((i) => i.status === "CHECKED_OUT").length
-    ),
+    totalItems:      String(site.items.length),
+    equipmentCount:  String(site.items.filter((i) => i.itemType === "EQUIPMENT").length),
+    materialCount:   String(site.items.filter((i) => i.itemType !== "EQUIPMENT").length),
+    lowStockCount:   String(site.items.filter((i) => i.status === "LOW_STOCK" || i.status === "OUT_OF_STOCK").length),
+    checkedOutCount: String(site.items.filter((i) => i.status === "CHECKED_OUT").length),
   };
 
   return (

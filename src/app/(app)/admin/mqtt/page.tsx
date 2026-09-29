@@ -1,19 +1,20 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, requireMasterAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import MqttSettingsClient from "./MqttSettingsClient";
 
 export default async function MqttSettingsPage() {
-  const profile = await getCurrentProfile();
-  if (!profile)                redirect("/auth/login");
-  if (profile.role !== "ADMIN") redirect("/dashboard");
+  await requireMasterAdmin();
 
   const config = await prisma.mqttConfig.findFirst();
 
   async function saveMqttConfig(formData: FormData) {
     "use server";
+
+    const me = await getCurrentProfile();
+    if (!me?.isMasterAdmin) redirect("/dashboard");
 
     const connectionName = String(formData.get("connectionName") ?? "").trim();
     const clusterUrl     = String(formData.get("clusterUrl")     ?? "").trim();

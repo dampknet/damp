@@ -4,19 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
-
-const ITEM_TYPES = [
-  { value: "EQUIPMENT",              label: "Equipment" },
-  { value: "ACCESSORIES",            label: "Accessories" },
-  { value: "TOOLS_AND_PARTS",        label: "Tools & Parts" },
-  { value: "GENERAL",                label: "General" },
-  { value: "COOLING_INFRASTRUCTURE", label: "Cooling Infrastructure" },
-  { value: "CABLES_AND_ELECTRONICS", label: "Cables & Electronics" },
-];
+import { ITEM_TYPES } from "@/lib/item-types";
 
 export default function NewInventoryItemClient({
-  site,
-  action,
+  site, action,
 }: {
   site:   { id: string; name: string; location: string | null };
   action: (formData: FormData) => void;
@@ -26,12 +17,17 @@ export default function NewInventoryItemClient({
   const searchParams = useSearchParams();
   const error        = searchParams.get("error");
 
-  const [itemType,     setItemType]     = useState("EQUIPMENT");
-  const [uncountable,  setUncountable]  = useState(false);
+  const [itemType,       setItemType]       = useState("EQUIPMENT");
+  const [uncountable,    setUncountable]    = useState(false);
+  const [quantity,       setQuantity]       = useState(0);
+  const [createEntities, setCreateEntities] = useState(false);
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
     : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none";
+
+  const canCreateEntities = !uncountable && quantity > 0 &&
+    (itemType === "EQUIPMENT" || itemType === "COOLING_INFRASTRUCTURE");
 
   return (
     <div className={dark
@@ -92,7 +88,6 @@ export default function NewInventoryItemClient({
 
           <form action={action} className="mt-6 space-y-5">
 
-            {/* Row 1 — Category + Name */}
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Item Category" dark={dark}>
                 <select name="itemType" value={itemType}
@@ -110,99 +105,94 @@ export default function NewInventoryItemClient({
               </Field>
             </div>
 
-            {/* Description */}
             <Field label="Description" dark={dark}>
               <textarea name="description" rows={3}
                 placeholder="Optional description, size, colour, etc."
                 title="Description" className={inputCls} />
             </Field>
 
-            {/* Row 2 — Item Code + Manufacturer + Model */}
             <div className="grid gap-4 md:grid-cols-3">
               <Field label="Item Code (optional — auto if blank)" dark={dark}>
                 <input name="itemCode" placeholder="e.g. KNET-EQUIP-001"
                   title="Item Code" className={inputCls} />
               </Field>
               <Field label="Manufacturer" dark={dark}>
-                <input name="manufacturer" placeholder="optional"
-                  title="Manufacturer" className={inputCls} />
+                <input name="manufacturer" placeholder="optional" title="Manufacturer" className={inputCls} />
               </Field>
               <Field label="Model" dark={dark}>
-                <input name="model" placeholder="optional"
-                  title="Model" className={inputCls} />
+                <input name="model" placeholder="optional" title="Model" className={inputCls} />
               </Field>
             </div>
 
-            {/* Row 3 — Quantity toggle + Quantity field + Unit */}
             <div className="space-y-3">
-              {/* N/A checkbox */}
               <label className={`flex items-center gap-3 cursor-pointer w-fit rounded-xl border px-4 py-3 transition ${
                 uncountable
-                  ? dark
-                    ? "border-emerald-500/30 bg-emerald-500/10"
-                    : "border-emerald-300 bg-emerald-50"
-                  : dark
-                    ? "border-white/10 bg-white/5"
-                    : "border-[#ddd5c9] bg-white"
+                  ? dark ? "border-emerald-500/30 bg-emerald-500/10" : "border-emerald-300 bg-emerald-50"
+                  : dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-white"
               }`}>
-                <input
-                  type="checkbox"
-                  name="uncountable"
-                  checked={uncountable}
-                  onChange={(e) => setUncountable(e.target.checked)}
-                  title="Quantity not applicable"
-                  className="h-4 w-4 rounded accent-emerald-500"
+                <input type="checkbox" name="uncountable" checked={uncountable}
+                  onChange={(e) => { setUncountable(e.target.checked); if (e.target.checked) setCreateEntities(false); }}
+                  title="Quantity not applicable" className="h-4 w-4 rounded accent-emerald-500"
                 />
                 <div>
-                  <div className={`text-sm font-semibold ${
-                    uncountable
-                      ? dark ? "text-emerald-300" : "text-emerald-700"
-                      : dark ? "text-slate-200" : "text-[#1a1814]"
-                  }`}>
+                  <div className={`text-sm font-semibold ${uncountable ? dark ? "text-emerald-300" : "text-emerald-700" : dark ? "text-slate-200" : "text-[#1a1814]"}`}>
                     Quantity not applicable (N/A)
                   </div>
                   <div className={`text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
-                    Tick for items like clamps, brackets — items without a trackable count. Will never show as low stock.
+                    Tick for items like clamps, brackets — items without a trackable count.
                   </div>
                 </div>
               </label>
 
-              {/* Quantity + Unit — hidden when uncountable */}
               {!uncountable && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Quantity" dark={dark}>
                     <input name="quantity" type="number" min="0" defaultValue="0"
-                      required title="Quantity" className={inputCls} />
+                      required title="Quantity" className={inputCls}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                    />
                   </Field>
                   <Field label="Unit" dark={dark}>
-                    <input name="unit" placeholder="e.g. pcs, rolls, boxes"
-                      title="Unit" className={inputCls} />
+                    <input name="unit" placeholder="e.g. pcs, rolls, boxes" title="Unit" className={inputCls} />
                   </Field>
                 </div>
               )}
 
-              {/* When uncountable, still send unit for reference */}
               {uncountable && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className={`flex items-center rounded-xl border px-3 py-2.5 ${
-                    dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-[#f5f2ed]"
-                  }`}>
-                    <span className={`text-sm font-bold ${dark ? "text-emerald-300" : "text-emerald-700"}`}>
-                      N/A — quantity not tracked
-                    </span>
+                  <div className={`flex items-center rounded-xl border px-3 py-2.5 ${dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-[#f5f2ed]"}`}>
+                    <span className={`text-sm font-bold ${dark ? "text-emerald-300" : "text-emerald-700"}`}>N/A — quantity not tracked</span>
                     <input type="hidden" name="quantity" value="0" />
                   </div>
                   <Field label="Unit (optional reference)" dark={dark}>
-                    <input name="unit" placeholder="e.g. pcs, sets"
-                      title="Unit" className={inputCls} />
+                    <input name="unit" placeholder="e.g. pcs, sets" title="Unit" className={inputCls} />
                   </Field>
                 </div>
               )}
             </div>
 
-            {/* Row 4 — Reorder + Target + Condition */}
+            {canCreateEntities && (
+              <label className={`flex items-center gap-3 cursor-pointer w-fit rounded-xl border px-4 py-3 transition ${
+                createEntities
+                  ? dark ? "border-blue-500/30 bg-blue-500/10" : "border-blue-300 bg-blue-50"
+                  : dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-white"
+              }`}>
+                <input type="checkbox" name="createEntities" checked={createEntities}
+                  onChange={(e) => setCreateEntities(e.target.checked)}
+                  title="Create entity codes" className="h-4 w-4 rounded accent-blue-500"
+                />
+                <div>
+                  <div className={`text-sm font-semibold ${createEntities ? dark ? "text-blue-300" : "text-blue-700" : dark ? "text-slate-200" : "text-[#1a1814]"}`}>
+                    Create individual entity codes ({quantity} unit{quantity !== 1 ? "s" : ""})
+                  </div>
+                  <div className={`text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
+                    Auto-generates codes like {`{itemCode}-01`}, {`{itemCode}-02`}… for each unit.
+                  </div>
+                </div>
+              </label>
+            )}
+
             <div className="grid gap-4 md:grid-cols-3">
-              {/* Hide reorder level for uncountable items — not relevant */}
               {!uncountable ? (
                 <>
                   <Field label="Reorder Level" dark={dark}>
@@ -216,14 +206,13 @@ export default function NewInventoryItemClient({
                 </>
               ) : (
                 <>
-                  <input type="hidden" name="reorderLevel"    value="0" />
+                  <input type="hidden" name="reorderLevel"     value="0" />
                   <input type="hidden" name="targetStockLevel" value="" />
-                  <div className="md:col-span-2" /> {/* spacer */}
+                  <div className="md:col-span-2" />
                 </>
               )}
               <Field label="Initial Condition" dark={dark}>
-                <select name="condition" defaultValue="NEW"
-                  title="Condition" className={inputCls}>
+                <select name="condition" defaultValue="NEW" title="Condition" className={inputCls}>
                   <option value="NEW">NEW</option>
                   <option value="UNUSED">UNUSED</option>
                   <option value="USED">USED</option>
@@ -253,14 +242,10 @@ export default function NewInventoryItemClient({
   );
 }
 
-function Field({ label, children, dark }: {
-  label: string; children: React.ReactNode; dark: boolean;
-}) {
+function Field({ label, children, dark }: { label: string; children: React.ReactNode; dark: boolean }) {
   return (
     <label className="block">
-      <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>
-        {label}
-      </div>
+      <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>{label}</div>
       {children}
     </label>
   );

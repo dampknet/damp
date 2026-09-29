@@ -10,7 +10,6 @@ import {
 } from "@/lib/inventory-upload";
 import UploadInventoryExcelClient from "./UploadInventoryExcelClient";
 
-/* ── Site prefix extracted from first existing item code or fallback ── */
 async function getSitePrefix(siteId: string, siteName: string): Promise<string> {
   const sample = await prisma.inventoryItem.findFirst({
     where:  { inventorySiteId: siteId, itemCode: { not: null } },
@@ -18,12 +17,10 @@ async function getSitePrefix(siteId: string, siteName: string): Promise<string> 
   });
 
   if (sample?.itemCode) {
-    // e.g. "KNET-EQUIP-001" → "KNET"
     const parts = sample.itemCode.split("-");
     if (parts.length >= 1) return parts[0];
   }
 
-  // Fallback: first 4 chars of site name uppercased
   return siteName.replace(/\s+/g, "").toUpperCase().slice(0, 4);
 }
 
@@ -64,7 +61,7 @@ export default async function UploadInventoryExcelPage({
   params,
   searchParams,
 }: {
-  params:       Promise<{ siteId: string }>;
+  params:        Promise<{ siteId: string }>;
   searchParams?: Promise<{ success?: string; error?: string }>;
 }) {
   const { siteId } = await params;
@@ -84,9 +81,6 @@ export default async function UploadInventoryExcelPage({
   if (!site) return notFound();
   const safeSite = site;
 
-  /* ─────────────────────────────────────────────────────────────────────────
-   * SERVER ACTION — called when the user clicks "Confirm Import"
-   * ───────────────────────────────────────────────────────────────────────── */
   async function confirmInventoryExcelImport(formData: FormData) {
     "use server";
 
@@ -103,7 +97,6 @@ export default async function UploadInventoryExcelPage({
       redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("No valid rows to import")}`);
     }
 
-    /* ── Duplicate item-code check before touching DB ── */
     const suppliedCodes = validRows
       .map((r) => (r.itemCode ?? "").trim().toUpperCase())
       .filter(Boolean);
@@ -131,13 +124,11 @@ export default async function UploadInventoryExcelPage({
       await prisma.$transaction(
         async (tx) => {
           for (const row of validRows) {
-            /* ── Resolve / auto-generate item code ── */
             let itemCode = (row.itemCode ?? "").trim() || null;
             if (!itemCode) {
               itemCode = await generateItemCode({ itemType: row.itemType, sitePrefix });
             }
 
-            /* ── Create master InventoryItem ── */
             const created = await tx.inventoryItem.create({
               data: {
                 inventorySiteId:  siteId,
@@ -156,7 +147,6 @@ export default async function UploadInventoryExcelPage({
               },
             });
 
-            /* ── Create AssetInstances if user ticked "Create Entities" ── */
             if (row.createEntities && !row.uncountable && row.quantity > 0) {
               const entityCodes = generateEntityCodes(itemCode, row.quantity);
               await tx.assetInstance.createMany({

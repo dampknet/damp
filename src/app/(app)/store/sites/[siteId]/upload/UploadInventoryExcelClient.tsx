@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useFormStatus } from "react-dom";
+import { ITEM_TYPE_LABEL, ITEM_TYPE_UPLOAD_HINT } from "@/lib/item-types";
 
 type PreviewRow = {
   rowNumber:   number;
@@ -18,34 +19,24 @@ type PreviewRow = {
 };
 
 type ValidRow = {
-  itemType:        string;
-  name:            string;
-  description:     string | null;
-  manufacturer:    string | null;
-  model:           string | null;
-  itemCode:        string | null;
-  serialNumber:    string | null;
-  quantity:        number;
-  uncountable:     boolean;
-  unit:            string | null;
-  reorderLevel:    number;
+  itemType:         string;
+  name:             string;
+  description:      string | null;
+  manufacturer:     string | null;
+  model:            string | null;
+  itemCode:         string | null;
+  serialNumber:     string | null;
+  quantity:         number;
+  uncountable:      boolean;
+  unit:             string | null;
+  reorderLevel:     number;
   targetStockLevel: number | null;
-  status:          string;
-  condition:       string;
-  // Added at confirm time by the user ticking the checkbox
-  createEntities?: boolean;
+  status:           string;
+  condition:        string;
+  createEntities?:  boolean;
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  EQUIPMENT:               "Equipment",
-  ACCESSORIES:             "Accessories",
-  TOOLS_AND_PARTS:         "Tools & Parts",
-  GENERAL:                 "General",
-  COOLING_INFRASTRUCTURE:  "Cooling",
-  CABLES_AND_ELECTRONICS:  "Cables & Electronics",
-};
 
 const CONDITION_COLOR: Record<string, string> = {
   NEW:    "text-emerald-500",
@@ -56,11 +47,9 @@ const CONDITION_COLOR: Record<string, string> = {
 
 function Spinner({ dark }: { dark: boolean }) {
   return (
-    <span
-      className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${
-        dark ? "border-white/30 border-t-white" : "border-white/40 border-t-white"
-      }`}
-    />
+    <span className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${
+      dark ? "border-white/30 border-t-white" : "border-white/40 border-t-white"
+    }`} />
   );
 }
 
@@ -70,10 +59,9 @@ function ConfirmSubmitButton({ dark }: { dark: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className={
-        dark
-          ? "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-          : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+      className={dark
+        ? "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        : "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
       }
     >
       {pending ? <><Spinner dark={dark} /> Importing...</> : "Confirm Import"}
@@ -99,14 +87,12 @@ export default function UploadInventoryExcelClient({
   const { mode } = useThemeMode();
   const dark = mode === "dark";
 
-  const [clientFileError,  setClientFileError]  = useState<string | null>(null);
-  const [previewError,     setPreviewError]      = useState<string | null>(null);
-  const [previewLoading,   setPreviewLoading]    = useState(false);
-  const [previewRows,      setPreviewRows]        = useState<PreviewRow[]>([]);
-  const [validRows,        setValidRows]          = useState<ValidRow[]>([]);
-
-  // Track which row indices the user has ticked "create entities" for
-  const [entityRows, setEntityRows] = useState<Set<number>>(new Set());
+  const [clientFileError, setClientFileError] = useState<string | null>(null);
+  const [previewError,    setPreviewError]     = useState<string | null>(null);
+  const [previewLoading,  setPreviewLoading]   = useState(false);
+  const [previewRows,     setPreviewRows]       = useState<PreviewRow[]>([]);
+  const [validRows,       setValidRows]         = useState<ValidRow[]>([]);
+  const [entityRows,      setEntityRows]        = useState<Set<number>>(new Set());
 
   const toggleEntity = (idx: number) => {
     setEntityRows((prev) => {
@@ -181,7 +167,6 @@ export default function UploadInventoryExcelClient({
     }
   }
 
-  // Build the enriched validRows JSON with createEntities flag set per user choice
   const enrichedValidRows: ValidRow[] = validRows.map((row, idx) => ({
     ...row,
     createEntities: entityRows.has(idx),
@@ -194,7 +179,6 @@ export default function UploadInventoryExcelClient({
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
 
-        {/* ── HEADER ── */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-sm"
@@ -207,8 +191,7 @@ export default function UploadInventoryExcelClient({
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <div className="flex flex-col items-start gap-3">
-                <Link
-                  href={`/store/sites/${site.id}`}
+                <Link href={`/store/sites/${site.id}`}
                   className={dark
                     ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
                     : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
@@ -250,9 +233,7 @@ export default function UploadInventoryExcelClient({
 
             <div className="w-full lg:w-80">
               <div className="flex justify-start lg:justify-end">
-                <a
-                  href={templateHref}
-                  download={templateFileName}
+                <a href={templateHref} download={templateFileName}
                   className={dark
                     ? "rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/15"
                     : "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
@@ -273,7 +254,7 @@ export default function UploadInventoryExcelClient({
                   reorderlevel, targetstock level, condition
                 </div>
                 <div className={`mt-3 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
-                  <span className="font-semibold">itemtype:</span> EQUIPMENT · ACCESSORIES · TOOLS AND PARTS · GENERAL · COOLING INFRASTRUCTURE · CABLES AND ELECTRONICS
+                  <span className="font-semibold">itemtype:</span> {ITEM_TYPE_UPLOAD_HINT}
                 </div>
                 <div className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
                   <span className="font-semibold">condition:</span> NEW · UNUSED · USED · FAULTY
@@ -285,7 +266,6 @@ export default function UploadInventoryExcelClient({
             </div>
           </div>
 
-          {/* Errors */}
           {serverError && (
             <div className={dark
               ? "mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
@@ -311,14 +291,10 @@ export default function UploadInventoryExcelClient({
             }>{serverSuccess}</div>
           )}
 
-          {/* File picker */}
-          <form
-            onSubmit={handlePreviewSubmit}
-            className={dark
-              ? "mt-6 rounded-3xl border border-white/10 bg-white/5 p-5"
-              : "mt-6 rounded-3xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
-            }
-          >
+          <form onSubmit={handlePreviewSubmit} className={dark
+            ? "mt-6 rounded-3xl border border-white/10 bg-white/5 p-5"
+            : "mt-6 rounded-3xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
+          }>
             <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
                 <label htmlFor="inventory-excel-file" className={dark
@@ -354,15 +330,11 @@ export default function UploadInventoryExcelClient({
             </div>
           </form>
 
-          {/* Confirm form — shown only after a valid preview */}
           {validRows.length > 0 && (
-            <form
-              action={confirmAction}
-              className={dark
-                ? "mt-4 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5"
-                : "mt-4 rounded-3xl border border-[#d6e9d8] bg-[#f7fcf8] p-5"
-              }
-            >
+            <form action={confirmAction} className={dark
+              ? "mt-4 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5"
+              : "mt-4 rounded-3xl border border-[#d6e9d8] bg-[#f7fcf8] p-5"
+            }>
               <input type="hidden" name="validRowsPayload" value={JSON.stringify(enrichedValidRows)} />
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -381,25 +353,22 @@ export default function UploadInventoryExcelClient({
           )}
         </section>
 
-        {/* ── STATS ── */}
         {previewRows.length > 0 && (
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <StatCard dark={dark} label="Rows Read"         value={String(previewRows.length)} />
-            <StatCard dark={dark} label="Valid"             value={String(validCount)} />
-            <StatCard dark={dark} label="Invalid / Skipped" value={String(invalidCount)} />
+            <StatCard dark={dark} label="Rows Read"          value={String(previewRows.length)} />
+            <StatCard dark={dark} label="Valid"              value={String(validCount)} />
+            <StatCard dark={dark} label="Invalid / Skipped"  value={String(invalidCount)} />
           </div>
         )}
 
-        {/* ── PREVIEW TABLE ── */}
         {previewRows.length > 0 && (
           <section className={dark
             ? "mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5"
             : "mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
           }>
-            {/* Legend */}
             <div className={`flex items-center gap-6 px-5 py-3 text-xs ${dark ? "border-b border-white/10 text-slate-400" : "border-b border-slate-100 text-[#5b564d]"}`}>
               <span className="font-semibold">Create Entities column:</span>
-              <span>Tick to auto-generate individual sub-codes (e.g. EQUIP-004-01, -02 …) per quantity. Leave unticked for bulk items like clamps.</span>
+              <span>Tick to auto-generate individual sub-codes per quantity. Leave unticked for bulk items like clamps.</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -412,15 +381,12 @@ export default function UploadInventoryExcelClient({
                     <th className="px-5 py-3 font-medium">Item Code</th>
                     <th className="px-5 py-3 font-medium text-center">Qty</th>
                     <th className="px-5 py-3 font-medium">Condition</th>
-                    <th className="px-5 py-3 font-medium text-center">
-                      Create Entities
-                    </th>
+                    <th className="px-5 py-3 font-medium text-center">Create Entities</th>
                     <th className="px-5 py-3 font-medium text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-500/10">
                   {previewRows.map((row, idx) => {
-                    // Only valid, non-uncountable, quantity > 0 rows can have entities
                     const canHaveEntities = !row.error && !row.uncountable && Number(row.quantity) > 0;
 
                     return (
@@ -451,8 +417,6 @@ export default function UploadInventoryExcelClient({
                         <td className={`px-5 py-3 text-xs font-bold ${CONDITION_COLOR[row.condition] ?? "opacity-50"}`}>
                           {row.condition || "-"}
                         </td>
-
-                        {/* ── Entity checkbox ── */}
                         <td className="px-5 py-3 text-center">
                           {canHaveEntities ? (
                             <label className="inline-flex cursor-pointer items-center gap-2">
@@ -473,7 +437,6 @@ export default function UploadInventoryExcelClient({
                             <span className="text-xs opacity-25">—</span>
                           )}
                         </td>
-
                         <td className={`px-5 py-3 text-right font-semibold ${row.error ? "text-red-500" : "text-emerald-500"}`}>
                           {row.error ?? "OK"}
                         </td>
@@ -490,8 +453,6 @@ export default function UploadInventoryExcelClient({
     </div>
   );
 }
-
-/* ── Small UI helpers ── */
 
 function Chip({ dark, label, value }: { dark: boolean; label: string; value: string }) {
   return (

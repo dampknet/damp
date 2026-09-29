@@ -1,55 +1,108 @@
-// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { getToken } from "next-auth/jwt";
+
+
+const XSS_PATTERNS = [
+  /<script[\s>]/i,
+  /javascript:/i,
+  /on\w+\s*=/i,
+  /<iframe/i,
+  /document\.cookie/i,
+  /eval\s*\(/i,
+];
+
+const SQL_PATTERNS = [
+  /('\s*(or|and)\s*'?\d)/i,
+  /(union\s+(all\s+)?select)/i,
+  /(drop\s+table)/i,
+  /(insert\s+into)/i,
+  /(delete\s+from)/i,
+  /(-{2}|\bxp_)/i,
+  /(\bor\b\s+1\s*=\s*1)/i,
+];
+
+const PATH_PATTERNS = [
+  /\.\.\//,
+  /\.\.%2f/i,
+  /%2e%2e/i,
+];
+
+function detectThreat(str: string): string | null {
+  const decoded = (() => { try { return decodeURIComponent(str); } catch { return str; } })();
+  for (const p of XSS_PATTERNS)  if (p.test(decoded)) return "XSS";
+  for (const p of SQL_PATTERNS)  if (p.test(decoded)) return "SQL_INJECTION";
+  for (const p of PATH_PATTERNS) if (p.test(decoded)) return "PATH_TRAVERSAL";
+  return null;
+}
+
+async function logSecurityEvent(
+  type: string,
+  detail: string,
+  req: NextRequest,
+  actorEmail?: string
+) {
+  
+  fetch(`${req.nextUrl.origin}/api/security/log`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json", "x-internal": "1" },
+    body:    JSON.stringify({
+      type,
+      detail,
+      ip:         req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown",
+      userAgent:  req.headers.get("user-agent") ?? "",
+      url:        req.nextUrl.pathname + req.nextUrl.search,
+      actorEmail: actorEmail ?? null,
+    }),
+  }).catch(() => {});
+}
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  const res      = NextResponse.next();
   const pathname = req.nextUrl.pathname;
 
-  // 1. Always allow auth routes to bypass checks
-  if (pathname.startsWith("/auth")) {
-    return res;
-  }
+  
+  if (pathname.startsWith("/auth")) return res;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            res.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  // Get the authenticated user from Supabase
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // 2. Redirect root to login
+ 
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/auth/login", req.url));
   }
 
-  // 3. Define Protected Routes
+
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET!,
+  });
+
+
+  const urlToCheck = req.nextUrl.pathname + req.nextUrl.search;
+  const urlThreat  = detectThreat(urlToCheck);
+  if (urlThreat) {
+    await logSecurityEvent(
+      urlThreat,
+      `Suspicious URL: ${urlToCheck.slice(0, 300)}`,
+      req,
+      token?.email as string | undefined
+    );
+    
+    return new NextResponse("Bad Request", { status: 400 });
+  }
+
+  
   const isProtected =
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/sites") ||
-    pathname.startsWith("/store") ||
-    pathname.startsWith("/activity") ||
-    pathname.startsWith("/assets") ||
+    pathname.startsWith("/sites")     ||
+    pathname.startsWith("/store")     ||
+    pathname.startsWith("/activity")  ||
+    pathname.startsWith("/assets")    ||
     pathname.startsWith("/admin");
 
   if (isProtected) {
-    // If NOT logged in at all
-    if (!user) {
+    if (!token) {
       return NextResponse.redirect(new URL("/auth/login", req.url));
     }
-      res.headers.set("x-user-id", user.id);
+    res.headers.set("x-user-id", (token.userId as string) ?? token.sub ?? "");
   }
 
   return res;

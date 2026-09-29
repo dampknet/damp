@@ -4,74 +4,90 @@ import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 
 export default function AdminIndexClient({
-  email, userCount, deletedCount, activityCount,
+  email, isMasterAdmin, userCount, deletedCount, activityCount,
 }: {
   email:         string;
+  isMasterAdmin: boolean;
   userCount:     number;
   deletedCount:  number;
   activityCount: number;
 }) {
   const { mode } = useThemeMode();
-  const dark      = mode === "dark";
+  const dark     = mode === "dark";
 
-  const cards = [
+  const allCards = [
     {
-      href:    "/admin/users",
-      emoji:   "👥",
-      label:   "User Management",
-      sub:     "Invite, manage roles, remove access",
-      accent:  dark ? "bg-[linear-gradient(90deg,#1d5fa8,#3b82f6)]" : "bg-[linear-gradient(90deg,#1d5fa8,#3b82f6)]",
-      iconBg:  dark ? "border-blue-500/20 bg-blue-500/10"  : "border-blue-200 bg-blue-50",
-      tag:     `${userCount} user${userCount !== 1 ? "s" : ""}`,
-      tagCls:  dark ? "border-blue-500/20 bg-blue-500/10 text-blue-300"  : "border-blue-200 bg-blue-50 text-blue-700",
-      hoverCl: dark ? "group-hover:text-blue-400" : "group-hover:text-blue-700",
+      masterOnly: true,
+      href:       "/admin/users",
+      emoji:      "👥",
+      label:      "User Management",
+      sub:        "Invite users, manage roles, master admins, suspensions and lockouts",
+      accent:     "bg-[linear-gradient(90deg,#1d5fa8,#3b82f6)]",
+      iconBg:     dark ? "border-blue-500/20 bg-blue-500/10" : "border-blue-200 bg-blue-50",
+      tag:        `${userCount} user${userCount !== 1 ? "s" : ""}`,
+      tagCls:     dark ? "border-blue-500/20 bg-blue-500/10 text-blue-300" : "border-blue-200 bg-blue-50 text-blue-700",
+      hoverCl:    dark ? "group-hover:text-blue-400" : "group-hover:text-blue-700",
     },
     {
-      href:    "/admin/deleted-items",
-      emoji:   "🗑️",
-      label:   "Recycle Bin",
-      sub:     "Review and restore deleted records",
-      accent:  "bg-[linear-gradient(90deg,#dc2626,#f87171)]",
-      iconBg:  dark ? "border-rose-500/20 bg-rose-500/10"   : "border-rose-200 bg-rose-50",
-      tag:     `${deletedCount} deleted item${deletedCount !== 1 ? "s" : ""}`,
-      tagCls:  deletedCount > 0
-        ? dark ? "border-rose-500/20 bg-rose-500/10 text-rose-300"  : "border-rose-200 bg-rose-50 text-rose-700"
-        : dark ? "border-white/10 bg-white/5 text-slate-400"        : "border-[#e0dbd2] bg-[#f5f2ed] text-[#6b655d]",
-      hoverCl: dark ? "group-hover:text-rose-400" : "group-hover:text-rose-700",
+      masterOnly: false,
+      href:       "/admin/deleted-items",
+      emoji:      "🗑️",
+      label:      "Recycle Bin",
+      sub:        "Review and restore deleted records",
+      accent:     "bg-[linear-gradient(90deg,#dc2626,#f87171)]",
+      iconBg:     dark ? "border-rose-500/20 bg-rose-500/10" : "border-rose-200 bg-rose-50",
+      tag:        `${deletedCount} deleted item${deletedCount !== 1 ? "s" : ""}`,
+      tagCls:     deletedCount > 0
+        ? dark ? "border-rose-500/20 bg-rose-500/10 text-rose-300" : "border-rose-200 bg-rose-50 text-rose-700"
+        : dark ? "border-white/10 bg-white/5 text-slate-400"       : "border-[#e0dbd2] bg-[#f5f2ed] text-[#6b655d]",
+      hoverCl:    dark ? "group-hover:text-rose-400" : "group-hover:text-rose-700",
     },
     {
-      href:    "/admin/backup",
-      emoji:   "💾",
-      label:   "Data Backup & Recovery",
-      sub:     "Export all data or restore from backup",
-      accent:  "bg-[linear-gradient(90deg,#2a7d52,#10b981)]",
-      iconBg:  dark ? "border-emerald-500/20 bg-emerald-500/10" : "border-emerald-200 bg-emerald-50",
-      tag:     "Download · Restore",
-      tagCls:  dark ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border-emerald-200 bg-emerald-50 text-emerald-700",
-      hoverCl: dark ? "group-hover:text-emerald-400" : "group-hover:text-emerald-700",
+      masterOnly: false,
+      href:       "/admin/backup",
+      emoji:      "💾",
+      label:      "Data Backup & Recovery",
+      sub:        "Export all data or restore from backup",
+      accent:     "bg-[linear-gradient(90deg,#2a7d52,#10b981)]",
+      iconBg:     dark ? "border-emerald-500/20 bg-emerald-500/10" : "border-emerald-200 bg-emerald-50",
+      tag:        "Download · Restore",
+      tagCls:     dark ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border-emerald-200 bg-emerald-50 text-emerald-700",
+      hoverCl:    dark ? "group-hover:text-emerald-400" : "group-hover:text-emerald-700",
     },
     {
-      href:    "/admin/mqtt",
-      emoji:   "📡",
-      label:   "HiveMQ Fuel Monitor",
-      sub:     "Configure MQTT connection for live fuel levels",
-      accent:  "bg-[linear-gradient(90deg,#1d5fa8,#06b6d4)]",
-      iconBg:  dark ? "border-sky-500/20 bg-sky-500/10"  : "border-sky-200 bg-sky-50",
-      tag:     "42 sites · Live fuel data",
-      tagCls:  dark ? "border-sky-500/20 bg-sky-500/10 text-sky-300" : "border-sky-200 bg-sky-50 text-sky-700",
-      hoverCl: dark ? "group-hover:text-sky-400" : "group-hover:text-sky-700",
+      masterOnly: true,
+      href:       "/admin/mqtt",
+      emoji:      "⛽",
+      label:      "HiveMQ Fuel Monitor",
+      sub:        "Configure MQTT connection for live fuel levels",
+      accent:     "bg-[linear-gradient(90deg,#1d5fa8,#06b6d4)]",
+      iconBg:     dark ? "border-sky-500/20 bg-sky-500/10" : "border-sky-200 bg-sky-50",
+      tag:        "42 sites · Live fuel data",
+      tagCls:     dark ? "border-sky-500/20 bg-sky-500/10 text-sky-300" : "border-sky-200 bg-sky-50 text-sky-700",
+      hoverCl:    dark ? "group-hover:text-sky-400" : "group-hover:text-sky-700",
     },
     {
-      href:    "/activity",
-      emoji:   "📋",
-      label:   "Activity Audit Log",
-      sub:     "Full trail of every system action",
-      accent:  "bg-[linear-gradient(90deg,#b08b2c,#f59e0b)]",
-      iconBg:  dark ? "border-amber-500/20 bg-amber-500/10" : "border-amber-200 bg-amber-50",
-      tag:     `${activityCount.toLocaleString()} events`,
-      tagCls:  dark ? "border-amber-500/20 bg-amber-500/10 text-amber-300" : "border-amber-200 bg-amber-50 text-amber-700",
-      hoverCl: dark ? "group-hover:text-amber-400" : "group-hover:text-amber-700",
+      masterOnly: false,
+      href:       "/activity",
+      emoji:      "📋",
+      label:      "Activity Audit Log",
+      sub:        isMasterAdmin ? "Full trail including sign-ins and security events" : "Trail of inventory and system changes",
+      accent:     "bg-[linear-gradient(90deg,#b08b2c,#f59e0b)]",
+      iconBg:     dark ? "border-amber-500/20 bg-amber-500/10" : "border-amber-200 bg-amber-50",
+      tag:        `${activityCount.toLocaleString()} events`,
+      tagCls:     dark ? "border-amber-500/20 bg-amber-500/10 text-amber-300" : "border-amber-200 bg-amber-50 text-amber-700",
+      hoverCl:    dark ? "group-hover:text-amber-400" : "group-hover:text-amber-700",
     },
+  ];
+
+  const cards = allCards.filter((c) => isMasterAdmin || !c.masterOnly);
+
+  const stats = [
+    ...(isMasterAdmin
+      ? [{ label: "Registered Users", value: String(userCount), sub: "with system access", accent: dark ? "bg-blue-500" : "bg-[#1d5fa8]" }]
+      : []),
+    { label: "Deleted Items", value: String(deletedCount),           sub: "recoverable from bin", accent: dark ? "bg-rose-500"  : "bg-[#dc2626]" },
+    { label: "Audit Events",  value: activityCount.toLocaleString(), sub: "total logged actions", accent: dark ? "bg-amber-500" : "bg-[#b08b2c]" },
   ];
 
   return (
@@ -81,7 +97,6 @@ export default function AdminIndexClient({
     }>
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
 
-        {/* ── HEADER ── */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
@@ -107,7 +122,9 @@ export default function AdminIndexClient({
                 ? "mt-2 max-w-xl text-sm font-medium leading-6 text-slate-400"
                 : "mt-2 max-w-xl text-sm font-medium leading-6 text-[#857f76]"
               }>
-                Manage users, view deleted records, backup data, and review system activity. All actions are logged to the audit trail.
+                {isMasterAdmin
+                  ? "Manage users, security, system settings, deleted records and backups. All actions are logged to the audit trail."
+                  : "View deleted records, back up data and review system activity. All actions are logged to the audit trail."}
               </p>
             </div>
 
@@ -119,23 +136,22 @@ export default function AdminIndexClient({
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {email}
               </div>
-              <span className={dark
-                ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#f97316]"
-                : "rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#c8611a]"
+              <span className={isMasterAdmin
+                ? dark
+                  ? "rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-300"
+                  : "rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700"
+                : dark
+                  ? "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#f97316]"
+                  : "rounded-full border border-[#eadfce] bg-[#fcfaf6] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#c8611a]"
               }>
-                ADMIN
+                {isMasterAdmin ? "Master Admin" : "Admin"}
               </span>
             </div>
           </div>
         </section>
 
-        {/* ── STATS ── */}
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          {[
-            { label: "Registered Users",  value: String(userCount),                    sub: "with system access",    accent: dark ? "bg-blue-500" : "bg-[#1d5fa8]" },
-            { label: "Deleted Items",     value: String(deletedCount),                 sub: "recoverable from bin",  accent: dark ? "bg-rose-500" : "bg-[#dc2626]" },
-            { label: "Audit Events",      value: activityCount.toLocaleString(),       sub: "total logged actions",  accent: dark ? "bg-amber-500" : "bg-[#b08b2c]" },
-          ].map((s) => (
+        <div className={`mt-5 grid gap-4 ${stats.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          {stats.map((s) => (
             <div key={s.label} className={dark
               ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl"
               : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm"
@@ -150,7 +166,6 @@ export default function AdminIndexClient({
           ))}
         </div>
 
-        {/* ── CARDS ── */}
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {cards.map((card) => (
             <Link key={card.href} href={card.href} className="group block">
@@ -174,7 +189,7 @@ export default function AdminIndexClient({
                         </div>
                       </div>
                     </div>
-                    <span className={dark ? "text-slate-600 group-hover:text-slate-300 transition-colors" : "text-[#c8c0b6] group-hover:text-[#1a1814] transition-colors"}>
+                    <span className={dark ? "text-slate-600 transition-colors group-hover:text-slate-300" : "text-[#c8c0b6] transition-colors group-hover:text-[#1a1814]"}>
                       →
                     </span>
                   </div>
@@ -190,14 +205,13 @@ export default function AdminIndexClient({
           ))}
         </div>
 
-        {/* ── BACKUP REMINDER ── */}
         <div className={dark
           ? "mt-5 overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-500/5"
           : "mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50"
         }>
           <div className="h-0.5 bg-[linear-gradient(90deg,#2a7d52,#10b981)]" />
           <div className="flex items-start gap-4 px-6 py-4">
-            <span className="mt-0.5 text-xl shrink-0">💡</span>
+            <span className="mt-0.5 shrink-0 text-xl">💡</span>
             <div>
               <div className={dark ? "text-sm font-semibold text-emerald-300" : "text-sm font-semibold text-emerald-800"}>
                 Remember to back up weekly

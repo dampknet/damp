@@ -6,15 +6,7 @@ import { useThemeMode } from "@/context/ThemeContext";
 import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import DeleteInventoryItemsDialog from "@/components/DeleteInventoryItemsDialog";
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  EQUIPMENT:              "Equipment",
-  ACCESSORIES:            "Accessories",
-  TOOLS_AND_PARTS:        "Tools & Parts",
-  GENERAL:                "General",
-  COOLING_INFRASTRUCTURE: "Cooling",
-  CABLES_AND_ELECTRONICS: "Cables & Electronics",
-};
+import { ITEM_TYPES, ITEM_TYPE_LABEL } from "@/lib/item-types";
 
 const ITEM_TYPE_COLOR_DARK: Record<string, string> = {
   EQUIPMENT:              "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -23,6 +15,9 @@ const ITEM_TYPE_COLOR_DARK: Record<string, string> = {
   GENERAL:                "bg-slate-500/10 text-slate-400 border-slate-500/20",
   COOLING_INFRASTRUCTURE: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
   CABLES_AND_ELECTRONICS: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  ACCESSORIES_AND_PARTS:  "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
+  TOOLS_AND_MAINTENANCE:  "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  CABLES_AND_ELECTRICALS: "bg-teal-500/10 text-teal-400 border-teal-500/20",
 };
 
 const ITEM_TYPE_COLOR_LIGHT: Record<string, string> = {
@@ -32,6 +27,9 @@ const ITEM_TYPE_COLOR_LIGHT: Record<string, string> = {
   GENERAL:                "bg-slate-50 text-slate-600 border-slate-200",
   COOLING_INFRASTRUCTURE: "bg-cyan-50 text-cyan-700 border-cyan-200",
   CABLES_AND_ELECTRONICS: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  ACCESSORIES_AND_PARTS:  "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  TOOLS_AND_MAINTENANCE:  "bg-orange-50 text-orange-700 border-orange-200",
+  CABLES_AND_ELECTRICALS: "bg-teal-50 text-teal-700 border-teal-200",
 };
 
 const CONDITIONS = ["NEW", "UNUSED", "USED", "FAULTY"] as const;
@@ -45,7 +43,6 @@ function conditionBadge(condition: string, dark: boolean) {
   return `${base} ${dark ? "border-slate-500/30 bg-slate-500/10 text-slate-300" : "border-slate-200 bg-slate-50 text-slate-700"}`;
 }
 
-// Same header select style as SitesClient
 function headerSelectCls(dark: boolean) {
   return dark
     ? "w-full rounded-md border border-white/10 bg-[#101720] px-2 py-1 text-[11px] font-semibold text-slate-300 outline-none transition hover:bg-white/5 focus:border-sky-400"
@@ -75,21 +72,22 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
   const dark     = mode === "dark";
   const router   = useRouter();
 
-  // ── search ────────────────────────────────────────────────────────────────
   const [q, setQ] = useState("");
 
-  // ── column header filters (same pattern as SitesClient) ──────────────────
   const [categoryFilter,  setCategoryFilter]  = useState("");
   const [conditionFilter, setConditionFilter] = useState("");
   const [statusFilter,    setStatusFilter]    = useState("");
 
-  // ── selection + delete ────────────────────────────────────────────────────
   const [selectedItemIds,    setSelectedItemIds]    = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteReason,       setDeleteReason]       = useState("");
   const [isDeleting,         setIsDeleting]         = useState(false);
 
-  // ── filtering ─────────────────────────────────────────────────────────────
+  const siteCategories = useMemo(() => {
+    const present = new Set(items.map((i: any) => i.itemType));
+    return ITEM_TYPES.filter((t) => present.has(t.value));
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     const qLow = q.toLowerCase().trim();
     return items.filter((item: any) => {
@@ -107,8 +105,8 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
       ].some((val: string | null | undefined) => val?.toLowerCase().includes(qLow));
 
       const matchesCategory  = !categoryFilter  || item.itemType  === categoryFilter;
-      const matchesCondition = !conditionFilter  || item.condition === conditionFilter;
-      const matchesStatus    = !statusFilter     || item.status    === statusFilter;
+      const matchesCondition = !conditionFilter || item.condition === conditionFilter;
+      const matchesStatus    = !statusFilter    || item.status    === statusFilter;
 
       return matchesQ && matchesCategory && matchesCondition && matchesStatus;
     });
@@ -175,7 +173,6 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
 
-        {/* ── HEADER ── */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
@@ -185,7 +182,6 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
             : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"
           } />
 
-          {/* title + action buttons */}
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <Link href="/store" className={dark
@@ -206,7 +202,6 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* ✅ Past Waybills — always visible */}
               <Link href={`/store/sites/${site.id}/waybills`}
                 className={dark
                   ? "rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 hover:bg-blue-500/20"
@@ -238,16 +233,14 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
             </div>
           </div>
 
-          {/* ── SUMMARY CARDS ── */}
           <div className="relative mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <SummaryCard dark={dark} label="Total Items"   value={summary.totalItems}      sub="in inventory"    accent="bg-[#1d5fa8]" />
-            <SummaryCard dark={dark} label="Equipment"     value={summary.equipmentCount}  sub="tracked units"   accent="bg-[#b08b2c]" />
-            <SummaryCard dark={dark} label="Other Items"   value={summary.materialCount}   sub="accessories etc" accent="bg-[#2a7d52]" />
-            <SummaryCard dark={dark} label="Low Stock"     value={summary.lowStockCount}   sub="needs attention" accent="bg-[#c8611a]" />
-            <SummaryCard dark={dark} label="Checked Out"   value={summary.checkedOutCount} sub="in the field"    accent="bg-[#1d5fa8]" />
+            <SummaryCard dark={dark} label="Total Items" value={summary.totalItems}      sub="in inventory"    accent="bg-[#1d5fa8]" />
+            <SummaryCard dark={dark} label="Equipment"   value={summary.equipmentCount}  sub="tracked units"   accent="bg-[#b08b2c]" />
+            <SummaryCard dark={dark} label="Other Items" value={summary.materialCount}   sub="accessories etc" accent="bg-[#2a7d52]" />
+            <SummaryCard dark={dark} label="Low Stock"   value={summary.lowStockCount}   sub="needs attention" accent="bg-[#c8611a]" />
+            <SummaryCard dark={dark} label="Checked Out" value={summary.checkedOutCount} sub="in the field"    accent="bg-[#1d5fa8]" />
           </div>
 
-          {/* ── SEARCH BAR ── */}
           <div className="relative mt-6 flex gap-3">
             <div className={dark
               ? "flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5"
@@ -276,7 +269,6 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
               )}
             </div>
 
-            {/* active filter chips */}
             {filteringActive ? (
               <button onClick={clearAllFilters}
                 className={dark
@@ -295,29 +287,27 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
             )}
 
             <PrintExportButton title={site.name} rows={exportRows} columns={[
-              { key: "No",          label: "No"          },
-              { key: "Item",        label: "Item"        },
-              { key: "Description", label: "Description" },
-              { key: "Category",    label: "Category"    },
-              { key: "Item Code",   label: "Item Code"   },
-              { key: "Manufacturer",label: "Manufacturer"},
-              { key: "Model",       label: "Model"       },
-              { key: "Qty",         label: "Qty"         },
-              { key: "Unit",        label: "Unit"        },
-              { key: "Condition",   label: "Condition"   },
-              { key: "Status",      label: "Status"      },
+              { key: "No",           label: "No"           },
+              { key: "Item",         label: "Item"         },
+              { key: "Description",  label: "Description"  },
+              { key: "Category",     label: "Category"     },
+              { key: "Item Code",    label: "Item Code"    },
+              { key: "Manufacturer", label: "Manufacturer" },
+              { key: "Model",        label: "Model"        },
+              { key: "Qty",          label: "Qty"          },
+              { key: "Unit",         label: "Unit"         },
+              { key: "Condition",    label: "Condition"    },
+              { key: "Status",       label: "Status"       },
             ]} />
           </div>
         </section>
 
-        {/* ── MAIN TABLE ── */}
         <div className={dark
           ? "mt-6 overflow-hidden rounded-[26px] border border-white/10 bg-white/5 backdrop-blur-xl"
           : "mt-6 overflow-hidden rounded-[26px] border border-[#e0dbd2] bg-white shadow-sm"
         }>
           <div className={dark ? "h-1 w-full bg-[#1d5fa8] opacity-50" : "h-1 w-full bg-[#1d5fa8]"} />
 
-          {/* table header row with count */}
           <div className="flex items-center justify-between px-5 py-3">
             <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>
               Inventory Items
@@ -335,8 +325,6 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                 : "sticky top-0 z-20 bg-[#f8f4ee] text-left text-[#5b564d]"
               }>
                 <tr className="font-semibold">
-
-                  {/* Checkbox */}
                   <th className="w-12 px-4 py-3 text-center">
                     <input type="checkbox" title="Select All"
                       onChange={(e) =>
@@ -348,13 +336,10 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                     />
                   </th>
 
-                  {/* No */}
                   <th className="w-10 px-2 py-3">No</th>
 
-                  {/* Item name — plain label, search bar handles it */}
                   <th className="px-4 py-3">Item & Description</th>
 
-                  {/* ── Category header with inline dropdown filter ── */}
                   <th className="px-4 py-3">
                     <span className="print-only">Category</span>
                     <div className="no-print">
@@ -365,20 +350,17 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                         className={headerSelectCls(dark)}
                       >
                         <option value="">Category ▼</option>
-                        {Object.entries(ITEM_TYPE_LABEL).map(([val, lbl]) => (
-                          <option key={val} value={val}>{lbl}</option>
+                        {siteCategories.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
                         ))}
                       </select>
                     </div>
                   </th>
 
-                  {/* Item Code — plain label */}
                   <th className="px-4 py-3">Item Code</th>
 
-                  {/* Quantity — plain label */}
                   <th className="px-4 py-3 text-center">Quantity</th>
 
-                  {/* ── Condition header with inline dropdown filter ── */}
                   <th className="px-4 py-3 text-right">
                     <span className="print-only">Condition</span>
                     <div className="no-print flex justify-end">
@@ -413,18 +395,15 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                     className={dark ? "cursor-pointer hover:bg-white/5" : "cursor-pointer hover:bg-[#fcfaf7]"}
                     onClick={() => router.push(`/store/sites/${site.id}/items/${item.id}/devices`)}
                   >
-                    {/* Checkbox */}
                     <td className="px-4 py-3 text-center" onClick={(e) => toggleSelect(item.id, e)}>
                       <input type="checkbox" title="Select Item"
                         checked={selectedItemIds.includes(item.id)} readOnly />
                     </td>
 
-                    {/* No */}
                     <td className={dark ? "px-2 py-3 font-medium text-slate-500" : "px-2 py-3 font-medium text-[#6b655d]"}>
                       {index + 1}
                     </td>
 
-                    {/* Name + description + manufacturer/model */}
                     <td className="px-4 py-3">
                       <Link
                         href={`/store/sites/${site.id}/items/${item.id}/edit`}
@@ -447,19 +426,16 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                       )}
                     </td>
 
-                    {/* Category badge */}
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${dark ? (ITEM_TYPE_COLOR_DARK[item.itemType] ?? "") : (ITEM_TYPE_COLOR_LIGHT[item.itemType] ?? "")}`}>
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${dark ? (ITEM_TYPE_COLOR_DARK[item.itemType] ?? ITEM_TYPE_COLOR_DARK.GENERAL) : (ITEM_TYPE_COLOR_LIGHT[item.itemType] ?? ITEM_TYPE_COLOR_LIGHT.GENERAL)}`}>
                         {ITEM_TYPE_LABEL[item.itemType] ?? item.itemType}
                       </span>
                     </td>
 
-                    {/* Item Code */}
                     <td className={dark ? "px-4 py-3 font-mono text-xs text-slate-400" : "px-4 py-3 font-mono text-xs text-[#5d584f]"}>
                       {item.itemCode || "—"}
                     </td>
 
-                    {/* Quantity */}
                     <td className="px-4 py-3 text-center">
                       {item.uncountable ? (
                         <span className={dark ? "text-xs italic text-slate-500" : "text-xs italic text-[#8b857c]"}>N/A</span>
@@ -473,7 +449,6 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                       )}
                     </td>
 
-                    {/* Condition badge */}
                     <td className="px-4 py-3 text-right">
                       <span className={conditionBadge(item.condition, dark)}>
                         {item.condition || "NEW"}

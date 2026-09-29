@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
+import { SECURITY_EVENT_WHERE } from "@/lib/security-events";
 import {
   Document, Packer, Paragraph, Table, TableRow, TableCell,
   TextRun, ImageRun, WidthType, AlignmentType, HeadingLevel,
@@ -75,6 +76,8 @@ export async function POST(req: Request) {
     const profile = await getCurrentProfile();
     if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const isMasterAdmin = profile.isMasterAdmin;
+
     const body    = await req.json();
     const period  = (body.period  ?? "THIS_MONTH") as Period;
     const siteId  = (body.siteId  ?? "ALL") as string;
@@ -87,10 +90,12 @@ export async function POST(req: Request) {
     const siteMap  = Object.fromEntries(inventorySites.map((s) => [s.id, s.name]));
     const siteName = siteId === "ALL" ? "All Sites" : (siteMap[siteId] ?? siteId);
 
-    // Fetch all data in parallel
     const [logs, issues, restocks] = await Promise.all([
       prisma.activityLog.findMany({
-        where:   { createdAt: { gte: start, lte: end } },
+        where: {
+          createdAt: { gte: start, lte: end },
+          ...(isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE }),
+        },
         orderBy: { createdAt: "asc" },
       }),
       prisma.warehouseIssue.findMany({
@@ -129,8 +134,11 @@ export async function POST(req: Request) {
       }),
     ]);
 
-    // Per-user login count
-    const loginLogs = logs.filter((l) => l.type === "USER_LOGIN");
+    const loginLogs = logs.filter((l) =>
+      l.type === "USER_LOGIN" &&
+      l.entityType !== "SECURITY" &&
+      !l.title.toLowerCase().includes("failed")
+    );
     const loginsByUser: Record<string, number> = {};
     for (const l of loginLogs) {
       const email = l.actorEmail ?? "Unknown";
@@ -147,7 +155,6 @@ export async function POST(req: Request) {
     const userName    = profile.fullName ?? profile.email ?? "Admin";
     const logo        = getLogo();
 
-    // ── Column widths ────────────────────────────────────────────────────────
     const COL  = [500, 2200, 1800, 1400, 3460]; // issues table
     const COL2 = [500, 3500, 1500, 3860];        // login table
     const COL3 = [500, 2000, 1600, 1000, 1200, 3060]; // restocks table
@@ -157,7 +164,6 @@ export async function POST(req: Request) {
         properties: { page: { margin: { top: 900, bottom: 900, left: 1000, right: 1000 } } },
         children: [
 
-          // ── HEADER ─────────────────────────────────────────────────────────
           new Paragraph({
             alignment: AlignmentType.CENTER,
             children: logo
@@ -174,7 +180,6 @@ export async function POST(req: Request) {
           }),
           new Paragraph({ children: [new TextRun({ text: "" })] }),
 
-          // Greeting
           new Paragraph({ children: [new TextRun({ text: `Hello, ${userName}`, size: 22, font: "Arial" })] }),
           new Paragraph({
             children: [new TextRun({ text: `This is the ${periodLabel} report for ${siteName}.`, size: 22, font: "Arial" })],
@@ -184,7 +189,6 @@ export async function POST(req: Request) {
           }),
           new Paragraph({ children: [new TextRun({ text: "" })] }),
 
-          // ── SUMMARY ────────────────────────────────────────────────────────
           new Paragraph({
             heading: HeadingLevel.HEADING_2,
             children: [new TextRun({ text: "Summary", bold: true, size: 26, font: "Arial" })],
@@ -200,7 +204,7 @@ export async function POST(req: Request) {
               ]}),
               ...[
                 ["Total System Activity", String(totalActivities), "All logged events"],
-                ["User Logins",           String(totalLogins),     "Unique login events"],
+                ...(isMasterAdmin ? [["User Logins", String(totalLogins), "Successful sign-ins"]] : []),
                 ["Items Issued",          String(totalIssued),     "Warehouse issues created"],
                 ["Items Returned",        String(totalReturned),   "Warehouse returns processed"],
                 ["Restock Operations",    String(totalRestocks),   "Items restocked to inventory"],
@@ -215,7 +219,7 @@ export async function POST(req: Request) {
           }),
           new Paragraph({ children: [new TextRun({ text: "" })] }),
 
-          // ── USER LOGIN SUMMARY ─────────────────────────────────────────────
+          ...(isMasterAdmin ? [
           new Paragraph({
             heading: HeadingLevel.HEADING_2,
             children: [new TextRun({ text: "User Login Summary", bold: true, size: 26, font: "Arial" })],
@@ -243,8 +247,8 @@ export async function POST(req: Request) {
                 ],
               })]),
           new Paragraph({ children: [new TextRun({ text: "" })] }),
+          ] : []),
 
-          // ── ITEMS ISSUED ───────────────────────────────────────────────────
           new Paragraph({
             heading: HeadingLevel.HEADING_2,
             children: [new TextRun({ text: "Items Issued", bold: true, size: 26, font: "Arial" })],
@@ -278,7 +282,6 @@ export async function POST(req: Request) {
               })]),
           new Paragraph({ children: [new TextRun({ text: "" })] }),
 
-          // ── RESTOCK OPERATIONS ─────────────────────────────────────────────
           new Paragraph({
             heading: HeadingLevel.HEADING_2,
             children: [new TextRun({ text: "Restock Operations", bold: true, size: 26, font: "Arial" })],
@@ -314,7 +317,6 @@ export async function POST(req: Request) {
               })]),
           new Paragraph({ children: [new TextRun({ text: "" })] }),
 
-          // ── FOOTER ─────────────────────────────────────────────────────────
           new Paragraph({
             alignment: AlignmentType.CENTER,
             children: [new TextRun({ text: `— End of Report — Generated by DAMP on ${generatedAt}`, size: 16, font: "Arial", color: "999999" })],
@@ -326,7 +328,6 @@ export async function POST(req: Request) {
     const buffer   = await Packer.toBuffer(doc);
     const filename = `DAMP-Report-${period}-${siteName.replace(/\s+/g, "-")}.docx`;
 
-    // Log the report generation
     await prisma.activityLog.create({
       data: {
         type:       "SYSTEM_EVENT",

@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
+import { getCurrentProfile } from "@/lib/auth";
+import { SECURITY_EVENT_WHERE, SECURITY_ACTION_TYPES } from "@/lib/security-events";
 import ActivityClient from "./ActivityClient";
+
+type Period = "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
 
 type SearchParams = {
   q?:      string;
   type?:   string;
-  period?: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
+  period?: Period;
   site?:   string;
+  view?:   string;
 };
 
 function formatDate(date: Date) {
@@ -15,45 +20,36 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
-function activityIndicator(type: string, title: string) {
+function activityIndicator(type: string, title: string, entityType: string | null) {
   const t          = type.toLowerCase();
   const titleLower = title.toLowerCase();
 
-  if (t.includes("logout"))  return { color: "bg-violet-500", label: "SYSTEM"   as const };
-  if (t.includes("login"))   return { color: "bg-sky-500",    label: "LOGIN"    as const };
-
+  if (entityType === "SECURITY" || titleLower.includes("security alert") || titleLower.includes("failed login"))
+    return { color: "bg-red-600",     label: "SECURITY"  as const };
+  if (t.includes("logout"))  return { color: "bg-violet-500",  label: "SYSTEM"    as const };
+  if (t.includes("login"))   return { color: "bg-sky-500",     label: "LOGIN"     as const };
   if (titleLower.includes("active") || titleLower.includes("up"))
-    return { color: "bg-emerald-500", label: "UP"   as const };
+    return { color: "bg-emerald-500", label: "UP"        as const };
   if (titleLower.includes("down"))
-    return { color: "bg-red-500",     label: "DOWN" as const };
-
-  if (t.includes("warehouse_issue_created"))
-    return { color: "bg-amber-500",   label: "ISSUED"    as const };
-  if (t.includes("warehouse_issue_returned"))
-    return { color: "bg-emerald-500", label: "RETURNED"  as const };
-
-  if (t.includes("returned"))  return { color: "bg-emerald-500", label: "RETURNED"  as const };
-  if (t.includes("issued"))    return { color: "bg-amber-500",   label: "ISSUED"    as const };
-  if (t.includes("restock"))   return { color: "bg-green-500",   label: "RESTOCK"   as const };
-  if (t.includes("import"))    return { color: "bg-blue-500",    label: "IMPORT"    as const };
-
-  if (t.includes("low_stock"))    return { color: "bg-orange-500", label: "LOW STOCK" as const };
-  if (t.includes("out_of_stock")) return { color: "bg-red-500",    label: "OUT"       as const };
-
-  if (t.includes("store_item_status"))  return { color: "bg-blue-500",  label: "UPDATED"  as const };
-  if (t.includes("store_item_deleted")) return { color: "bg-rose-500",  label: "DELETED"  as const };
-
+    return { color: "bg-red-500",     label: "DOWN"      as const };
+  if (t.includes("warehouse_issue_created"))  return { color: "bg-amber-500",   label: "ISSUED"   as const };
+  if (t.includes("warehouse_issue_returned")) return { color: "bg-emerald-500", label: "RETURNED" as const };
+  if (t.includes("returned"))     return { color: "bg-emerald-500", label: "RETURNED"  as const };
+  if (t.includes("issued"))       return { color: "bg-amber-500",   label: "ISSUED"    as const };
+  if (t.includes("restock"))      return { color: "bg-green-500",   label: "RESTOCK"   as const };
+  if (t.includes("import"))       return { color: "bg-blue-500",    label: "IMPORT"    as const };
+  if (t.includes("low_stock"))    return { color: "bg-orange-500",  label: "LOW STOCK" as const };
+  if (t.includes("out_of_stock")) return { color: "bg-red-500",     label: "OUT"       as const };
+  if (t.includes("store_item_status"))  return { color: "bg-blue-500", label: "UPDATED" as const };
+  if (t.includes("store_item_deleted")) return { color: "bg-rose-500", label: "DELETED" as const };
   if (t.includes("serial_updated") || titleLower.includes("unit updated"))
-    return { color: "bg-indigo-500", label: "UNIT" as const };
-
+    return { color: "bg-indigo-500", label: "UNIT"  as const };
   if (t.includes("fault") || titleLower.includes("faulty"))
     return { color: "bg-orange-500", label: "FAULT" as const };
-
-  if (t.includes("deleted"))                   return { color: "bg-rose-500",    label: "DELETED"  as const };
-  if (t.includes("created"))                   return { color: "bg-emerald-500", label: "CREATED"  as const };
+  if (t.includes("deleted")) return { color: "bg-rose-500",    label: "DELETED" as const };
+  if (t.includes("created")) return { color: "bg-emerald-500", label: "CREATED" as const };
   if (t.includes("updated") || t.includes("changed"))
-                                               return { color: "bg-blue-500",    label: "UPDATED"  as const };
-
+    return { color: "bg-blue-500", label: "UPDATED" as const };
   return { color: "bg-gray-400", label: "SYSTEM" as const };
 }
 
@@ -74,7 +70,7 @@ function entityLabel(entityType: string | null, entityId: string | null) {
   return `${entityType} (${entityId.slice(-8)})`;
 }
 
-function getPeriodStart(period: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR") {
+function getPeriodStart(period: Period) {
   const now = new Date();
   if (period === "TODAY") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (period === "WEEK") {
@@ -89,34 +85,34 @@ function getPeriodStart(period: "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR") {
 }
 
 const actionOptions = [
-  { value: "USER_LOGIN",  label: "User Login"  },
-  { value: "USER_LOGOUT", label: "User Logout" },
-  { value: "SITE_CREATED",        label: "Site Created"         },
-  { value: "SITE_UPDATED",        label: "Site Updated"         },
-  { value: "SITE_STATUS_CHANGED", label: "Site Status Changed"  },
-  { value: "SITE_TOWER_UPDATED",  label: "Site Tower Updated"   },
-  { value: "SITE_HEIGHT_UPDATED", label: "Site Height Updated"  },
-  { value: "SITE_GPS_UPDATED",    label: "Site GPS Updated"     },
-  { value: "SITE_DELETED",        label: "Site Deleted"         },
-  { value: "ASSET_CREATED",        label: "Asset Created"        },
-  { value: "ASSET_UPDATED",        label: "Asset Updated"        },
-  { value: "ASSET_DELETED",        label: "Asset Deleted"        },
-  { value: "ASSET_STATUS_CHANGED", label: "Asset Status Changed" },
-  { value: "ASSET_SERIAL_UPDATED", label: "Unit / Serial Updated"},
-  { value: "INVENTORY_ITEM_CREATED", label: "Inventory Item Created" },
-  { value: "INVENTORY_ITEM_UPDATED", label: "Inventory Item Updated" },
-  { value: "INVENTORY_ITEM_DELETED", label: "Inventory Item Deleted" },
-  { value: "INVENTORY_RESTOCK_ADDED",      label: "Restock Added"      },
-  { value: "INVENTORY_ITEM_ISSUED",        label: "Item Issued"        },
-  { value: "INVENTORY_EQUIPMENT_RETURNED", label: "Equipment Returned" },
-  { value: "INVENTORY_IMPORT",             label: "Inventory Import"   },
-  { value: "INVENTORY_LOW_STOCK",    label: "Low Stock Alert"    },
-  { value: "INVENTORY_OUT_OF_STOCK", label: "Out of Stock Alert" },
-  { value: "STORE_ITEM_STATUS_CHANGED", label: "Store Item Status Changed" },
-  { value: "STORE_ITEM_DELETED",        label: "Store Item Deleted"        },
-  { value: "WAREHOUSE_ISSUE_CREATED",  label: "Warehouse Issue Created"  },
-  { value: "WAREHOUSE_ISSUE_RETURNED", label: "Warehouse Item Returned"  },
-  { value: "SYSTEM_EVENT", label: "System Event" },
+  { value: "USER_LOGIN",                   label: "User Login"                },
+  { value: "USER_LOGOUT",                  label: "User Logout"               },
+  { value: "SITE_CREATED",                 label: "Site Created"              },
+  { value: "SITE_UPDATED",                 label: "Site Updated"              },
+  { value: "SITE_STATUS_CHANGED",          label: "Site Status Changed"       },
+  { value: "SITE_TOWER_UPDATED",           label: "Site Tower Updated"        },
+  { value: "SITE_HEIGHT_UPDATED",          label: "Site Height Updated"       },
+  { value: "SITE_GPS_UPDATED",             label: "Site GPS Updated"          },
+  { value: "SITE_DELETED",                 label: "Site Deleted"              },
+  { value: "ASSET_CREATED",                label: "Asset Created"             },
+  { value: "ASSET_UPDATED",                label: "Asset Updated"             },
+  { value: "ASSET_DELETED",                label: "Asset Deleted"             },
+  { value: "ASSET_STATUS_CHANGED",         label: "Asset Status Changed"      },
+  { value: "ASSET_SERIAL_UPDATED",         label: "Unit / Serial Updated"     },
+  { value: "INVENTORY_ITEM_CREATED",       label: "Inventory Item Created"    },
+  { value: "INVENTORY_ITEM_UPDATED",       label: "Inventory Item Updated"    },
+  { value: "INVENTORY_ITEM_DELETED",       label: "Inventory Item Deleted"    },
+  { value: "INVENTORY_RESTOCK_ADDED",      label: "Restock Added"             },
+  { value: "INVENTORY_ITEM_ISSUED",        label: "Item Issued"               },
+  { value: "INVENTORY_EQUIPMENT_RETURNED", label: "Equipment Returned"        },
+  { value: "INVENTORY_IMPORT",             label: "Inventory Import"          },
+  { value: "INVENTORY_LOW_STOCK",          label: "Low Stock Alert"           },
+  { value: "INVENTORY_OUT_OF_STOCK",       label: "Out of Stock Alert"        },
+  { value: "STORE_ITEM_STATUS_CHANGED",    label: "Store Item Status Changed" },
+  { value: "STORE_ITEM_DELETED",           label: "Store Item Deleted"        },
+  { value: "WAREHOUSE_ISSUE_CREATED",      label: "Warehouse Issue Created"   },
+  { value: "WAREHOUSE_ISSUE_RETURNED",     label: "Warehouse Item Returned"   },
+  { value: "SYSTEM_EVENT",                 label: "System Event"              },
 ];
 
 function getActionLabel(type: string) {
@@ -128,57 +124,64 @@ export default async function ActivityPage({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
-  const sp     = (await searchParams) ?? {};
-  const q      = (sp.q      ?? "").trim();
-  const type   = (sp.type   ?? "").trim();
-  const period = sp.period  ?? "ALL";
-  const site   = (sp.site   ?? "").trim();
+  const sp      = (await searchParams) ?? {};
+  const q       = (sp.q    ?? "").trim();
+  const rawType = (sp.type ?? "").trim();
+  const period  = sp.period ?? "ALL";
+  const site    = (sp.site ?? "").trim();
 
-  const periodStart = getPeriodStart(period);
+  const profile       = await getCurrentProfile();
+  const isMasterAdmin = !!profile?.isMasterAdmin;
+  const view          = isMasterAdmin && sp.view === "security" ? "security" : "all";
+  const type          = !isMasterAdmin && SECURITY_ACTION_TYPES.includes(rawType) ? "" : rawType;
+  const periodStart   = getPeriodStart(period);
 
-  // Fetch sites first so we can look up names for filtering
   const inventorySites = await prisma.inventorySite.findMany({
     where:   { isDeleted: false },
     orderBy: { name: "asc" },
     select:  { id: true, name: true },
   });
-  const siteNameMap = Object.fromEntries(inventorySites.map((s) => [s.id, s.name]));
+  const siteNameMap      = Object.fromEntries(inventorySites.map((s) => [s.id, s.name]));
   const selectedSiteName = site ? (siteNameMap[site] ?? "") : "";
 
-  const activitiesRaw = await prisma.activityLog.findMany({
-    where: {
-      AND: [
-        q ? {
-          OR: [
-            { title:      { contains: q, mode: "insensitive" } },
-            { details:    { contains: q, mode: "insensitive" } },
-            { actorEmail: { contains: q, mode: "insensitive" } },
-            { entityType: { contains: q, mode: "insensitive" } },
-            { entityId:   { contains: q, mode: "insensitive" } },
-          ],
-        } : {},
-        type        ? { type: type as any }               : {},
-        periodStart ? { createdAt: { gte: periodStart } } : {},
-        // ✅ Site filter: match by entityId OR site name in title/details
-        site ? {
-          OR: [
-            { entityId: site },
-            { details:  { contains: selectedSiteName, mode: "insensitive" } },
-            { title:    { contains: selectedSiteName, mode: "insensitive" } },
-          ],
-        } : {},
-      ],
-    },
-    orderBy: { createdAt: "desc" },
-    take: 500,
-  });
+  const [activitiesRaw, securityRaw] = await Promise.all([
+    prisma.activityLog.findMany({
+      where: {
+        AND: [
+          isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE },
+          q ? {
+            OR: [
+              { title:      { contains: q, mode: "insensitive" } },
+              { details:    { contains: q, mode: "insensitive" } },
+              { actorEmail: { contains: q, mode: "insensitive" } },
+              { entityType: { contains: q, mode: "insensitive" } },
+              { entityId:   { contains: q, mode: "insensitive" } },
+            ],
+          } : {},
+          type        ? { type: type as any }               : {},
+          periodStart ? { createdAt: { gte: periodStart } } : {},
+          site && selectedSiteName ? {
+            OR: [
+              { entityId: site },
+              { details:  { contains: selectedSiteName, mode: "insensitive" } },
+              { title:    { contains: selectedSiteName, mode: "insensitive" } },
+            ],
+          } : {},
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+    isMasterAdmin
+      ? prisma.activityLog.findMany({
+          where:   SECURITY_EVENT_WHERE,
+          orderBy: { createdAt: "desc" },
+          take:    300,
+        })
+      : Promise.resolve([]),
+  ]);
 
-  const title =
-    q || type || period !== "ALL" || site
-      ? `Activity Log${q      ? ` — "${q}"`                 : ""}${type   ? ` — ${getActionLabel(type)}` : ""}${period !== "ALL" ? ` — ${period}` : ""}${site ? ` — ${selectedSiteName}` : ""}`
-      : "Activity Log";
-
-  const activities = activitiesRaw.map((a, index) => ({
+  const mapLog = (a: (typeof activitiesRaw)[number], index: number) => ({
     id:          a.id,
     no:          index + 1,
     timeLabel:   formatDate(a.createdAt),
@@ -187,15 +190,24 @@ export default async function ActivityPage({
     actorEmail:  a.actorEmail ?? "-",
     type:        a.type,
     typeLabel:   getActionLabel(a.type),
-    indicator:   activityIndicator(a.type, a.title),
+    indicator:   activityIndicator(a.type, a.title, a.entityType),
     href:        entityHref(a.entityType, a.entityId),
     entityLabel: entityLabel(a.entityType, a.entityId),
     exportTime:  a.createdAt.toISOString(),
     entityType:  a.entityType ?? "",
     entityId:    a.entityId   ?? "",
-  }));
+  });
 
-  const exportRows = activities.map((a) => ({
+  const activities         = activitiesRaw.map(mapLog);
+  const securityActivities = securityRaw.map(mapLog);
+
+  const title = q || type || period !== "ALL" || site
+    ? `Activity Log${q ? ` — "${q}"` : ""}${type ? ` — ${getActionLabel(type)}` : ""}${period !== "ALL" ? ` — ${period}` : ""}${selectedSiteName ? ` — ${selectedSiteName}` : ""}`
+    : "Activity Log";
+
+  const exportSource = view === "security" ? securityActivities : activities;
+
+  const exportRows = exportSource.map((a) => ({
     No:         a.no,
     Time:       a.exportTime,
     Action:     a.typeLabel,
@@ -217,15 +229,22 @@ export default async function ActivityPage({
     { key: "EntityId",   label: "Entity ID"   },
   ];
 
+  const visibleActions = isMasterAdmin
+    ? actionOptions
+    : actionOptions.filter((a) => !SECURITY_ACTION_TYPES.includes(a.value));
+
   return (
     <ActivityClient
       q={q}
       type={type}
       period={period}
       site={site}
-      actionOptions={actionOptions}
-      title={title}
+      view={view}
+      actionOptions={visibleActions}
+      title={view === "security" ? "Security Events" : title}
       activities={activities}
+      securityActivities={securityActivities}
+      isMasterAdmin={isMasterAdmin}
       exportRows={exportRows}
       exportCols={exportCols}
       inventorySites={inventorySites}

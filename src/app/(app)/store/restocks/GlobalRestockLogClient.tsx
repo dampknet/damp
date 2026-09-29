@@ -4,15 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  EQUIPMENT:              "Equipment",
-  ACCESSORIES:            "Accessories",
-  TOOLS_AND_PARTS:        "Tools & Parts",
-  GENERAL:                "General",
-  COOLING_INFRASTRUCTURE: "Cooling",
-  CABLES_AND_ELECTRONICS: "Cables & Electronics",
-};
+import { ITEM_TYPE_LABEL } from "@/lib/item-types";
 
 type RestockRow = {
   id:           string;
@@ -25,8 +17,8 @@ type RestockRow = {
   inventoryItem: {
     name:          string;
     itemType:      string;
-    itemCode:      string | null;   // ✅ replaces stockNumber
-    entityDisplay: string;          // ✅ replaces serialNumber
+    itemCode:      string | null;
+    entityDisplay: string;
     unit:          string | null;
   };
   inventorySite: {
@@ -80,7 +72,6 @@ export default function GlobalRestockLogClient({
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
 
-        {/* ── HEADER ── */}
         <section className={dark
           ? "no-print relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "no-print relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-[0_16px_40px_rgba(26,24,20,0.06)]"
@@ -164,7 +155,6 @@ export default function GlobalRestockLogClient({
           </div>
         </section>
 
-        {/* ── SUMMARY CARDS ── */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <SummaryCard dark={dark} label="Restock Records"         value={String(totalRestocks)}
             sub="all logged restocks"           accent={dark ? "bg-[linear-gradient(90deg,#10b981,#34d399)]" : "bg-[#2a7d52]"} />
@@ -172,7 +162,6 @@ export default function GlobalRestockLogClient({
             sub="sum of current search result"  accent={dark ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]" : "bg-[#1d5fa8]"} />
         </div>
 
-        {/* ── TABLE ── */}
         <section className={dark
           ? "print-area mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl"
           : "print-area mt-6 overflow-hidden rounded-3xl border border-[#e0dbd2] bg-white shadow-[0_12px_34px_rgba(26,24,20,0.055)]"

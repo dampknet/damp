@@ -6,8 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { X, Trash2, Loader2, QrCode, ArrowLeft } from "lucide-react";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { ALL_CODE_SEGMENTS, ALL_SITE_PREFIXES } from "@/lib/item-types";
 
 type InstanceRow = {
   id:         string;
@@ -39,16 +38,14 @@ type BucketEntry = {
   conditions:   { code: string; condition: string }[];
   returnable:   boolean;
   isBulk:       boolean;
-  uncountable?: boolean;   // ✅ added
+  uncountable?: boolean;
   bulkCondition?: string;
   availableQty?: number | null;
   unit?:        string | null;
 };
 
-// ─── Code matching ────────────────────────────────────────────────────────────
-
-const SITE_PREFIXES = ["KNET-", "BAAT-", "TSEA-", "GBC-", "KANDA-", "BAATSONA-", "TSEADDO-"];
-const TYPE_SEGS     = ["EQUIP-", "ACCESS-", "TO/PA-", "GEN-", "COOL-", "CA/EL-"];
+const SITE_PREFIXES = ALL_SITE_PREFIXES;
+const TYPE_SEGS     = ALL_CODE_SEGMENTS;
 
 function canonicalise(raw: string): string {
   let s = raw.trim().toUpperCase();
@@ -81,8 +78,6 @@ function conditionColor(c: string) {
   return "bg-rose-600";
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function IssueInventoryItemClient({
   site, items, action,
 }: {
@@ -98,22 +93,18 @@ export default function IssueInventoryItemClient({
   const [bucket,         setBucket]         = useState<BucketEntry[]>([]);
   const [isSearching,    setIsSearching]    = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isSubmitting,   setIsSubmitting]   = useState(false); // ✅ prevent double submit
+  const [isSubmitting,   setIsSubmitting]   = useState(false);
 
-  // ✅ Use refs so the keydown handler always sees latest values
   const bucketRef = useRef<BucketEntry[]>([]);
   const itemsRef  = useRef<ItemRow[]>(items);
 
   useEffect(() => { bucketRef.current = bucket; }, [bucket]);
   useEffect(() => { itemsRef.current  = items;  }, [items]);
 
-  // Syble gun assembler refs
   const scanBuffer    = useRef("");
   const assembledScan = useRef("");
   const lastKeyTime   = useRef(0);
   const assembleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ─── SCAN MATCH (useCallback so it's stable) ─────────────────────────────
 
   const handleScanMatch = useCallback((rawScan: string) => {
     const scanned   = rawScan.replace(/\r\n|\r|\n/g, "").trim();
@@ -125,7 +116,6 @@ export default function IssueInventoryItemClient({
     const currentBucket = bucketRef.current;
     const currentItems  = itemsRef.current;
 
-    // ── Pass 1: match a specific instance entity code ──────────────────────
     let foundInstance:        InstanceRow | null = null;
     let foundItemForInstance: ItemRow     | null = null;
 
@@ -173,7 +163,7 @@ export default function IssueInventoryItemClient({
             quantity:     1,
             entityCodes:  [foundInstance!.entityCode],
             conditions:   [{ code: foundInstance!.entityCode, condition: foundInstance!.condition }],
-            returnable:   false,  // ✅ default OFF — user ticks consciously
+            returnable:   false,
             isBulk:       false,
           },
         ];
@@ -182,7 +172,6 @@ export default function IssueInventoryItemClient({
       return;
     }
 
-    // ── Pass 2: match item code (bulk) ─────────────────────────────────────
     const foundBulkItem = currentItems.find(
       (item) => item.itemCode && matchCode(scanned, item.itemCode)
     );
@@ -219,9 +208,7 @@ export default function IssueInventoryItemClient({
     console.warn("[SCAN] No match for canonical:", canonical);
     alert(`No item found for: ${scanned}\nLooking for: ${canonical}\n\nCheck F12 console for registered codes.`);
     setIsSearching(false);
-  }, []); // ✅ stable — reads from refs, not closure
-
-  // ─── SYBLE GUN ASSEMBLER ─────────────────────────────────────────────────
+  }, []);
 
   useEffect(() => {
     const isComplete = (s: string) => {
@@ -267,9 +254,7 @@ export default function IssueInventoryItemClient({
       window.removeEventListener("keydown", handleKeyDown);
       if (assembleTimer.current) clearTimeout(assembleTimer.current);
     };
-  }, [handleScanMatch]); // ✅ stable dep — handleScanMatch never changes
-
-  // ─── CAMERA ──────────────────────────────────────────────────────────────
+  }, [handleScanMatch]);
 
   useEffect(() => {
     if (isCameraActive) {
@@ -283,23 +268,19 @@ export default function IssueInventoryItemClient({
     }
   }, [isCameraActive, handleScanMatch]);
 
-  // ─── SEARCH FUNCTION — handles entity code, item code, name ─────────────
   const doSearch = (val: string) => {
     const currentItems  = itemsRef.current;
     const currentBucket = bucketRef.current;
 
-    // Pass 1: match entity code across all instances
     for (const item of currentItems) {
       for (const ins of item.instances) {
         if (matchCode(val, ins.entityCode)) {
-          // Found as entity — use scanner flow
           handleScanMatch(val);
           return;
         }
       }
     }
 
-    // Pass 2: match item code
     const byItemCode = currentItems.find(
       (i) => i.itemCode && matchCode(val, i.itemCode)
     );
@@ -325,7 +306,6 @@ export default function IssueInventoryItemClient({
       return;
     }
 
-    // Pass 3: match by name (partial, case-insensitive)
     const byName = currentItems.find(
       (i) => i.name.toLowerCase().includes(val.toLowerCase())
     );
@@ -354,12 +334,7 @@ export default function IssueInventoryItemClient({
     alert(`No item found for: "${val}"\nTry the item code, entity code, or part of the name.`);
   };
 
-  // ─── FORM SUBMIT — inject bucketData as hidden input ─────────────────────
-  // ✅ Fix: don't use onSubmit fd.append — use a hidden input that holds JSON
-
   const bucketJson = JSON.stringify(bucket);
-
-  // ─── RENDER ──────────────────────────────────────────────────────────────
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
@@ -434,7 +409,6 @@ export default function IssueInventoryItemClient({
             </div>
           )}
 
-          {/* Bucket table */}
           <div className={`mt-8 overflow-hidden rounded-2xl border ${
             dark ? "border-white/10 bg-white/5" : "border-[#e7ded3] bg-white"
           }`}>
@@ -461,7 +435,6 @@ export default function IssueInventoryItemClient({
                 )}
                 {bucket.map((b) => (
                   <tr key={b.id} className="hover:bg-sky-500/5 transition-colors">
-                    {/* Item name */}
                     <td className="px-6 py-4">
                       <div className="font-bold text-sm text-sky-500">{b.name}</div>
                       <div className="flex items-center gap-2 mt-1">
@@ -475,10 +448,8 @@ export default function IssueInventoryItemClient({
                       )}
                     </td>
 
-                    {/* Units */}
                     <td className="px-6 py-4">
                       {b.isBulk ? (
-                        // Bulk: just show availability — condition is in the Condition column
                         <div className="flex flex-col items-center gap-1">
                           <span className={`text-[10px] italic ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
                             {b.uncountable ? "N/A qty" : `${b.availableQty ?? 0} avail`}
@@ -506,7 +477,6 @@ export default function IssueInventoryItemClient({
                       )}
                     </td>
 
-                    {/* Condition */}
                     <td className="px-6 py-4 text-center">
                       {b.isBulk ? (
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black text-white ${conditionColor(b.bulkCondition ?? "USED")}`}>
@@ -524,7 +494,6 @@ export default function IssueInventoryItemClient({
                       )}
                     </td>
 
-                    {/* Qty */}
                     <td className="px-6 py-4 text-center">
                       {b.isBulk || (b.itemType !== "EQUIPMENT" && b.itemType !== "COOLING_INFRASTRUCTURE") ? (
                         <input type="number" min="1"
@@ -543,7 +512,6 @@ export default function IssueInventoryItemClient({
                       )}
                     </td>
 
-                    {/* Returnable checkbox */}
                     <td className="px-6 py-4 text-center">
                       <label className="inline-flex flex-col items-center gap-1 cursor-pointer">
                         <input type="checkbox"
@@ -579,7 +547,6 @@ export default function IssueInventoryItemClient({
             </table>
           </div>
 
-          {/* Item code / entity code / name search */}
           <div className="mt-4">
             <div className={dark ? "mb-1 text-xs font-medium text-slate-400" : "mb-1 text-xs font-medium text-gray-600"}>
               Search by item code, entity code or name
@@ -612,7 +579,6 @@ export default function IssueInventoryItemClient({
             </div>
           </div>
 
-          {/* Manual add */}
           <div className="mt-4">
             <select title="Manual Add" aria-label="Manual Add"
               className={`w-full rounded-xl border px-4 py-3 text-sm font-medium outline-none ${
@@ -658,9 +624,7 @@ export default function IssueInventoryItemClient({
             </select>
           </div>
 
-          {/* ✅ Form uses a hidden input for bucketData — no onSubmit needed */}
           <form action={action} className="mt-10 space-y-8" onSubmit={() => setIsSubmitting(true)}>
-            {/* Hidden input holds the bucket JSON — always in sync with state */}
             <input type="hidden" name="bucketData" value={bucketJson} />
 
             <section className={dark

@@ -4,15 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { ChevronDown, ChevronUp, Download } from "lucide-react";
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  EQUIPMENT:              "Equipment",
-  ACCESSORIES:            "Accessories",
-  TOOLS_AND_PARTS:        "Tools & Parts",
-  GENERAL:                "General",
-  COOLING_INFRASTRUCTURE: "Cooling",
-  CABLES_AND_ELECTRONICS: "Cables & Electronics",
-};
+import { ITEM_TYPE_LABEL } from "@/lib/item-types";
 
 type IssueItem = {
   id:               string;
@@ -64,7 +56,6 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
   const someReturned = trip.items.some((i)  => i.status === "RETURNED");
   const totalUnits   = trip.items.reduce((s, i) => s + i.quantityTaken, 0);
 
-  // ✅ Only returnable items count toward status
   const returnableItems   = trip.items.filter((i) => !!i.expectedReturnAt);
   const allReturnableDone = returnableItems.length === 0 ||
                             returnableItems.every((i) => i.status === "RETURNED");
@@ -96,7 +87,6 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
       ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5"
       : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm"
     }>
-      {/* Trip header */}
       <div
         className={`flex cursor-pointer items-center gap-4 px-5 py-4 ${dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}`}
         onClick={() => setExpanded(!expanded)}
@@ -111,7 +101,6 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
             <span className={dark ? "text-sm font-bold text-slate-100" : "text-sm font-bold text-[#1a1814]"}>
               {trip.takenBy}
             </span>
-            {/* Site badge */}
             <span className={dark
               ? "rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-400"
               : "rounded-full border border-[#e0dbd2] bg-[#f5f2ed] px-2 py-0.5 text-[10px] font-semibold text-[#5b564d]"
@@ -149,7 +138,6 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
         </span>
       </div>
 
-      {/* Expanded items */}
       {expanded && (
         <div className={dark ? "border-t border-white/8" : "border-t border-[#eee7dd]"}>
           {trip.items.map((item, idx) => {
@@ -249,7 +237,6 @@ export default function GlobalIssueLogClient({
     }>
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
 
-        {/* Header */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-sm"
@@ -290,7 +277,6 @@ export default function GlobalIssueLogClient({
             </div>
           </div>
 
-          {/* Filters */}
           <div className={dark ? "mt-6 rounded-2xl border border-white/10 bg-white/5 p-4" : "mt-6 rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-4"}>
             <form className="flex flex-wrap gap-3">
               <input name="q" defaultValue={q}
@@ -334,7 +320,6 @@ export default function GlobalIssueLogClient({
           </div>
         </section>
 
-        {/* Summary */}
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { label: "Issued",     value: summary.openCount,     sub: "currently open",    accent: dark ? "bg-amber-500" : "bg-[#b08b2c]" },
@@ -356,7 +341,6 @@ export default function GlobalIssueLogClient({
           ))}
         </div>
 
-        {/* Trip cards */}
         <div className="mt-5 space-y-3">
           <div className={dark ? "text-sm font-semibold text-slate-400" : "text-sm font-semibold text-[#8b857c]"}>
             {trips.length} trip{trips.length !== 1 ? "s" : ""} shown

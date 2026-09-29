@@ -22,7 +22,6 @@ export default async function GlobalIssueLogPage({
   const role    = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
 
-  // ✅ Read from WarehouseIssue (not InventoryIssue)
   const rawIssues = await prisma.warehouseIssue.findMany({
     where: {
       AND: [
@@ -86,7 +85,6 @@ export default async function GlobalIssueLogPage({
     },
   });
 
-  // Group by groupId — same as site-specific log
   const groupMap = new Map<string, typeof rawIssues>();
   for (const issue of rawIssues) {
     const key = issue.groupId ?? issue.id;
@@ -120,7 +118,7 @@ export default async function GlobalIssueLogPage({
     prisma.warehouseIssue.count({
       where: {
         inventoryItem: {
-          itemType: { in: ["ACCESSORIES","TOOLS_AND_PARTS","GENERAL","COOLING_INFRASTRUCTURE","CABLES_AND_ELECTRONICS"] },
+          itemType: { not: "EQUIPMENT" },
         },
       },
     }),

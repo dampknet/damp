@@ -1,28 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
-  email: string;
-  role: "ADMIN" | "EDITOR" | "VIEWER";
-  displayName: string;
+  email:         string;
+  role:          "ADMIN" | "EDITOR" | "VIEWER";
+  isMasterAdmin: boolean;
+  displayName:   string;
 };
 
 export default function SettingsMenu({
   email,
   role,
+  isMasterAdmin,
   displayName,
 }: Props) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
-  const formRef = useRef<HTMLFormElement | null>(null);
   const { mode, toggleMode } = useThemeMode();
+  const [signingOut, setSigningOut] = useState(false);
 
-  const isAdmin = role === "ADMIN";
-  const isDark = mode === "dark";
-  const safeName = displayName.trim() || email;
-  const initial = (safeName?.[0] ?? email?.[0] ?? "U").toUpperCase();
+  const isAdmin   = role === "ADMIN";
+  const isDark    = mode === "dark";
+  const roleLabel = isMasterAdmin ? "MASTER ADMIN" : role;
+  const safeName  = displayName.trim() || email;
+  const initial   = (safeName?.[0] ?? email?.[0] ?? "U").toUpperCase();
 
   function closeMenu() {
     if (detailsRef.current) detailsRef.current.open = false;
@@ -36,10 +40,7 @@ export default function SettingsMenu({
     function onClickOutside(e: MouseEvent) {
       const root = detailsRef.current;
       if (!root || !root.open) return;
-
-      if (!root.contains(e.target as Node)) {
-        closeMenu();
-      }
+      if (!root.contains(e.target as Node)) closeMenu();
     }
 
     document.addEventListener("keydown", onEsc);
@@ -51,10 +52,17 @@ export default function SettingsMenu({
     };
   }, []);
 
-  function handleLogout() {
+  async function handleLogout() {
     closeMenu();
-    formRef.current?.requestSubmit();
+    setSigningOut(true);
+    await signOut({ callbackUrl: "/auth/login" });
   }
+
+  const itemCls = `block px-5 py-3 text-sm font-medium transition ${
+    isDark ? "text-slate-200 hover:bg-white/5" : "text-[#2f2a25] hover:bg-[#faf7f2]"
+  }`;
+  const subCls  = `mt-0.5 text-[11px] ${isDark ? "text-slate-500" : "text-[#8b857c]"}`;
+  const divider = isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]";
 
   return (
     <details ref={detailsRef} className="relative">
@@ -77,19 +85,11 @@ export default function SettingsMenu({
           </span>
 
           <div className="hidden text-left sm:block">
-            <div
-              className={`max-w-37.5 truncate text-xs font-semibold ${
-                isDark ? "text-slate-100" : "text-gray-900"
-              }`}
-            >
+            <div className={`max-w-37.5 truncate text-xs font-semibold ${isDark ? "text-slate-100" : "text-gray-900"}`}>
               {safeName}
             </div>
-            <div
-              className={`text-[11px] font-medium ${
-                isDark ? "text-slate-500" : "text-gray-500"
-              }`}
-            >
-              {role}
+            <div className={`text-[11px] font-medium ${isMasterAdmin ? "text-amber-500" : isDark ? "text-slate-500" : "text-gray-500"}`}>
+              {roleLabel}
             </div>
           </div>
 
@@ -99,9 +99,7 @@ export default function SettingsMenu({
 
       <div
         className={`absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl border shadow-2xl backdrop-blur-xl ${
-          isDark
-            ? "border-white/10 bg-[#101720]/95"
-            : "border-[#eadfd3] bg-white/95"
+          isDark ? "border-white/10 bg-[#101720]/95" : "border-[#eadfd3] bg-white/95"
         }`}
       >
         <div
@@ -114,41 +112,31 @@ export default function SettingsMenu({
           <div className="flex items-center gap-3">
             <div
               className={`grid h-11 w-11 place-items-center rounded-2xl text-sm font-bold ${
-                isDark
-                  ? "bg-[linear-gradient(135deg,#1d5fa8,#60a5fa)] text-white"
-                  : "bg-[#1a1814] text-white"
+                isDark ? "bg-[linear-gradient(135deg,#1d5fa8,#60a5fa)] text-white" : "bg-[#1a1814] text-white"
               }`}
             >
               {initial}
             </div>
 
             <div className="min-w-0">
-              <div
-                className={`max-w-45 truncate text-sm font-semibold ${
-                  isDark ? "text-slate-100" : "text-[#1a1814]"
-                }`}
-              >
+              <div className={`max-w-45 truncate text-sm font-semibold ${isDark ? "text-slate-100" : "text-[#1a1814]"}`}>
                 {safeName}
               </div>
-              <div
-                className={`mt-0.5 truncate text-[11px] ${
-                  isDark ? "text-slate-500" : "text-[#8b857c]"
-                }`}
-              >
+              <div className={`mt-0.5 truncate text-[11px] ${isDark ? "text-slate-500" : "text-[#8b857c]"}`}>
                 {email}
               </div>
               <div
                 className={`mt-1 text-[11px] font-bold uppercase tracking-[0.14em] ${
-                  isDark ? "text-[#60a5fa]" : "text-[#c8611a]"
+                  isMasterAdmin ? "text-amber-500" : isDark ? "text-[#60a5fa]" : "text-[#c8611a]"
                 }`}
               >
-                {role}
+                {roleLabel}
               </div>
             </div>
           </div>
         </div>
 
-        <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
+        <div className={divider} />
 
         <button
           type="button"
@@ -157,105 +145,54 @@ export default function SettingsMenu({
             closeMenu();
           }}
           className={`flex w-full items-center justify-between px-5 py-3 text-left text-sm font-medium transition ${
-            isDark
-              ? "text-slate-200 hover:bg-white/5"
-              : "text-[#2f2a25] hover:bg-[#faf7f2]"
+            isDark ? "text-slate-200 hover:bg-white/5" : "text-[#2f2a25] hover:bg-[#faf7f2]"
           }`}
         >
           <div>
-            <div className="font-semibold">
-              {isDark ? "Light Mode" : "Dark Mode"}
-            </div>
-            <div
-              className={`mt-0.5 text-[11px] ${
-                isDark ? "text-slate-500" : "text-[#8b857c]"
-              }`}
-            >
-              Switch dashboard appearance
-            </div>
+            <div className="font-semibold">{isDark ? "Light Mode" : "Dark Mode"}</div>
+            <div className={subCls}>Switch dashboard appearance</div>
           </div>
 
           <div
             className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              isDark
-                ? "bg-[#1d5fa8]/20 text-[#60a5fa]"
-                : "bg-[#edf4ff] text-[#1d5fa8]"
+              isDark ? "bg-[#1d5fa8]/20 text-[#60a5fa]" : "bg-[#edf4ff] text-[#1d5fa8]"
             }`}
           >
             {isDark ? "ON" : "OFF"}
           </div>
         </button>
 
-        {isAdmin ? (
+        {isAdmin && (
           <>
-            <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
-
-            <Link
-              href="/admin"
-              className={`block px-5 py-3 text-sm font-medium transition ${
-                isDark
-                  ? "text-slate-200 hover:bg-white/5"
-                  : "text-[#2f2a25] hover:bg-[#faf7f2]"
-              }`}
-              onClick={closeMenu}
-            >
+            <div className={divider} />
+            <Link href="/admin" className={itemCls} onClick={closeMenu}>
               <div className="font-semibold">Admin Settings</div>
-              <div
-                className={`mt-0.5 text-[11px] ${
-                  isDark ? "text-slate-500" : "text-[#8b857c]"
-                }`}
-              >
-                Manage users and access
+              <div className={subCls}>
+                {isMasterAdmin ? "Users, security and system settings" : "Recycle bin, backups and audit trail"}
               </div>
             </Link>
 
-            <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
-
-            <Link
-              href="/admin/deleted-items"
-              className={`block px-5 py-3 text-sm font-medium transition ${
-                isDark
-                  ? "text-slate-200 hover:bg-white/5"
-                  : "text-[#2f2a25] hover:bg-[#faf7f2]"
-              }`}
-              onClick={closeMenu}
-            >
+            <div className={divider} />
+            <Link href="/admin/deleted-items" className={itemCls} onClick={closeMenu}>
               <div className="font-semibold">Deleted Items</div>
-              <div
-                className={`mt-0.5 text-[11px] ${
-                  isDark ? "text-slate-500" : "text-[#8b857c]"
-                }`}
-              >
-                Restore or permanently remove deleted records
-              </div>
+              <div className={subCls}>Restore or permanently remove deleted records</div>
             </Link>
           </>
-        ) : null}
+        )}
 
-        <div className={isDark ? "h-px bg-white/8" : "h-px bg-[#f0e6dc]"} />
+        <div className={divider} />
 
-        <form ref={formRef} action="/auth/logout" method="post">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`w-full px-5 py-3 text-left text-sm font-medium transition ${
-              isDark
-                ? "text-red-400 hover:bg-red-500/10"
-                : "text-red-600 hover:bg-red-50"
-            }`}
-          >
-            <div className="font-semibold">Logout</div>
-            <div
-              className={`mt-0.5 text-[11px] ${
-                isDark ? "text-slate-500" : "text-[#8b857c]"
-              }`}
-            >
-              End your current session
-            </div>
-          </button>
-
-          <button type="submit" className="hidden" aria-hidden="true" />
-        </form>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={signingOut}
+          className={`w-full px-5 py-3 text-left text-sm font-medium transition disabled:opacity-60 ${
+            isDark ? "text-red-400 hover:bg-red-500/10" : "text-red-600 hover:bg-red-50"
+          }`}
+        >
+          <div className="font-semibold">{signingOut ? "Signing out…" : "Logout"}</div>
+          <div className={subCls}>End your current session</div>
+        </button>
       </div>
     </details>
   );

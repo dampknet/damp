@@ -5,15 +5,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { ChevronDown, ChevronUp, Download } from "lucide-react";
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  EQUIPMENT:              "Equipment",
-  ACCESSORIES:            "Accessories",
-  TOOLS_AND_PARTS:        "Tools & Parts",
-  GENERAL:                "General",
-  COOLING_INFRASTRUCTURE: "Cooling",
-  CABLES_AND_ELECTRONICS: "Cables & Electronics",
-};
+import { ITEM_TYPE_LABEL } from "@/lib/item-types";
 
 type IssueItem = {
   id:               string;
@@ -69,12 +61,9 @@ function TripCard({
   const itemCount    = trip.items.length;
   const totalUnits   = trip.items.reduce((sum, i) => sum + i.quantityTaken, 0);
 
-  // ✅ Only count RETURNABLE items for status calculation
   const returnableItems    = trip.items.filter((i) => !!i.expectedReturnAt);
   const nonReturnableItems = trip.items.filter((i) => !i.expectedReturnAt);
 
-  // A trip is CLOSED if:
-  // - all returnable items are returned (or there are none)
   const allReturnableDone  = returnableItems.length === 0 ||
                              returnableItems.every((i) => i.status === "RETURNED");
   const someReturnableDone = returnableItems.some((i) => i.status === "RETURNED");
@@ -106,18 +95,15 @@ function TripCard({
       ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5"
       : "overflow-hidden rounded-2xl border border-[#e0dbd2] bg-white shadow-sm"
     }>
-      {/* Trip header */}
       <div
         className={`flex cursor-pointer items-center gap-4 px-5 py-4 ${dark ? "hover:bg-white/5" : "hover:bg-[#fcfaf7]"}`}
         onClick={() => setExpanded(!expanded)}
       >
-        {/* Status dot */}
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
           tripStatus === "CLOSED"  ? "bg-emerald-500" :
           tripStatus === "PARTIAL" ? "bg-amber-500"   : "bg-red-400"
         }`} />
 
-        {/* Main info */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className={dark ? "text-sm font-bold text-slate-100" : "text-sm font-bold text-[#1a1814]"}>
@@ -143,7 +129,6 @@ function TripCard({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={handleDownload}
@@ -163,7 +148,6 @@ function TripCard({
         </span>
       </div>
 
-      {/* Expanded items */}
       {expanded && (
         <div className={dark ? "border-t border-white/8" : "border-t border-[#eee7dd]"}>
           {trip.items.map((item, idx) => {
@@ -195,7 +179,6 @@ function TripCard({
                     )}
                   </div>
 
-                  {/* Entity codes with conditions */}
                   {item.lines.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {item.lines.map((line) => (
@@ -215,7 +198,6 @@ function TripCard({
                   </div>
                 </div>
 
-                {/* Return button per item */}
                 {canEdit && !isItemReturned && isReturnable && (
                   <Link
                     href={`/store/sites/${siteId}/issues/${item.id}/return`}
@@ -237,7 +219,6 @@ function TripCard({
                     <span className={dark ? "text-xs font-semibold text-emerald-400" : "text-xs font-semibold text-emerald-700"}>
                       ✓ Closed
                     </span>
-                    {/* ✅ Download return receipt for already-returned items */}
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -296,7 +277,6 @@ export default function IssueLogClient({
     }>
       <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
 
-        {/* Header */}
         <section className={dark
           ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
           : "relative overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 p-6 shadow-sm"
@@ -338,7 +318,6 @@ export default function IssueLogClient({
             }>{success}</div>
           )}
 
-          {/* Search */}
           <div className={dark ? "mt-6 rounded-2xl border border-white/10 bg-white/5 p-4" : "mt-6 rounded-2xl border border-[#e7dfd4] bg-[#fffdfa] p-4"}>
             <form className="flex flex-wrap gap-3">
               <input name="q" defaultValue={q}
@@ -372,7 +351,6 @@ export default function IssueLogClient({
           </div>
         </section>
 
-        {/* Summary */}
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {[
             { label: "Open Issues",  value: summary.openCount,     sub: "items currently out",  accent: dark ? "bg-amber-500" : "bg-[#b08b2c]" },
@@ -392,7 +370,6 @@ export default function IssueLogClient({
           ))}
         </div>
 
-        {/* Trip cards */}
         <div className="mt-5 space-y-3">
           {trips.length === 0 ? (
             <div className={dark

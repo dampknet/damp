@@ -6,14 +6,22 @@ import SettingsMenu from "@/components/SettingsMenu";
 import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
-  email: string;
-  role: "ADMIN" | "EDITOR" | "VIEWER";
-  displayName: string;
+  email:         string;
+  role:          "ADMIN" | "EDITOR" | "VIEWER";
+  isMasterAdmin: boolean;
+  displayName:   string;
 };
+
+const LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/sites",     label: "Sites"     },
+  { href: "/store",     label: "Store"     },
+];
 
 export default function AppNavbarClient({
   email,
   role,
+  isMasterAdmin,
   displayName,
 }: Props) {
   const { mode } = useThemeMode();
@@ -68,14 +76,15 @@ export default function AppNavbarClient({
               : "border-[#e7dfd4] bg-white"
           }`}
         >
-          <NavItem href="/dashboard" label="Dashboard" isDark={isDark} />
-          <NavItem href="/sites" label="Sites" isDark={isDark} />
-          <NavItem href="/store" label="Store" isDark={isDark} />
+          {LINKS.map((l) => (
+            <NavItem key={l.href} href={l.href} label={l.label} isDark={isDark} />
+          ))}
         </nav>
 
         <SettingsMenu
           email={email}
           role={role}
+          isMasterAdmin={isMasterAdmin}
           displayName={displayName}
         />
       </div>
@@ -87,10 +96,10 @@ export default function AppNavbarClient({
             : "border-t border-[#efe8de] bg-white"
         }`}
       >
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2">
-          <NavItem href="/dashboard" label="Dashboard" isDark={isDark} mobile />
-          <NavItem href="/sites" label="Sites" isDark={isDark} mobile />
-          <NavItem href="/store" label="Store" isDark={isDark} mobile />
+        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-4 py-2">
+          {LINKS.map((l) => (
+            <NavItem key={l.href} href={l.href} label={l.label} isDark={isDark} mobile />
+          ))}
         </div>
       </div>
     </header>
@@ -103,9 +112,9 @@ function NavItem({
   isDark,
   mobile = false,
 }: {
-  href: string;
-  label: string;
-  isDark: boolean;
+  href:    string;
+  label:   string;
+  isDark:  boolean;
   mobile?: boolean;
 }) {
   return (

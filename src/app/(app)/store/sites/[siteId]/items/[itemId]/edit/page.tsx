@@ -3,13 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
+import { VALID_ITEM_TYPES } from "@/lib/item-types";
 import type { InventoryItemStatus, InventoryItemType } from "@prisma/client";
 import EditInventoryItemClient from "./EditInventoryItemClient";
-
-const VALID_TYPES = [
-  "EQUIPMENT","ACCESSORIES","TOOLS_AND_PARTS",
-  "GENERAL","COOLING_INFRASTRUCTURE","CABLES_AND_ELECTRONICS",
-];
 
 export default async function EditInventoryItemPage({
   params,
@@ -30,7 +26,6 @@ export default async function EditInventoryItemPage({
   });
   if (!site) return notFound();
 
-  // ✅ Capture before server action closure
   const siteName = site.name;
 
   const item = await prisma.inventoryItem.findFirst({
@@ -79,7 +74,7 @@ export default async function EditInventoryItemPage({
     const statusRaw      = String(formData.get("status")           ?? "AVAILABLE").trim();
     const uncountable    = formData.get("uncountable") === "on";
 
-    const itemType = VALID_TYPES.includes(itemTypeRaw) ? itemTypeRaw : "GENERAL";
+    const itemType = VALID_ITEM_TYPES.includes(itemTypeRaw as any) ? itemTypeRaw : "GENERAL";
 
     if (!name) {
       redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent("Item name is required")}`);
@@ -99,7 +94,6 @@ export default async function EditInventoryItemPage({
       uncountable,
     });
 
-    // Check item code uniqueness if changed
     if (itemCode && itemCode !== safeItem.itemCode) {
       const existing = await prisma.inventoryItem.findFirst({
         where:  { itemCode, NOT: { id: itemId } },
