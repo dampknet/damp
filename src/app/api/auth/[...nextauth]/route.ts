@@ -284,21 +284,14 @@ export const authOptions: NextAuthOptions = {
       });
 
       await logAuthEvent({
-        title:    `${profile.fullName ?? user.name ?? email} signed in via ${method}`,
+        title:    profile.isEmergency
+          ? `${email} signed in via ${method} (Created Account)`
+          : `${profile.fullName ?? user.name ?? email} signed in via ${method}`,
         email,
+        ...(profile.isEmergency ? { details: "Login credentials were set up from Create Account." } : {}),
         security: false,
         info,
       });
-
-      if (profile.isEmergency) {
-        await logAuthEvent({
-          title:    `Emergency account used: ${email}`,
-          email,
-          details:  `Emergency account signed in via ${method}.${profile.accessExpiresAt ? ` Access expires ${profile.accessExpiresAt.toISOString()}.` : " No expiry set."}`,
-          security: true,
-          info,
-        });
-      }
 
       return true;
     },

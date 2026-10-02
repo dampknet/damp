@@ -11,7 +11,7 @@ import {
 import {
   UserPlus, Users, ShieldCheck, X, Trash2, Search, CheckCircle,
   ChevronRight, Loader2, Crown, Lock, Unlock, Ban, RotateCcw,
-  Key, AlertTriangle, Clock, Copy, RefreshCw,
+  Key, Clock, Copy, RefreshCw,
 } from "lucide-react";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
@@ -101,6 +101,7 @@ export default function UsersTable({
   const [emPassword,    setEmPassword]    = useState("");
   const [emExpiry,      setEmExpiry]      = useState("");
   const [emMustChange,  setEmMustChange]  = useState(true);
+  const [emNeverExpire, setEmNeverExpire] = useState(false);
 
   const [passwordFor,   setPasswordFor]   = useState<UserRow | null>(null);
   const [pwValue,       setPwValue]       = useState("");
@@ -183,6 +184,7 @@ export default function UsersTable({
     setEmPassword(generatePassword());
     setEmExpiry(toLocalInput(new Date(Date.now() + 48 * 60 * 60 * 1000)));
     setEmMustChange(true);
+    setEmNeverExpire(false);
     setFormError(null);
     setEmergencyOpen(true);
   };
@@ -195,7 +197,7 @@ export default function UsersTable({
       fullName:   emName,
       role:       emRole,
       password:   emPassword,
-      expiresAt:  localInputToIso(emExpiry),
+      expiresAt:  emNeverExpire ? null : localInputToIso(emExpiry),
       mustChange: emMustChange,
     };
     startTransition(async () => {
@@ -349,10 +351,10 @@ export default function UsersTable({
             <button
               onClick={openEmergency}
               className={`flex items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold shadow-sm transition ${
-                dark ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                dark ? "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10" : "border-[#e7dfd4] bg-white text-[#1a1814] hover:bg-[#f5f2ed]"
               }`}
             >
-              <AlertTriangle size={16} /> Emergency Account
+              <Key size={16} /> Create Account
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -368,7 +370,7 @@ export default function UsersTable({
           {[
             { label: "Active Accounts", value: users.length - suspendedCount, icon: <Users size={18} style={{ color: accent }} />,          iconBg: dark ? "bg-blue-500/10"  : "bg-blue-50"  },
             { label: "Master Admins",   value: masterCount,                  icon: <Crown size={18} className="text-amber-500" />,           iconBg: dark ? "bg-amber-500/10" : "bg-amber-50" },
-            { label: "Suspended / Emergency", value: `${suspendedCount} / ${emergencyCount}`, icon: <ShieldCheck size={18} className="text-rose-500" />, iconBg: dark ? "bg-rose-500/10" : "bg-rose-50" },
+            { label: "Suspended / Created", value: `${suspendedCount} / ${emergencyCount}`, icon: <ShieldCheck size={18} className="text-rose-500" />, iconBg: dark ? "bg-rose-500/10" : "bg-rose-50" },
           ].map((s) => (
             <div key={s.label} className={`flex items-center gap-4 rounded-2xl border ${border} ${surface} px-5 py-4 shadow-sm`}>
               <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${s.iconBg}`}>{s.icon}</div>
@@ -438,8 +440,8 @@ export default function UsersTable({
                                 </span>
                               )}
                               {u.isEmergency && (
-                                <span className={badge(dark ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-red-200 bg-red-50 text-red-700")}>
-                                  <AlertTriangle size={10} /> Emergency
+                                <span className={badge(dark ? "border-blue-500/30 bg-blue-500/10 text-blue-300" : "border-blue-200 bg-blue-50 text-[#1d5fa8]")}>
+                                  <Key size={10} /> Created Account
                                 </span>
                               )}
                               {u.accessExpiresAt && (
@@ -652,11 +654,11 @@ export default function UsersTable({
       {emergencyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className={`w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
-            <div className="h-1 bg-[linear-gradient(90deg,#dc2626,#f59e0b)]" />
+            <div className="h-1 bg-[linear-gradient(90deg,#1d5fa8,#60a5fa)]" />
             <form onSubmit={submitEmergency} className="space-y-4 p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className={`text-base font-semibold ${txt}`}>Create Emergency Account</h2>
+                  <h2 className={`text-base font-semibold ${txt}`}>Create Account</h2>
                   <p className={`mt-1 text-xs ${muted}`}>
                     A local account for when Microsoft or Google sign-in is down. No email is sent — you hand the details over yourself.
                   </p>
@@ -670,7 +672,7 @@ export default function UsersTable({
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Full Name</label>
-                  <input value={emName} onChange={(e) => setEmName(e.target.value)} placeholder="e.g. Store Emergency"
+                  <input value={emName} onChange={(e) => setEmName(e.target.value)} placeholder="e.g. Store Manager"
                     className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
                 </div>
                 <div>
@@ -687,17 +689,24 @@ export default function UsersTable({
               <div>
                 <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Sign-in Email</label>
                 <input type="email" required value={emEmail} onChange={(e) => setEmEmail(e.target.value)}
-                  placeholder="e.g. emergency1@knetgh.com"
+                  placeholder="e.g. store1@knetgh.com"
                   className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
               </div>
 
               <PasswordField dark={dark} value={emPassword} onChange={setEmPassword} input={input} border={border} muted={muted} hoverBg={hoverBg} />
 
               <div>
-                <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Access Expires (optional)</label>
+                <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Access Expires</label>
                 <input type="datetime-local" value={emExpiry} onChange={(e) => setEmExpiry(e.target.value)} aria-label="Access expires"
-                  className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
-                <p className={`mt-1 text-[11px] ${muted}`}>Clear it for no expiry. The account stops working automatically at this time.</p>
+                  disabled={emNeverExpire} required={!emNeverExpire}
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition disabled:opacity-40 ${input}`} />
+                <label className={`mt-2 flex cursor-pointer items-center gap-2 text-xs font-medium ${txt}`}>
+                  <input type="checkbox" checked={emNeverExpire} onChange={(e) => setEmNeverExpire(e.target.checked)} className="h-4 w-4 accent-[#1d5fa8]" />
+                  Never expire
+                </label>
+                <p className={`mt-1 text-[11px] ${muted}`}>
+                  {emNeverExpire ? "The account keeps working until you suspend or remove it." : "The account stops working automatically at this time."}
+                </p>
               </div>
 
               <label className={`flex cursor-pointer items-center gap-2 text-xs font-medium ${txt}`}>
@@ -717,7 +726,8 @@ export default function UsersTable({
                   Cancel
                 </button>
                 <button type="submit" disabled={isPending}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50">
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: accent }}>
                   {isPending ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : "Create Account"}
                 </button>
               </div>

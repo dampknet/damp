@@ -240,7 +240,7 @@ export async function createEmergencyAccount(input: {
   const created = await prisma.userProfile.create({
     data: {
       email,
-      fullName:           input.fullName.trim() || "Emergency Access",
+      fullName:           input.fullName.trim() || "Created Account",
       role:               input.role as any,
       passwordHash:       await bcrypt.hash(input.password, 12),
       isEmergency:        true,
@@ -251,7 +251,7 @@ export async function createEmergencyAccount(input: {
 
   await securityLog(
     me.email,
-    `Emergency account created: ${email}`,
+    `Account created: ${email}`,
     `Role: ${input.role}. ${expiresAt ? `Expires ${expiresAt.toISOString()}.` : "No expiry."} Must change password: ${input.mustChange ? "yes" : "no"}. Created by ${me.email}.`,
     created.id,
   );
@@ -292,7 +292,7 @@ export async function removeLocalPassword(userId: string) {
 
   if (!target.passwordHash) return;
   if (target.id === me.id) throw new Error("You cannot remove your own password — it is your backup way in.");
-  if (target.isEmergency)  throw new Error("Emergency accounts only sign in with a password. Remove the account instead.");
+  if (target.isEmergency)  throw new Error("Created accounts only sign in with a password. Remove the account instead.");
 
   await prisma.userProfile.update({
     where: { id: userId },
