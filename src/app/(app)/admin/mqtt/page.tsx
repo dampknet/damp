@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, requireMasterAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { encryptSecret, hasEncryptionKey } from "@/lib/secrets";
 import MqttSettingsClient from "./MqttSettingsClient";
 
 export default async function MqttSettingsPage() {
@@ -21,15 +22,22 @@ export default async function MqttSettingsPage() {
     const mqttPort       = Number(formData.get("mqttPort")       ?? 8883);
     const websocketPort  = Number(formData.get("websocketPort")  ?? 8884);
     const username       = String(formData.get("username")       ?? "").trim();
-    const password       = String(formData.get("password")       ?? "").trim();
+    const newPassword    = String(formData.get("password")       ?? "").trim();
 
-    if (!clusterUrl || !username || !password) {
+    const existing = await prisma.mqttConfig.findFirst();
+
+    if (!clusterUrl || !username || (!newPassword && !existing?.password)) {
       redirect("/admin/mqtt?error=Cluster+URL%2C+username+and+password+are+required");
     }
 
+    if (newPassword && !hasEncryptionKey()) {
+      redirect("/admin/mqtt?error=CONFIG_ENCRYPTION_KEY+is+not+set%2C+so+the+password+cannot+be+stored+safely");
+    }
+
+    const password = newPassword ? encryptSecret(newPassword) : existing!.password;
+
     let dbError: string | null = null;
     try {
-      const existing = await prisma.mqttConfig.findFirst();
       if (existing) {
         await prisma.mqttConfig.update({
           where: { id: existing.id },
@@ -40,6 +48,17 @@ export default async function MqttSettingsPage() {
           data: { connectionName, clusterUrl, mqttPort, websocketPort, username, password },
         });
       }
+
+      await prisma.activityLog.create({
+        data: {
+          type:       "SYSTEM_EVENT",
+          title:      "HiveMQ settings updated",
+          details:    `Cluster: ${clusterUrl}. Password ${newPassword ? "replaced" : "unchanged"}. Changed by ${me.email}.`,
+          actorEmail: me.email,
+          entityType: "SECURITY",
+        },
+      }).catch(() => {});
+
       revalidatePath("/admin/mqtt");
     } catch (e) {
       if (isRedirectError(e)) throw e;
@@ -54,7 +73,15 @@ export default async function MqttSettingsPage() {
 
   return (
     <MqttSettingsClient
-      config={config as any}
+      config={config ? {
+        id:             config.id,
+        connectionName: config.connectionName ?? "",
+        clusterUrl:     config.clusterUrl,
+        mqttPort:       config.mqttPort,
+        websocketPort:  config.websocketPort,
+        username:       config.username,
+        hasPassword:    !!config.password,
+      } : null}
       action={saveMqttConfig}
     />
   );

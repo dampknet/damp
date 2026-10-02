@@ -37,6 +37,7 @@ export default async function InventorySitePage({
           unit:         true,
           reorderLevel: true,
           status:       true,
+          condition:    true,
           instances: {
             select: {
               id:         true,
@@ -54,7 +55,7 @@ export default async function InventorySitePage({
 
   const itemsWithCondition = site.items.map((item) => ({
     ...item,
-    condition: item.instances[0]?.condition ?? "NEW",
+    condition: item.condition,
   }));
 
   const summary = {

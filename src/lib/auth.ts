@@ -16,7 +16,7 @@ const loadProfile = cache(async () => {
   const user = await getCurrentUser();
   if (!user?.email) return null;
 
-  return prisma.userProfile.findFirst({
+  const record = await prisma.userProfile.findFirst({
     where: {
       OR: [
         ...(user.id ? [{ id: user.id }] : []),
@@ -24,28 +24,43 @@ const loadProfile = cache(async () => {
       ],
     },
     select: {
-      id:            true,
-      email:         true,
-      fullName:      true,
-      role:          true,
-      isMasterAdmin: true,
-      isSuspended:   true,
-      createdAt:     true,
-      updatedAt:     true,
+      id:                 true,
+      email:              true,
+      fullName:           true,
+      role:               true,
+      isMasterAdmin:      true,
+      isSuspended:        true,
+      isEmergency:        true,
+      accessExpiresAt:    true,
+      mustChangePassword: true,
+      passwordHash:       true,
+      createdAt:          true,
+      updatedAt:          true,
     },
   });
+
+  if (!record) return null;
+
+  const { passwordHash, ...rest } = record;
+  return {
+    ...rest,
+    hasLocalPassword: !!passwordHash,
+    isExpired:        !!rest.accessExpiresAt && rest.accessExpiresAt.getTime() <= Date.now(),
+  };
 });
 
 export const getCurrentProfile = cache(async () => {
   const profile = await loadProfile();
-  if (!profile || profile.isSuspended) return null;
+  if (!profile || profile.isSuspended || profile.isExpired) return null;
   return profile;
 });
 
 export async function requireCurrentProfile() {
   const profile = await loadProfile();
-  if (!profile)            redirect("/auth/login?error=not_authorized");
-  if (profile.isSuspended) redirect("/auth/error?error=Suspended");
+  if (!profile)                    redirect("/auth/login?error=not_authorized");
+  if (profile.isSuspended)         redirect("/auth/error?error=Suspended");
+  if (profile.isExpired)           redirect("/auth/error?error=Expired");
+  if (profile.mustChangePassword)  redirect("/auth/change-password");
   return profile;
 }
 

@@ -14,6 +14,7 @@ export default async function AppNavbar() {
       email={email}
       role={role}
       isMasterAdmin={profile.isMasterAdmin}
+      hasLocalPassword={profile.hasLocalPassword}
       displayName={displayName}
     />
   );

@@ -113,7 +113,7 @@ export default async function ReturnItemPage({
                 inventorySiteId: siteId,
                 name:            issuedItemName,
                 isDeleted:       false,
-                instances:       { some: { condition: newCondition } },
+                condition:       newCondition,
               },
               select: { id: true },
             });
@@ -147,6 +147,7 @@ export default async function ReturnItemPage({
                   unit:            issuedUnit,
                   reorderLevel:    0,
                   status:          "AVAILABLE",
+                  condition:       newCondition,
                 },
               });
 

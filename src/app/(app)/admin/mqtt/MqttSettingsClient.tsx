@@ -13,7 +13,7 @@ type MqttConfig = {
   mqttPort:       number;
   websocketPort:  number;
   username:       string;
-  password:       string;
+  hasPassword:    boolean;
 } | null;
 
 export default function MqttSettingsClient({
@@ -166,10 +166,10 @@ export default function MqttSettingsClient({
                   placeholder="admin"
                   className={inputCls} />
               </Field>
-              <Field label="Password" dark={dark} required>
-                <input name="password" type="password" required
-                  defaultValue={config?.password ?? ""}
-                  placeholder="••••••••••"
+              <Field label="Password" dark={dark} required={!config?.hasPassword}>
+                <input name="password" type="password" required={!config?.hasPassword}
+                  autoComplete="new-password"
+                  placeholder={config?.hasPassword ? "Saved — leave blank to keep" : "••••••••••"}
                   className={inputCls} />
               </Field>
             </div>

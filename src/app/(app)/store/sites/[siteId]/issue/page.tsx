@@ -42,6 +42,7 @@ export default async function IssueInventoryItemPage({
       unit:         true,
       reorderLevel: true,
       status:       true,
+      condition:    true,
       instances: {
         where:  { status: "AVAILABLE" }, // ✅ only show available instances
         select: {
@@ -56,7 +57,7 @@ export default async function IssueInventoryItemPage({
 
   const items = rawItems.map((item) => ({
     ...item,
-    condition: item.instances[0]?.condition ?? "NEW",
+    condition: item.condition,
   }));
 
   async function issueItemsAction(formData: FormData) {

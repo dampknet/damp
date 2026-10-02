@@ -19,16 +19,22 @@ export default async function AdminUsersPage() {
       lockedUntil:     true,
       lastLoginAt:     true,
       lastLoginIp:     true,
-      lastLoginMethod: true,
+      lastLoginMethod:    true,
+      isEmergency:        true,
+      accessExpiresAt:    true,
+      mustChangePassword: true,
+      passwordHash:       true,
     },
   });
 
   return (
     <UsersTable
-      users={users.map((u) => ({
+      users={users.map(({ passwordHash, ...u }) => ({
         ...u,
-        lockedUntil: u.lockedUntil?.toISOString() ?? null,
-        lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+        hasLocalPassword: !!passwordHash,
+        lockedUntil:      u.lockedUntil?.toISOString()     ?? null,
+        lastLoginAt:      u.lastLoginAt?.toISOString()     ?? null,
+        accessExpiresAt:  u.accessExpiresAt?.toISOString() ?? null,
       }))}
       currentUserId={me.id}
     />

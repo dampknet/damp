@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getProviders } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
 function errorMessage(code: string | null): string | null {
@@ -12,12 +12,42 @@ function errorMessage(code: string | null): string | null {
   if (code === "AccessDenied")  return "Access denied. Contact your system administrator.";
   if (code === "OAuthSignin")   return "That sign-in provider is unavailable right now. Try another method.";
   if (code === "Suspended")     return "This account has been suspended. Contact a master admin.";
+  if (code === "Expired")       return "This account's access has expired. Contact a master admin.";
   if (code.startsWith("Locked:")) {
     const mins = Number(code.split(":")[1]) || 5;
     return `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}, or ask a master admin to unlock your account.`;
   }
   if (code === "not_authorized") return null;
   return "Invalid email or password, or your account doesn't have access.";
+}
+
+function ProviderIcon({ id }: { id: string }) {
+  if (id === "azure-ad") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 21 21" fill="none" aria-hidden="true">
+        <rect x="1"  y="1"  width="9" height="9" fill="#F25022"/>
+        <rect x="11" y="1"  width="9" height="9" fill="#7FBA00"/>
+        <rect x="1"  y="11" width="9" height="9" fill="#00A4EF"/>
+        <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+      </svg>
+    );
+  }
+  if (id === "google") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/>
+      </svg>
+    );
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d5fa8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
 }
 
 function LoginFormInner() {
@@ -28,7 +58,8 @@ function LoginFormInner() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
-  const [ssoLoad,  setSsoLoad]  = useState(false);
+  const [ssoLoad,  setSsoLoad]  = useState<string | null>(null);
+  const [external, setExternal] = useState<{ id: string; name: string }[]>([]);
   const [msg,      setMsg]      = useState<string | null>(errorMessage(urlError));
   const [mounted, setMounted] = useState(false);
 
@@ -57,14 +88,25 @@ function LoginFormInner() {
     window.location.href = "/dashboard";
   };
 
-  const handleMicrosoft = async () => {
-    setSsoLoad(true);
-    signIn("azure-ad", { callbackUrl: "/dashboard" });
+  useEffect(() => {
+    let cancelled = false;
+    getProviders()
+      .then((list) => {
+        if (cancelled || !list) return;
+        setExternal(Object.values(list).filter((p) => p.id !== "credentials").map((p) => ({ id: p.id, name: p.name })));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleProvider = (id: string) => {
+    setSsoLoad(id);
+    signIn(id, { callbackUrl: "/dashboard" });
   };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#f7f4ee_0%,#efe6d8_45%,#f6f1e8_100%)]">
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes floaty {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-8px); }
@@ -81,7 +123,7 @@ function LoginFormInner() {
           0% { transform: translateX(-120%); }
           100% { transform: translateX(300%); }
         }
-      `}</style>
+      ` }} />
 
       {loading && (
         <div className="fixed inset-0 z-200 bg-black/25 backdrop-blur-sm">
@@ -224,7 +266,7 @@ function LoginFormInner() {
                   )}
 
                   <button
-                    disabled={loading || ssoLoad}
+                    disabled={loading || !!ssoLoad}
                     className="w-full rounded-xl bg-[linear-gradient(135deg,#1d5fa8_0%,#2563eb_45%,#c8611a_100%)] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(29,95,168,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(29,95,168,0.28)] disabled:opacity-60"
                     type="submit"
                   >
@@ -232,29 +274,34 @@ function LoginFormInner() {
                   </button>
                 </form>
 
-                <div className="my-5 flex items-center gap-3">
-                  <div className="flex-1 border-t border-[#e7dfd4]" />
-                  <span className="text-xs text-[#9c9890]">or</span>
-                  <div className="flex-1 border-t border-[#e7dfd4]" />
-                </div>
+                {external.length > 0 && (
+                  <>
+                    <div className="my-5 flex items-center gap-3">
+                      <div className="flex-1 border-t border-[#e7dfd4]" />
+                      <span className="text-xs text-[#9c9890]">or</span>
+                      <div className="flex-1 border-t border-[#e7dfd4]" />
+                    </div>
 
-                <button
-                  onClick={handleMicrosoft}
-                  disabled={loading || ssoLoad}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#ddd5c9] bg-white px-4 py-2.5 text-sm font-semibold text-[#1a1814] shadow-sm hover:-translate-y-0.5 hover:bg-[#f7f3ed] transition disabled:opacity-60"
-                >
-                  {ssoLoad ? (
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1d5fa8]/30 border-t-[#1d5fa8]" />
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
-                      <rect x="1"  y="1"  width="9" height="9" fill="#F25022"/>
-                      <rect x="11" y="1"  width="9" height="9" fill="#7FBA00"/>
-                      <rect x="1"  y="11" width="9" height="9" fill="#00A4EF"/>
-                      <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
-                    </svg>
-                  )}
-                  {ssoLoad ? "Redirecting..." : "Sign in with Microsoft"}
-                </button>
+                    <div className="space-y-2.5">
+                      {external.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleProvider(p.id)}
+                          disabled={loading || !!ssoLoad}
+                          className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#ddd5c9] bg-white px-4 py-2.5 text-sm font-semibold text-[#1a1814] shadow-sm hover:-translate-y-0.5 hover:bg-[#f7f3ed] transition disabled:opacity-60"
+                        >
+                          {ssoLoad === p.id ? (
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1d5fa8]/30 border-t-[#1d5fa8]" />
+                          ) : (
+                            <ProviderIcon id={p.id} />
+                          )}
+                          {ssoLoad === p.id ? "Redirecting..." : `Sign in with ${p.name}`}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <div className="mt-5 rounded-2xl border border-[#eee6da] bg-[#faf7f2] px-4 py-3 transition duration-200 hover:bg-[#f7f1ea]">
                   <p className="text-xs leading-5 text-[#7c766e]">

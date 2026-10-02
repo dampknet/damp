@@ -8,8 +8,9 @@ import { useThemeMode } from "@/context/ThemeContext";
 type Props = {
   email:         string;
   role:          "ADMIN" | "EDITOR" | "VIEWER";
-  isMasterAdmin: boolean;
-  displayName:   string;
+  isMasterAdmin:    boolean;
+  hasLocalPassword: boolean;
+  displayName:      string;
 };
 
 const LINKS = [
@@ -22,6 +23,7 @@ export default function AppNavbarClient({
   email,
   role,
   isMasterAdmin,
+  hasLocalPassword,
   displayName,
 }: Props) {
   const { mode } = useThemeMode();
@@ -85,6 +87,7 @@ export default function AppNavbarClient({
           email={email}
           role={role}
           isMasterAdmin={isMasterAdmin}
+          hasLocalPassword={hasLocalPassword}
           displayName={displayName}
         />
       </div>

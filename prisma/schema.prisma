@@ -110,23 +110,26 @@ enum WarehouseIssueStatus {
 }
 
 model UserProfile {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  fullName         String?
-  role             Role      @default(VIEWER)
-  isMasterAdmin    Boolean   @default(false)
-  passwordHash     String?
-  failedLoginCount Int       @default(0)
-  lockedUntil      DateTime?
-  isSuspended      Boolean   @default(false)
-  suspendedAt      DateTime?
-  suspendedBy      String?
-  suspendReason    String?
-  lastLoginAt      DateTime?
-  lastLoginIp      String?
-  lastLoginMethod  String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  fullName           String?
+  role               Role      @default(VIEWER)
+  isMasterAdmin      Boolean   @default(false)
+  passwordHash       String?
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  isEmergency        Boolean   @default(false)
+  accessExpiresAt    DateTime?
+  mustChangePassword Boolean   @default(false)
+  isSuspended        Boolean   @default(false)
+  suspendedAt        DateTime?
+  suspendedBy        String?
+  suspendReason      String?
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  lastLoginMethod    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model Account {
@@ -345,6 +348,7 @@ model InventoryItem {
   reorderLevel     Int                 @default(0)
   targetStockLevel Int?
   status           InventoryItemStatus @default(AVAILABLE)
+  condition        EquipmentCondition  @default(NEW)
   isDeleted        Boolean             @default(false)
   deletedAt        DateTime?
   deletedByEmail   String?
@@ -493,4 +497,28 @@ model MqttConfig {
   password       String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model AuthProviderConfig {
+  provider        String   @id
+  enabled         Boolean  @default(false)
+  displayName     String?
+  clientId        String?
+  clientSecretEnc String?
+  tenantId        String?
+  issuer          String?
+  updatedBy       String?
+  updatedAt       DateTime @updatedAt
+}
+
+model MailConfig {
+  id              String   @id @default("default")
+  enabled         Boolean  @default(true)
+  tenantId        String?
+  clientId        String?
+  clientSecretEnc String?
+  senderEmail     String?
+  companyDomain   String?
+  updatedBy       String?
+  updatedAt       DateTime @updatedAt
 }

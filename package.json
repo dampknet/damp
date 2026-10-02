@@ -44,8 +44,8 @@
   },
   "allowScripts": {
     "@prisma/client@6.15.0": true,
-    "@prisma/engines@6.15.0": true,
-    "prisma@6.15.0": true,
-    "sharp@0.34.5": true
+    "sharp@0.34.5": true,
+    "@prisma/engines@6.19.3": true,
+    "prisma@6.19.3": true
   }
 }

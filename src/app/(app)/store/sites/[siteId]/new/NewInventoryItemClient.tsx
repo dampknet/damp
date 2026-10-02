@@ -26,8 +26,7 @@ export default function NewInventoryItemClient({
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
     : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none";
 
-  const canCreateEntities = !uncountable && quantity > 0 &&
-    (itemType === "EQUIPMENT" || itemType === "COOLING_INFRASTRUCTURE");
+  const canCreateEntities = !uncountable && quantity > 0;
 
   return (
     <div className={dark

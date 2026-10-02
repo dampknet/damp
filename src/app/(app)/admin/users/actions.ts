@@ -6,12 +6,15 @@ import { logActivity }       from "@/lib/activity";
 import { revalidatePath }    from "next/cache";
 import { sendSetPasswordEmail, sendCompanyAccessEmail } from "@/lib/mailer";
 import crypto                from "crypto";
+import bcrypt                from "bcryptjs";
+import { validatePassword }  from "@/lib/passwords";
+import { getCompanyDomain }  from "@/lib/system-config";
 
-const COMPANY_DOMAIN = process.env.COMPANY_EMAIL_DOMAIN ?? "knetgh.com";
-const VALID_ROLES    = ["ADMIN", "EDITOR", "VIEWER"];
+const VALID_ROLES = ["ADMIN", "EDITOR", "VIEWER"];
 
-function isCompanyEmail(email: string): boolean {
-  return email.toLowerCase().endsWith(`@${COMPANY_DOMAIN}`);
+async function isCompanyEmail(email: string): Promise<boolean> {
+  const domain = await getCompanyDomain();
+  return email.toLowerCase().endsWith(`@${domain}`);
 }
 
 async function requireMaster() {
@@ -27,7 +30,7 @@ async function activeMasterCount() {
 async function getTarget(userId: string) {
   const target = await prisma.userProfile.findUnique({
     where:  { id: userId },
-    select: { id: true, email: true, role: true, isMasterAdmin: true, isSuspended: true },
+    select: { id: true, email: true, role: true, isMasterAdmin: true, isSuspended: true, isEmergency: true, passwordHash: true },
   });
   if (!target) throw new Error("User not found.");
   return target;
@@ -65,7 +68,7 @@ export async function addUser(email: string, fullName: string, role: string) {
   });
 
   try {
-    if (isCompanyEmail(normalizedEmail)) {
+    if (await isCompanyEmail(normalizedEmail)) {
       await sendCompanyAccessEmail(normalizedEmail, fullName);
     } else {
       const token       = crypto.randomBytes(32).toString("hex");
@@ -201,5 +204,123 @@ export async function unlockUser(userId: string) {
   });
 
   await securityLog(me.email, `Account unlocked: ${target.email}`, `Unlocked early by ${me.email}.`, userId);
+  revalidatePath("/admin/users");
+}
+
+function parseExpiry(value: string | null): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (isNaN(date.getTime())) throw new Error("Invalid expiry date.");
+  if (date.getTime() <= Date.now()) throw new Error("The expiry date must be in the future.");
+  return date;
+}
+
+export async function createEmergencyAccount(input: {
+  email:       string;
+  fullName:    string;
+  role:        string;
+  password:    string;
+  expiresAt:   string | null;
+  mustChange:  boolean;
+}) {
+  const me    = await requireMaster();
+  const email = input.email.toLowerCase().trim();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email or username in email format.");
+  if (!VALID_ROLES.includes(input.role))           throw new Error("Invalid role.");
+
+  const rule = validatePassword(input.password);
+  if (rule) throw new Error(rule);
+
+  const expiresAt = parseExpiry(input.expiresAt);
+
+  const existing = await prisma.userProfile.findUnique({ where: { email }, select: { id: true } });
+  if (existing) throw new Error("A user with this email already exists. Use Set Password on their row instead.");
+
+  const created = await prisma.userProfile.create({
+    data: {
+      email,
+      fullName:           input.fullName.trim() || "Emergency Access",
+      role:               input.role as any,
+      passwordHash:       await bcrypt.hash(input.password, 12),
+      isEmergency:        true,
+      accessExpiresAt:    expiresAt,
+      mustChangePassword: input.mustChange,
+    },
+  });
+
+  await securityLog(
+    me.email,
+    `Emergency account created: ${email}`,
+    `Role: ${input.role}. ${expiresAt ? `Expires ${expiresAt.toISOString()}.` : "No expiry."} Must change password: ${input.mustChange ? "yes" : "no"}. Created by ${me.email}.`,
+    created.id,
+  );
+  revalidatePath("/admin/users");
+}
+
+export async function setLocalPassword(userId: string, password: string, mustChange: boolean) {
+  const me     = await requireMaster();
+  const target = await getTarget(userId);
+
+  const rule = validatePassword(password);
+  if (rule) throw new Error(rule);
+
+  const isSelf = target.id === me.id;
+
+  await prisma.userProfile.update({
+    where: { id: userId },
+    data: {
+      passwordHash:       await bcrypt.hash(password, 12),
+      mustChangePassword: isSelf ? false : mustChange,
+      failedLoginCount:   0,
+      lockedUntil:        null,
+    },
+  });
+
+  await securityLog(
+    me.email,
+    `${target.passwordHash ? "Local password reset" : "Local password set"}: ${target.email}`,
+    `Set by ${me.email}. Must change on next sign-in: ${!isSelf && mustChange ? "yes" : "no"}.`,
+    userId,
+  );
+  revalidatePath("/admin/users");
+}
+
+export async function removeLocalPassword(userId: string) {
+  const me     = await requireMaster();
+  const target = await getTarget(userId);
+
+  if (!target.passwordHash) return;
+  if (target.id === me.id) throw new Error("You cannot remove your own password — it is your backup way in.");
+  if (target.isEmergency)  throw new Error("Emergency accounts only sign in with a password. Remove the account instead.");
+
+  await prisma.userProfile.update({
+    where: { id: userId },
+    data:  { passwordHash: null, mustChangePassword: false, failedLoginCount: 0, lockedUntil: null },
+  });
+
+  await securityLog(me.email, `Local password removed: ${target.email}`, `Removed by ${me.email}. User can now only sign in via SSO.`, userId);
+  revalidatePath("/admin/users");
+}
+
+export async function setAccessExpiry(userId: string, expiresAt: string | null) {
+  const me     = await requireMaster();
+  const target = await getTarget(userId);
+
+  if (target.id === me.id) throw new Error("You cannot set an expiry on your own account.");
+
+  const date = parseExpiry(expiresAt);
+
+  await prisma.userProfile.update({
+    where: { id: userId },
+    data:  { accessExpiresAt: date },
+  });
+
+  await securityLog(
+    me.email,
+    `Access expiry ${date ? "set" : "cleared"}: ${target.email}`,
+    date ? `Expires ${date.toISOString()}. Set by ${me.email}.` : `Expiry removed by ${me.email}.`,
+    userId,
+  );
   revalidatePath("/admin/users");
 }

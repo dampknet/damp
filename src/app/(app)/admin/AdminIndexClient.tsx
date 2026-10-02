@@ -67,6 +67,18 @@ export default function AdminIndexClient({
       hoverCl:    dark ? "group-hover:text-sky-400" : "group-hover:text-sky-700",
     },
     {
+      masterOnly: true,
+      href:       "/admin/sign-in-settings",
+      emoji:      "🔐",
+      label:      "Sign-in & Email Settings",
+      sub:        "Identity providers, credentials and invite email",
+      accent:     "bg-[linear-gradient(90deg,#7c3aed,#a78bfa)]",
+      iconBg:     dark ? "border-violet-500/20 bg-violet-500/10" : "border-violet-200 bg-violet-50",
+      tag:        "Microsoft · Google · OIDC",
+      tagCls:     dark ? "border-violet-500/20 bg-violet-500/10 text-violet-300" : "border-violet-200 bg-violet-50 text-violet-700",
+      hoverCl:    dark ? "group-hover:text-violet-400" : "group-hover:text-violet-700",
+    },
+    {
       masterOnly: false,
       href:       "/activity",
       emoji:      "📋",

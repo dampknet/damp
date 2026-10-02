@@ -3,26 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
-import { generateItemCode } from "@/lib/inventory-upload";
+import { generateItemCode, getSitePrefix } from "@/lib/inventory-upload";
 import { VALID_ITEM_TYPES } from "@/lib/item-types";
 import type { EquipmentCondition, InventoryItemType } from "@prisma/client";
 import NewInventoryItemClient from "./NewInventoryItemClient";
-
-async function getSitePrefix(siteId: string): Promise<string> {
-  const sample = await prisma.inventoryItem.findFirst({
-    where:  { inventorySiteId: siteId, itemCode: { not: null } },
-    select: { itemCode: true },
-  });
-  if (sample?.itemCode) {
-    const parts = sample.itemCode.split("-");
-    if (parts.length >= 1) return parts[0];
-  }
-  const site = await prisma.inventorySite.findUnique({
-    where:  { id: siteId },
-    select: { name: true },
-  });
-  return (site?.name ?? "SITE").replace(/\s+/g, "").toUpperCase().slice(0, 4);
-}
 
 export default async function NewInventoryItemPage({
   params,
@@ -111,6 +95,7 @@ export default async function NewInventoryItemPage({
             reorderLevel:     Math.trunc(reorder),
             targetStockLevel: targetStock === null ? null : Math.trunc(targetStock),
             status:           finalStatus,
+            condition,
           },
         });
 

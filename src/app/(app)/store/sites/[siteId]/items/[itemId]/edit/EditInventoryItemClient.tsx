@@ -7,7 +7,7 @@ import { useThemeMode } from "@/context/ThemeContext";
 import { ITEM_TYPES } from "@/lib/item-types";
 
 export default function EditInventoryItemClient({
-  site, item, action,
+  site, item, instanceCount, action,
 }: {
   site: { id: string; name: string; location: string | null };
   item: {
@@ -26,6 +26,7 @@ export default function EditInventoryItemClient({
     status:           string;
     condition:        string;
   };
+  instanceCount: number;
   action: (formData: FormData) => void;
 }) {
   const { mode }     = useThemeMode();
@@ -35,6 +36,11 @@ export default function EditInventoryItemClient({
 
   const [itemType,    setItemType]    = useState(item.itemType);
   const [uncountable, setUncountable] = useState(item.uncountable);
+  const [quantity,    setQuantity]    = useState(item.quantity);
+  const [generate,    setGenerate]    = useState(false);
+
+  const missingUnits = Math.max(0, Math.trunc(quantity || 0) - instanceCount);
+  const canGenerate  = !uncountable && missingUnits > 0;
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
@@ -150,7 +156,8 @@ export default function EditInventoryItemClient({
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Quantity" dark={dark}>
                     <input name="quantity" type="number" min="0"
-                      defaultValue={item.quantity} required
+                      value={Number.isFinite(quantity) ? quantity : ""} required
+                      onChange={(e) => setQuantity(e.target.value === "" ? 0 : Number(e.target.value))}
                       title="Quantity" className={inputCls} />
                   </Field>
                   <Field label="Unit" dark={dark}>
@@ -214,6 +221,34 @@ export default function EditInventoryItemClient({
                 </select>
               </Field>
             </div>
+
+            {!uncountable && (
+              <div className={`text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
+                {instanceCount > 0
+                  ? `${instanceCount} unit${instanceCount === 1 ? " has" : "s have"} individual entity codes.`
+                  : "This item has no individual entity codes yet."}
+              </div>
+            )}
+
+            {canGenerate && (
+              <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                generate
+                  ? dark ? "border-blue-500/40 bg-blue-500/10" : "border-blue-300 bg-blue-50"
+                  : dark ? "border-white/10 bg-white/5" : "border-[#e7dfd4] bg-[#fffdf9]"
+              }`}>
+                <input type="checkbox" name="generateEntities" checked={generate}
+                  onChange={(e) => setGenerate(e.target.checked)}
+                  title="Generate entity codes" className="mt-0.5 h-4 w-4 rounded accent-blue-500" />
+                <div>
+                  <div className={`text-sm font-semibold ${generate ? dark ? "text-blue-300" : "text-blue-700" : dark ? "text-slate-200" : "text-[#1a1814]"}`}>
+                    Generate entity codes for {missingUnits} unit{missingUnits === 1 ? "" : "s"} without one
+                  </div>
+                  <div className={`mt-0.5 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
+                    Each unit gets its own code (e.g. {item.itemCode || "ITEM-CODE"}-01) so it can be scanned and tracked when issued.
+                  </div>
+                </div>
+              </label>
+            )}
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <button type="submit" className={dark

@@ -13,8 +13,10 @@ export default async function AuthErrorPage({
   const isAccessDenied = error === "AccessDenied" || error === "not_invited";
   const isExpired      = error === "link_expired";
   const isLocked       = error.startsWith("Locked");
+  const isExpiredAcct  = error === "Expired";
 
   const title = isSuspended    ? "Account Suspended"
+              : isExpiredAcct  ? "Access Expired"
               : isLocked       ? "Account Temporarily Locked"
               : isAccessDenied ? "Access Denied"
               : isExpired      ? "Link Expired"
@@ -22,6 +24,8 @@ export default async function AuthErrorPage({
 
   const message = isSuspended
     ? "Your account has been suspended and you have been signed out. Contact a master admin if you believe this is a mistake."
+    : isExpiredAcct
+    ? "This account's access period has ended and you have been signed out. Contact a master admin if you still need access."
     : isLocked
     ? "Too many failed sign-in attempts. Wait a few minutes and try again, or ask a master admin to unlock your account."
     : isAccessDenied
@@ -32,7 +36,7 @@ export default async function AuthErrorPage({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(180deg,#fbf8f3_0%,#f5f2ed_48%,#f2ede5_100%)]">
-      {isSuspended && <SignOutOnLoad />}
+      {(isSuspended || isExpiredAcct) && <SignOutOnLoad />}
       <div className="w-full max-w-sm overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white/95 shadow-xl">
         <div className="h-1 bg-[linear-gradient(90deg,#dc2626,#f87171)]" />
         <div className="p-8 text-center">

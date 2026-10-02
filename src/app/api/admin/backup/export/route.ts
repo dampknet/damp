@@ -9,7 +9,6 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Fetch all tables in parallel
     const [
       inventorySites,
       inventoryItems,
@@ -39,11 +38,17 @@ export async function GET() {
       prisma.storeItem.findMany({ orderBy: { createdAt: "asc" } }),
     ]);
 
+    const includeHashes = profile.isMasterAdmin;
+    const safeProfiles  = includeHashes
+      ? userProfiles
+      : userProfiles.map(({ passwordHash, ...rest }) => rest);
+
     const backup = {
       _meta: {
         version:    "1.0",
         exportedAt: new Date().toISOString(),
         exportedBy: profile.email,
+        includesPasswordHashes: includeHashes,
         counts: {
           inventorySites:      inventorySites.length,
           inventoryItems:      inventoryItems.length,
@@ -66,7 +71,7 @@ export async function GET() {
       warehouseIssueLines,
       sites,
       assets,
-      userProfiles,
+      userProfiles: safeProfiles,
       activityLogs,
       storeItems,
     };

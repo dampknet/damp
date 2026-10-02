@@ -6,10 +6,12 @@ import { useThemeMode } from "@/context/ThemeContext";
 import {
   updateUserRole, addUser, removeUser,
   setMasterAdmin, suspendUser, reinstateUser, unlockUser,
+  createEmergencyAccount, setLocalPassword, removeLocalPassword, setAccessExpiry,
 } from "./actions";
 import {
   UserPlus, Users, ShieldCheck, X, Trash2, Search, CheckCircle,
   ChevronRight, Loader2, Crown, Lock, Unlock, Ban, RotateCcw,
+  Key, AlertTriangle, Clock, Copy, RefreshCw,
 } from "lucide-react";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
@@ -26,8 +28,14 @@ interface UserRow {
   lockedUntil:     string | null;
   lastLoginAt:     string | null;
   lastLoginIp:     string | null;
-  lastLoginMethod: string | null;
+  lastLoginMethod:    string | null;
+  isEmergency:        boolean;
+  accessExpiresAt:    string | null;
+  mustChangePassword: boolean;
+  hasLocalPassword:   boolean;
 }
+
+type Handover = { email: string; password: string; mustChange: boolean };
 
 type Confirm = {
   title:   string;
@@ -37,6 +45,28 @@ type Confirm = {
   reason?: boolean;
   run:     (reason: string) => Promise<void>;
 };
+
+const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+function generatePassword(length = 14): string {
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  let out = Array.from(bytes, (b) => PASSWORD_CHARS[b % PASSWORD_CHARS.length]).join("");
+  if (!/[0-9]/.test(out))    out = out.slice(0, -1) + "7";
+  if (!/[A-Za-z]/.test(out)) out = "K" + out.slice(1);
+  return out;
+}
+
+function toLocalInput(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function localInputToIso(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date.toISOString();
+}
 
 function formatWhen(iso: string | null) {
   if (!iso) return "Never";
@@ -63,6 +93,25 @@ export default function UsersTable({
   const [busyId,      setBusyId]      = useState<string | null>(null);
   const [now,         setNow]         = useState<number | null>(null);
   const [toast,       setToast]       = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [emName,        setEmName]        = useState("");
+  const [emEmail,       setEmEmail]       = useState("");
+  const [emRole,        setEmRole]        = useState<Role>("EDITOR");
+  const [emPassword,    setEmPassword]    = useState("");
+  const [emExpiry,      setEmExpiry]      = useState("");
+  const [emMustChange,  setEmMustChange]  = useState(true);
+
+  const [passwordFor,   setPasswordFor]   = useState<UserRow | null>(null);
+  const [pwValue,       setPwValue]       = useState("");
+  const [pwMustChange,  setPwMustChange]  = useState(true);
+
+  const [expiryFor,     setExpiryFor]     = useState<UserRow | null>(null);
+  const [expiryValue,   setExpiryValue]   = useState("");
+
+  const [handover,      setHandover]      = useState<Handover | null>(null);
+  const [copied,        setCopied]        = useState(false);
+  const [formError,     setFormError]     = useState<string | null>(null);
 
   useEffect(() => {
     setNow(Date.now());
@@ -127,6 +176,103 @@ export default function UsersTable({
     });
   };
 
+  const openEmergency = () => {
+    setEmName("");
+    setEmEmail("");
+    setEmRole("EDITOR");
+    setEmPassword(generatePassword());
+    setEmExpiry(toLocalInput(new Date(Date.now() + 48 * 60 * 60 * 1000)));
+    setEmMustChange(true);
+    setFormError(null);
+    setEmergencyOpen(true);
+  };
+
+  const submitEmergency = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    const payload = {
+      email:      emEmail,
+      fullName:   emName,
+      role:       emRole,
+      password:   emPassword,
+      expiresAt:  localInputToIso(emExpiry),
+      mustChange: emMustChange,
+    };
+    startTransition(async () => {
+      try {
+        await createEmergencyAccount(payload);
+        setEmergencyOpen(false);
+        setCopied(false);
+        setHandover({ email: payload.email.toLowerCase().trim(), password: payload.password, mustChange: payload.mustChange });
+      } catch (error: any) {
+        setFormError(error?.message || "Could not create the account");
+      }
+    });
+  };
+
+  const openPassword = (u: UserRow) => {
+    setPwValue(generatePassword());
+    setPwMustChange(u.id !== currentUserId);
+    setFormError(null);
+    setPasswordFor(u);
+  };
+
+  const submitPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordFor) return;
+    setFormError(null);
+    const target     = passwordFor;
+    const password   = pwValue;
+    const mustChange = target.id !== currentUserId && pwMustChange;
+    startTransition(async () => {
+      try {
+        await setLocalPassword(target.id, password, mustChange);
+        setPasswordFor(null);
+        setCopied(false);
+        setHandover({ email: target.email, password, mustChange });
+      } catch (error: any) {
+        setFormError(error?.message || "Could not set the password");
+      }
+    });
+  };
+
+  const openExpiry = (u: UserRow) => {
+    setExpiryValue(u.accessExpiresAt
+      ? toLocalInput(new Date(u.accessExpiresAt))
+      : toLocalInput(new Date(Date.now() + 48 * 60 * 60 * 1000)));
+    setFormError(null);
+    setExpiryFor(u);
+  };
+
+  const submitExpiry = (clear: boolean) => {
+    if (!expiryFor) return;
+    setFormError(null);
+    const target = expiryFor;
+    const iso    = clear ? null : localInputToIso(expiryValue);
+    if (!clear && !iso) { setFormError("Pick a valid date and time."); return; }
+    startTransition(async () => {
+      try {
+        await setAccessExpiry(target.id, iso);
+        setExpiryFor(null);
+        showToast("success", clear ? `Expiry removed for ${target.email}` : `Access for ${target.email} now expires ${formatWhen(iso)}`);
+      } catch (error: any) {
+        setFormError(error?.message || "Could not update expiry");
+      }
+    });
+  };
+
+  const copyHandover = async () => {
+    if (!handover) return;
+    try {
+      await navigator.clipboard.writeText(`Email: ${handover.email}\nPassword: ${handover.password}`);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const isExpired = (u: UserRow) => !!u.accessExpiresAt && now !== null && new Date(u.accessExpiresAt).getTime() <= now;
+
   const isLocked = (u: UserRow) => !!u.lockedUntil && now !== null && new Date(u.lockedUntil).getTime() > now;
 
   const filteredUsers = users.filter((u) =>
@@ -135,6 +281,7 @@ export default function UsersTable({
   );
 
   const masterCount    = users.filter((u) => u.isMasterAdmin).length;
+  const emergencyCount = users.filter((u) => u.isEmergency).length;
   const suspendedCount = users.filter((u) => u.isSuspended).length;
 
   const bg      = dark ? "bg-[#0d1117]"     : "bg-[#f5f2ed]";
@@ -198,20 +345,30 @@ export default function UsersTable({
               Manage who can sign in, their roles, master admin access, suspensions and lockouts.
             </p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            <UserPlus size={16} /> Invite Member
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={openEmergency}
+              className={`flex items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold shadow-sm transition ${
+                dark ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+              }`}
+            >
+              <AlertTriangle size={16} /> Emergency Account
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+              style={{ backgroundColor: accent }}
+            >
+              <UserPlus size={16} /> Invite Member
+            </button>
+          </div>
         </div>
 
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           {[
             { label: "Active Accounts", value: users.length - suspendedCount, icon: <Users size={18} style={{ color: accent }} />,          iconBg: dark ? "bg-blue-500/10"  : "bg-blue-50"  },
             { label: "Master Admins",   value: masterCount,                  icon: <Crown size={18} className="text-amber-500" />,           iconBg: dark ? "bg-amber-500/10" : "bg-amber-50" },
-            { label: "Suspended",       value: suspendedCount,               icon: <ShieldCheck size={18} className="text-rose-500" />,      iconBg: dark ? "bg-rose-500/10"  : "bg-rose-50"  },
+            { label: "Suspended / Emergency", value: `${suspendedCount} / ${emergencyCount}`, icon: <ShieldCheck size={18} className="text-rose-500" />, iconBg: dark ? "bg-rose-500/10" : "bg-rose-50" },
           ].map((s) => (
             <div key={s.label} className={`flex items-center gap-4 rounded-2xl border ${border} ${surface} px-5 py-4 shadow-sm`}>
               <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${s.iconBg}`}>{s.icon}</div>
@@ -280,6 +437,28 @@ export default function UsersTable({
                                   <Ban size={10} /> Suspended
                                 </span>
                               )}
+                              {u.isEmergency && (
+                                <span className={badge(dark ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-red-200 bg-red-50 text-red-700")}>
+                                  <AlertTriangle size={10} /> Emergency
+                                </span>
+                              )}
+                              {u.accessExpiresAt && (
+                                isExpired(u) ? (
+                                  <span className={badge(dark ? "border-slate-500/30 bg-slate-500/10 text-slate-300" : "border-slate-300 bg-slate-100 text-slate-600")}>
+                                    <Clock size={10} /> Expired
+                                  </span>
+                                ) : (
+                                  <span suppressHydrationWarning className={badge(dark ? "border-sky-500/30 bg-sky-500/10 text-sky-300" : "border-sky-200 bg-sky-50 text-sky-700")}>
+                                    <Clock size={10} /> Until {formatWhen(u.accessExpiresAt)}
+                                  </span>
+                                )
+                              )}
+                              {u.hasLocalPassword && (
+                                <span title={u.mustChangePassword ? "Must change password at next sign-in" : "Can sign in with a local password"}
+                                  className={badge(dark ? "border-white/10 bg-white/5 text-slate-300" : "border-[#e7dfd4] bg-[#f5f2ed] text-[#5b564d]")}>
+                                  <Key size={10} /> {u.mustChangePassword ? "Temp password" : "Password"}
+                                </span>
+                              )}
                               {locked && (
                                 <span className={badge(dark ? "border-orange-500/30 bg-orange-500/10 text-orange-300" : "border-orange-200 bg-orange-50 text-orange-700")}>
                                   <Lock size={10} /> Locked until {new Date(u.lockedUntil!).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
@@ -328,6 +507,28 @@ export default function UsersTable({
                             <button disabled={isPending} className={actionBtn("good")}
                               onClick={() => run(u.id, () => unlockUser(u.id), `${u.email} unlocked`)}>
                               <Unlock size={12} /> Unlock
+                            </button>
+                          )}
+
+                          <button disabled={isPending} className={actionBtn("neutral")} onClick={() => openPassword(u)}>
+                            <Key size={12} /> {u.hasLocalPassword ? "Reset Password" : "Set Password"}
+                          </button>
+
+                          {!isMe && u.hasLocalPassword && !u.isEmergency && (
+                            <button disabled={isPending} className={actionBtn("neutral")}
+                              onClick={() => openConfirm({
+                                title: "Remove local password",
+                                body:  `${u.email} will no longer be able to sign in with a password — only through Microsoft or Google. Do this once the identity provider is working again.`,
+                                label: "Remove Password",
+                                run:   async () => { await removeLocalPassword(u.id); showToast("success", `Local password removed for ${u.email}`); },
+                              })}>
+                              Remove Password
+                            </button>
+                          )}
+
+                          {!isMe && (
+                            <button disabled={isPending} className={actionBtn("neutral")} onClick={() => openExpiry(u)}>
+                              <Clock size={12} /> Expiry
                             </button>
                           )}
 
@@ -448,6 +649,206 @@ export default function UsersTable({
         </div>
       )}
 
+      {emergencyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
+            <div className="h-1 bg-[linear-gradient(90deg,#dc2626,#f59e0b)]" />
+            <form onSubmit={submitEmergency} className="space-y-4 p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className={`text-base font-semibold ${txt}`}>Create Emergency Account</h2>
+                  <p className={`mt-1 text-xs ${muted}`}>
+                    A local account for when Microsoft or Google sign-in is down. No email is sent — you hand the details over yourself.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setEmergencyOpen(false)} aria-label="Close"
+                  className={`rounded-lg border ${border} p-1.5 transition ${hoverBg} ${muted}`}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Full Name</label>
+                  <input value={emName} onChange={(e) => setEmName(e.target.value)} placeholder="e.g. Store Emergency"
+                    className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
+                </div>
+                <div>
+                  <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Role</label>
+                  <select value={emRole} onChange={(e) => setEmRole(e.target.value as Role)} aria-label="Role"
+                    className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`}>
+                    <option value="VIEWER">Viewer</option>
+                    <option value="EDITOR">Editor</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Sign-in Email</label>
+                <input type="email" required value={emEmail} onChange={(e) => setEmEmail(e.target.value)}
+                  placeholder="e.g. emergency1@knetgh.com"
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
+              </div>
+
+              <PasswordField dark={dark} value={emPassword} onChange={setEmPassword} input={input} border={border} muted={muted} hoverBg={hoverBg} />
+
+              <div>
+                <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Access Expires (optional)</label>
+                <input type="datetime-local" value={emExpiry} onChange={(e) => setEmExpiry(e.target.value)} aria-label="Access expires"
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
+                <p className={`mt-1 text-[11px] ${muted}`}>Clear it for no expiry. The account stops working automatically at this time.</p>
+              </div>
+
+              <label className={`flex cursor-pointer items-center gap-2 text-xs font-medium ${txt}`}>
+                <input type="checkbox" checked={emMustChange} onChange={(e) => setEmMustChange(e.target.checked)} className="h-4 w-4 accent-[#1d5fa8]" />
+                Require a new password at first sign-in
+              </label>
+
+              {formError && (
+                <div className={dark ? "rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300" : "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"}>
+                  {formError}
+                </div>
+              )}
+
+              <div className={`flex gap-2 border-t ${border} pt-4`}>
+                <button type="button" onClick={() => setEmergencyOpen(false)}
+                  className={`flex-1 rounded-xl border ${border} py-2.5 text-sm font-semibold ${txt} transition ${hoverBg}`}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isPending}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50">
+                  {isPending ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : "Create Account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {passwordFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
+            <div className="h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6)]" />
+            <form onSubmit={submitPassword} className="space-y-4 p-6">
+              <div>
+                <h2 className={`text-base font-semibold ${txt}`}>
+                  {passwordFor.hasLocalPassword ? "Reset Local Password" : "Set Local Password"}
+                </h2>
+                <p className={`mt-1 text-xs ${muted}`}>
+                  {passwordFor.email} will be able to sign in with this password even when Microsoft or Google is unavailable.
+                </p>
+              </div>
+
+              <PasswordField dark={dark} value={pwValue} onChange={setPwValue} input={input} border={border} muted={muted} hoverBg={hoverBg} />
+
+              {passwordFor.id !== currentUserId && (
+                <label className={`flex cursor-pointer items-center gap-2 text-xs font-medium ${txt}`}>
+                  <input type="checkbox" checked={pwMustChange} onChange={(e) => setPwMustChange(e.target.checked)} className="h-4 w-4 accent-[#1d5fa8]" />
+                  Require a new password at next sign-in
+                </label>
+              )}
+
+              {formError && (
+                <div className={dark ? "rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300" : "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"}>
+                  {formError}
+                </div>
+              )}
+
+              <div className={`flex gap-2 border-t ${border} pt-4`}>
+                <button type="button" onClick={() => setPasswordFor(null)}
+                  className={`flex-1 rounded-xl border ${border} py-2.5 text-sm font-semibold ${txt} transition ${hoverBg}`}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isPending}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: accent }}>
+                  {isPending ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {expiryFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
+            <div className="h-1 bg-[linear-gradient(90deg,#0ea5e9,#3b82f6)]" />
+            <div className="space-y-4 p-6">
+              <div>
+                <h2 className={`text-base font-semibold ${txt}`}>Access Expiry</h2>
+                <p className={`mt-1 text-xs ${muted}`}>
+                  {expiryFor.email} will be signed out and blocked automatically at this time.
+                </p>
+              </div>
+              <input type="datetime-local" value={expiryValue} onChange={(e) => setExpiryValue(e.target.value)} aria-label="Expiry"
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition ${input}`} />
+
+              {formError && (
+                <div className={dark ? "rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300" : "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"}>
+                  {formError}
+                </div>
+              )}
+
+              <div className={`flex flex-wrap gap-2 border-t ${border} pt-4`}>
+                <button type="button" onClick={() => setExpiryFor(null)}
+                  className={`rounded-xl border ${border} px-4 py-2.5 text-sm font-semibold ${txt} transition ${hoverBg}`}>
+                  Cancel
+                </button>
+                {expiryFor.accessExpiresAt && (
+                  <button type="button" disabled={isPending} onClick={() => submitExpiry(true)}
+                    className={`rounded-xl border ${border} px-4 py-2.5 text-sm font-semibold ${txt} transition ${hoverBg} disabled:opacity-50`}>
+                    Remove Expiry
+                  </button>
+                )}
+                <button type="button" disabled={isPending} onClick={() => submitExpiry(false)}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: accent }}>
+                  {isPending ? <Loader2 size={14} className="animate-spin" /> : "Save Expiry"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {handover && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
+            <div className="h-1 bg-[linear-gradient(90deg,#10b981,#34d399)]" />
+            <div className="space-y-4 p-6">
+              <div>
+                <h2 className={`text-base font-semibold ${txt}`}>Copy these details now</h2>
+                <p className={`mt-1 text-xs ${muted}`}>
+                  The password is not stored in readable form, so this is the only time it can be shown.
+                </p>
+              </div>
+
+              <div className={`space-y-2 rounded-xl border ${border} ${dark ? "bg-[#0d1117]" : "bg-[#f5f2ed]"} p-4 font-mono text-sm ${txt}`}>
+                <div><span className={muted}>Email:</span> {handover.email}</div>
+                <div><span className={muted}>Password:</span> {handover.password}</div>
+              </div>
+
+              {handover.mustChange && (
+                <p className={`text-xs ${muted}`}>They will be asked to choose their own password the first time they sign in.</p>
+              )}
+
+              <div className={`flex gap-2 border-t ${border} pt-4`}>
+                <button type="button" onClick={copyHandover}
+                  className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl border ${border} py-2.5 text-sm font-semibold ${txt} transition ${hoverBg}`}>
+                  <Copy size={14} /> {copied ? "Copied" : "Copy"}
+                </button>
+                <button type="button" onClick={() => setHandover(null)}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className={`relative w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
@@ -504,6 +905,34 @@ export default function UsersTable({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PasswordField({
+  dark, value, onChange, input, border, muted, hoverBg,
+}: {
+  dark:     boolean;
+  value:    string;
+  onChange: (v: string) => void;
+  input:    string;
+  border:   string;
+  muted:    string;
+  hoverBg:  string;
+}) {
+  return (
+    <div>
+      <label className={`mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] ${muted}`}>Password</label>
+      <div className="flex gap-2">
+        <input value={value} onChange={(e) => onChange(e.target.value)} required minLength={8}
+          autoComplete="off" spellCheck={false}
+          className={`w-full rounded-xl border px-3 py-2.5 font-mono text-sm outline-none transition ${input}`} />
+        <button type="button" onClick={() => onChange(generatePassword())} title="Generate a strong password"
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border ${border} px-3 text-xs font-semibold transition ${hoverBg} ${dark ? "text-slate-300" : "text-[#5b564d]"}`}>
+          <RefreshCw size={12} /> Generate
+        </button>
+      </div>
+      <p className={`mt-1 text-[11px] ${muted}`}>At least 8 characters with a letter and a number.</p>
     </div>
   );
 }

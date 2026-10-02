@@ -3,26 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import {
-  parseInventoryFile,
   generateItemCode,
   generateEntityCodes,
+  getSitePrefix,
   type ValidRow,
 } from "@/lib/inventory-upload";
 import UploadInventoryExcelClient from "./UploadInventoryExcelClient";
-
-async function getSitePrefix(siteId: string, siteName: string): Promise<string> {
-  const sample = await prisma.inventoryItem.findFirst({
-    where:  { inventorySiteId: siteId, itemCode: { not: null } },
-    select: { itemCode: true },
-  });
-
-  if (sample?.itemCode) {
-    const parts = sample.itemCode.split("-");
-    if (parts.length >= 1) return parts[0];
-  }
-
-  return siteName.replace(/\s+/g, "").toUpperCase().slice(0, 4);
-}
 
 async function buildInventoryTemplateDataUrl() {
   const XLSX = await import("xlsx");
@@ -116,7 +102,7 @@ export default async function UploadInventoryExcelPage({
       }
     }
 
-    const sitePrefix = await getSitePrefix(siteId, safeSite.name);
+    const sitePrefix = await getSitePrefix(siteId);
 
     try {
       let importedCount = 0;
@@ -144,6 +130,7 @@ export default async function UploadInventoryExcelPage({
                 reorderLevel:     row.reorderLevel,
                 targetStockLevel: row.targetStockLevel,
                 status:           row.status,
+                condition:        row.condition,
               },
             });
 

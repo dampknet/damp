@@ -8,14 +8,16 @@ import { useThemeMode } from "@/context/ThemeContext";
 type Props = {
   email:         string;
   role:          "ADMIN" | "EDITOR" | "VIEWER";
-  isMasterAdmin: boolean;
-  displayName:   string;
+  isMasterAdmin:    boolean;
+  hasLocalPassword: boolean;
+  displayName:      string;
 };
 
 export default function SettingsMenu({
   email,
   role,
   isMasterAdmin,
+  hasLocalPassword,
   displayName,
 }: Props) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
@@ -161,6 +163,16 @@ export default function SettingsMenu({
             {isDark ? "ON" : "OFF"}
           </div>
         </button>
+
+        {hasLocalPassword && (
+          <>
+            <div className={divider} />
+            <Link href="/auth/change-password" className={itemCls} onClick={closeMenu}>
+              <div className="font-semibold">Change Password</div>
+              <div className={subCls}>Update your local sign-in password</div>
+            </Link>
+          </>
+        )}
 
         {isAdmin && (
           <>

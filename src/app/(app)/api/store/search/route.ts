@@ -39,11 +39,7 @@ export async function GET(req: Request) {
       uncountable: true,
       unit:        true,
       status:      true,
-      instances: {
-        select:  { condition: true },
-        take:    1,
-        orderBy: { createdAt: "asc" },
-      },
+      condition:   true,
       inventorySite: {
         select: { id: true, name: true },
       },
@@ -61,7 +57,7 @@ export async function GET(req: Request) {
     uncountable: item.uncountable,
     unit:        item.unit,
     status:      item.status,
-    condition:   item.instances[0]?.condition ?? "NEW",
+    condition:   item.condition,
     siteId:      item.inventorySite.id,
     siteName:    item.inventorySite.name,
   }));
