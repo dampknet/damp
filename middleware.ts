@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextFetchEvent } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 
@@ -28,6 +28,17 @@ const PATH_PATTERNS = [
   /%2e%2e/i,
 ];
 
+// Paths DAMP never serves; only bots probing for PHP, WordPress or leaked config ask for them.
+const SCANNER_PATTERNS = [
+  /\.(php\d?|phtml|asp|aspx|jsp|cgi)$/i,
+  /^\/(wp-|wordpress|xmlrpc|phpmyadmin|pma|cgi-bin|vendor\/phpunit)/i,
+  /\/\.(env|git|svn|hg|aws|ssh|ds_store)\b/i,
+];
+
+function isScanner(pathname: string) {
+  return SCANNER_PATTERNS.some((p) => p.test(pathname));
+}
+
 function detectThreat(str: string): string | null {
   const decoded = (() => { try { return decodeURIComponent(str); } catch { return str; } })();
   for (const p of XSS_PATTERNS)  if (p.test(decoded)) return "XSS";
@@ -36,20 +47,25 @@ function detectThreat(str: string): string | null {
   return null;
 }
 
-async function logSecurityEvent(
+function logSecurityEvent(
   type: string,
   detail: string,
   req: NextRequest,
   actorEmail?: string
-) {
-  
-  fetch(`${req.nextUrl.origin}/api/security/log`, {
+): Promise<unknown> {
+  const secret = process.env.SECURITY_LOG_SECRET;
+  if (!secret) return Promise.resolve();
+
+  // Post to our own configured URL, never the request's Host header, so the secret can't be sent elsewhere.
+  const origin = (process.env.NEXTAUTH_URL ?? req.nextUrl.origin).replace(/\/$/, "");
+
+  return fetch(`${origin}/api/security/log`, {
     method:  "POST",
-    headers: { "Content-Type": "application/json", "x-internal": "1" },
+    headers: { "Content-Type": "application/json", "x-security-log-secret": secret },
     body:    JSON.stringify({
       type,
       detail,
-      ip:         req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown",
+      ip:         req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? req.headers.get("x-real-ip") ?? "unknown",
       userAgent:  req.headers.get("user-agent") ?? "",
       url:        req.nextUrl.pathname + req.nextUrl.search,
       actorEmail: actorEmail ?? null,
@@ -57,11 +73,16 @@ async function logSecurityEvent(
   }).catch(() => {});
 }
 
-export async function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const res      = NextResponse.next();
   const pathname = req.nextUrl.pathname;
 
-  
+  if (isScanner(pathname)) {
+    event.waitUntil(logSecurityEvent("SCANNER", "Scanner probe", req));
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
+
   if (pathname.startsWith("/auth")) return res;
 
  
@@ -79,12 +100,12 @@ export async function middleware(req: NextRequest) {
   const urlToCheck = req.nextUrl.pathname + req.nextUrl.search;
   const urlThreat  = detectThreat(urlToCheck);
   if (urlThreat) {
-    await logSecurityEvent(
+    event.waitUntil(logSecurityEvent(
       urlThreat,
       `Suspicious URL: ${urlToCheck.slice(0, 300)}`,
       req,
       token?.email as string | undefined
-    );
+    ));
     
     return new NextResponse("Bad Request", { status: 400 });
   }
