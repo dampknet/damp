@@ -59,7 +59,7 @@ export default function AppNavbarClient({
                 isDark ? "text-slate-100" : "text-[#1a1814]"
               }`}
             >
-              KNET - GHANA DTT ASSET MANAGEMENT AND INVENTORY PLATFORM
+              KIMS - KNET INVENTORY MANAGEMENT SYSTEM
             </div>
             <div
               className={`text-[11px] font-medium ${

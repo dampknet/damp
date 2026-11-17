@@ -181,9 +181,9 @@ function LoginFormInner() {
                   ))}
                 </div>
                 <h1 className="text-5xl font-semibold leading-[1.15] tracking-tight text-[#1a1814]">
-                  DTT Asset
+                  KNET Inventory
                   <span className="block pb-1 bg-[linear-gradient(90deg,#1d5fa8_0%,#3b82f6_35%,#c8611a_100%)] bg-clip-text text-transparent">
-                    Management Platform
+                    Management System
                   </span>
                 </h1>
               </div>
@@ -312,7 +312,7 @@ function LoginFormInner() {
               </div>
             </div>
             <p className="mt-4 text-center text-xs font-medium text-[#9c9890]">
-              © 2026 DTT Asset Management Platform. All rights reserved.
+              © 2026 KNET Inventory Management System. All rights reserved.
             </p>
           </div>
         </div>
