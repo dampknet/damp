@@ -9,10 +9,10 @@ import { ArrowLeft, Wifi, Loader2 } from "lucide-react";
 type MqttConfig = {
   id:             string;
   connectionName: string;
-  clusterUrl:     string;
+  clusterUrlHint: string;
   mqttPort:       number;
   websocketPort:  number;
-  username:       string;
+  usernameHint:   string;
   hasPassword:    boolean;
 } | null;
 
@@ -95,7 +95,7 @@ export default function MqttSettingsClient({
               : "mt-5 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700"
             }>
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Configuration saved — {config.connectionName || config.clusterUrl}
+              Configuration saved{config.connectionName ? ` — ${config.connectionName}` : ""}
             </div>
           ) : (
             <div className={dark
@@ -139,10 +139,10 @@ export default function MqttSettingsClient({
                 className={inputCls} />
             </Field>
 
-            <Field label="HiveMQ Cluster URL" dark={dark} required>
-              <input name="clusterUrl" required
-                defaultValue={config?.clusterUrl ?? ""}
-                placeholder="example.s1.eu.hivemq.cloud"
+            <Field label="HiveMQ Cluster URL" dark={dark} required={!config?.clusterUrlHint}>
+              <input name="clusterUrl" required={!config?.clusterUrlHint}
+                autoComplete="off"
+                placeholder={config?.clusterUrlHint || "example.s1.eu.hivemq.cloud"}
                 className={inputCls} />
             </Field>
 
@@ -160,16 +160,16 @@ export default function MqttSettingsClient({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Username" dark={dark} required>
-                <input name="username" required
-                  defaultValue={config?.username ?? ""}
-                  placeholder="admin"
+              <Field label="Username" dark={dark} required={!config?.usernameHint}>
+                <input name="username" required={!config?.usernameHint}
+                  autoComplete="off"
+                  placeholder={config?.usernameHint || "admin"}
                   className={inputCls} />
               </Field>
               <Field label="Password" dark={dark} required={!config?.hasPassword}>
                 <input name="password" type="password" required={!config?.hasPassword}
                   autoComplete="new-password"
-                  placeholder={config?.hasPassword ? "Saved — leave blank to keep" : "••••••••••"}
+                  placeholder={config?.hasPassword ? "••••••••••••" : "Enter the password"}
                   className={inputCls} />
               </Field>
             </div>

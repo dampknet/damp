@@ -254,8 +254,8 @@ export default function DashboardClient({
 
           {/* ✅ Recent Activity — no href on Card to avoid nested <a> */}
           <div className={dark
-            ? "rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl"
-            : "rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
+            ? "min-w-0 rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl"
+            : "min-w-0 rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
           }>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className={dark ? "text-lg font-semibold tracking-tight text-slate-100" : "text-lg font-semibold tracking-tight text-[#1a1814]"}>
@@ -287,11 +287,11 @@ export default function DashboardClient({
                     : "mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#c8611a]"
                   } />
                   <div className="min-w-0 flex-1">
-                    <div className={dark ? "text-sm font-semibold text-slate-200" : "text-sm font-semibold text-[#1a1814]"}>
+                    <div className={dark ? "break-words text-sm font-semibold text-slate-200" : "break-words text-sm font-semibold text-[#1a1814]"}>
                       {item.title}
                     </div>
                     {item.details && (
-                      <div className={dark ? "mt-1 text-sm text-slate-500" : "mt-1 text-sm text-[#6f6a62]"}>
+                      <div className={dark ? "mt-1 break-words text-sm text-slate-500" : "mt-1 break-words text-sm text-[#6f6a62]"}>
                         {item.details}
                       </div>
                     )}

@@ -352,10 +352,10 @@ export default function ActivityClient({
                         {a.typeLabel}
                       </span>
                     </td>
-                    <td className={dark ? "px-5 py-4 text-slate-100" : "px-5 py-4 text-[#1a1814]"}>
-                      <div className="text-sm font-semibold">{a.reason}</div>
+                    <td className={dark ? "min-w-[280px] px-5 py-4 text-slate-100" : "min-w-[280px] px-5 py-4 text-[#1a1814]"}>
+                      <div className="text-sm font-semibold [overflow-wrap:anywhere]">{a.reason}</div>
                       {a.details && (
-                        <div className={dark ? "mt-1 text-xs font-normal text-slate-500" : "mt-1 text-xs font-normal text-[#8b857c]"}>
+                        <div className={dark ? "mt-1 text-xs font-normal text-slate-500 [overflow-wrap:anywhere]" : "mt-1 text-xs font-normal text-[#8b857c] [overflow-wrap:anywhere]"}>
                           {a.details}
                         </div>
                       )}

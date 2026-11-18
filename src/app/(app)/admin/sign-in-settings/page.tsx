@@ -6,6 +6,11 @@ import {
 } from "@/lib/system-config";
 import SignInSettingsClient, { type ProviderView, type MailView } from "./SignInSettingsClient";
 
+// Never send saved IDs to the browser; only a masked hint so admins can tell what is stored.
+function hint(value?: string | null) {
+  return value ? `••••••••${value.slice(-4)}` : "";
+}
+
 export default async function SignInSettingsPage() {
   await requireMasterAdmin();
 
@@ -28,9 +33,9 @@ export default async function SignInSettingsPage() {
       defaultName: PROVIDER_DEFAULT_NAME[key],
       enabled:     row ? row.enabled : !!running,
       displayName: row?.displayName ?? "",
-      clientId:    row?.clientId ?? (running?.source === "env" ? running.clientId : ""),
-      tenantId:    row?.tenantId ?? (running?.source === "env" ? running.tenantId ?? "" : ""),
-      issuer:      row?.issuer   ?? (running?.source === "env" ? running.issuer   ?? "" : ""),
+      clientIdHint: hint(row?.clientId ?? (running?.source === "env" ? running.clientId : "")),
+      tenantIdHint: hint(row?.tenantId ?? (running?.source === "env" ? running.tenantId : "")),
+      issuerHint:   hint(row?.issuer ?? (running?.source === "env" ? running.issuer : "")),
       hasSecret:   !!row?.clientSecretEnc,
       source:      row ? "database" : running ? "env" : "none",
       active:      !!running,
@@ -42,10 +47,10 @@ export default async function SignInSettingsPage() {
 
   const mailView: MailView = {
     enabled:       mailRow ? mailRow.enabled : true,
-    tenantId:      mailRow?.tenantId    ?? (mail?.source === "env" ? mail.tenantId    : ""),
-    clientId:      mailRow?.clientId    ?? (mail?.source === "env" ? mail.clientId    : ""),
-    senderEmail:   mailRow?.senderEmail ?? (mail?.source === "env" ? mail.senderEmail : ""),
-    companyDomain: domain,
+    tenantIdHint:  hint(mailRow?.tenantId ?? (mail?.source === "env" ? mail.tenantId : "")),
+    clientIdHint:  hint(mailRow?.clientId ?? (mail?.source === "env" ? mail.clientId : "")),
+    senderEmailHint:   hint(mailRow?.senderEmail ?? (mail?.source === "env" ? mail.senderEmail : "")),
+    companyDomainHint: hint(domain),
     hasSecret:     !!mailRow?.clientSecretEnc,
     source:        mailRow?.clientId ? "database" : mail ? "env" : "none",
     active:        !!mail,

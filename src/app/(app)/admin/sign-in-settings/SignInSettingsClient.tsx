@@ -13,10 +13,10 @@ export type ProviderView = {
   key:         "azure-ad" | "google" | "oidc";
   defaultName: string;
   enabled:     boolean;
-  displayName: string;
-  clientId:    string;
-  tenantId:    string;
-  issuer:      string;
+  displayName:  string;
+  clientIdHint: string;
+  tenantIdHint: string;
+  issuerHint:   string;
   hasSecret:   boolean;
   source:      "database" | "env" | "none";
   active:      boolean;
@@ -27,10 +27,10 @@ export type ProviderView = {
 
 export type MailView = {
   enabled:       boolean;
-  tenantId:      string;
-  clientId:      string;
-  senderEmail:   string;
-  companyDomain: string;
+  tenantIdHint:  string;
+  clientIdHint:      string;
+  senderEmailHint:   string;
+  companyDomainHint: string;
   hasSecret:     boolean;
   source:        "database" | "env" | "none";
   active:        boolean;
@@ -107,6 +107,14 @@ function ResultBox({ dark, result }: { dark: boolean; result: ActionResult | nul
   return <div className={`rounded-xl border px-3 py-2.5 text-xs ${cls}`}>{result.message}</div>;
 }
 
+// Saved values are never sent to the browser: show the masked hint (dots + last 4) so the
+// admin can see something is stored. Typing a new value replaces it.
+const SECRET_DOTS = "••••••••••••";
+
+function savedPlaceholder(hint: string, empty: string) {
+  return hint || empty;
+}
+
 function CopyField({ dark, value, label }: { dark: boolean; value: string; label: string }) {
   const [copied, setCopied] = useState(false);
   const s = useStyles(dark);
@@ -140,10 +148,10 @@ function ProviderCard({ dark, provider, encryptionReady }: { dark: boolean; prov
   const [form, setForm] = useState<ProviderInput>({
     enabled:      provider.enabled,
     displayName:  provider.displayName,
-    clientId:     provider.clientId,
+    clientId:     "",
     clientSecret: "",
-    tenantId:     provider.tenantId,
-    issuer:       provider.issuer,
+    tenantId:     "",
+    issuer:       "",
   });
   const [result,  setResult]  = useState<ActionResult | null>(null);
   const [pending, start]      = useTransition();
@@ -157,14 +165,12 @@ function ProviderCard({ dark, provider, encryptionReady }: { dark: boolean; prov
     start(async () => {
       const res = kind === "save" ? await saveProvider(provider.key, form) : await testProvider(provider.key, form);
       setResult(res);
-      if (kind === "save" && res.ok) set("clientSecret", "");
+      if (kind === "save" && res.ok) setForm((f) => ({ ...f, clientId: "", tenantId: "", issuer: "", clientSecret: "" }));
       setBusy(null);
     });
   };
 
-  const secretPlaceholder = provider.hasSecret
-    ? "Saved — leave blank to keep the current secret"
-    : provider.source === "env" ? "Currently read from .env — enter a value to store it here" : "Paste the client secret";
+  const secretPlaceholder = provider.hasSecret || provider.source === "env" ? SECRET_DOTS : "Paste the client secret";
 
   return (
     <section className={s.card}>
@@ -193,16 +199,16 @@ function ProviderCard({ dark, provider, encryptionReady }: { dark: boolean; prov
           {provider.key === "azure-ad" && (
             <div>
               <label className={s.label}>Tenant ID</label>
-              <input value={form.tenantId} onChange={(e) => set("tenantId", e.target.value)}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className={`${s.input} font-mono`} />
+              <input value={form.tenantId} onChange={(e) => set("tenantId", e.target.value)} autoComplete="off"
+                placeholder={savedPlaceholder(provider.tenantIdHint, "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")} className={`${s.input} font-mono`} />
             </div>
           )}
 
           {provider.key === "oidc" && (
             <div>
               <label className={s.label}>Issuer URL</label>
-              <input value={form.issuer} onChange={(e) => set("issuer", e.target.value)}
-                placeholder="https://yourcompany.okta.com" className={`${s.input} font-mono`} />
+              <input value={form.issuer} onChange={(e) => set("issuer", e.target.value)} autoComplete="off"
+                placeholder={savedPlaceholder(provider.issuerHint, "https://yourcompany.okta.com")} className={`${s.input} font-mono`} />
             </div>
           )}
         </div>
@@ -211,7 +217,7 @@ function ProviderCard({ dark, provider, encryptionReady }: { dark: boolean; prov
           <div>
             <label className={s.label}>Client ID</label>
             <input value={form.clientId} onChange={(e) => set("clientId", e.target.value)}
-              autoComplete="off" className={`${s.input} font-mono`} />
+              autoComplete="off" placeholder={savedPlaceholder(provider.clientIdHint, "Paste the client ID")} className={`${s.input} font-mono`} />
           </div>
           <div>
             <label className={s.label}>Client secret</label>
@@ -250,11 +256,11 @@ function MailCard({ dark, mail, encryptionReady }: { dark: boolean; mail: MailVi
 
   const [form, setForm] = useState({
     enabled:       mail.enabled,
-    tenantId:      mail.tenantId,
-    clientId:      mail.clientId,
+    tenantId:      "",
+    clientId:      "",
     clientSecret:  "",
-    senderEmail:   mail.senderEmail,
-    companyDomain: mail.companyDomain,
+    senderEmail:   "",
+    companyDomain: "",
   });
   const [result,  setResult] = useState<ActionResult | null>(null);
   const [pending, start]     = useTransition();
@@ -268,7 +274,7 @@ function MailCard({ dark, mail, encryptionReady }: { dark: boolean; mail: MailVi
     start(async () => {
       const res = kind === "save" ? await saveMail(form) : await testMail(kind === "send");
       setResult(res);
-      if (kind === "save" && res.ok) set("clientSecret", "");
+      if (kind === "save" && res.ok) setForm((f) => ({ ...f, tenantId: "", clientId: "", clientSecret: "", senderEmail: "", companyDomain: "" }));
       setBusy(null);
     });
   };
@@ -294,30 +300,32 @@ function MailCard({ dark, mail, encryptionReady }: { dark: boolean; mail: MailVi
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={s.label}>Tenant ID</label>
-            <input value={form.tenantId} onChange={(e) => set("tenantId", e.target.value)} className={`${s.input} font-mono`} />
+            <input value={form.tenantId} onChange={(e) => set("tenantId", e.target.value)} autoComplete="off"
+              placeholder={savedPlaceholder(mail.tenantIdHint, "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")} className={`${s.input} font-mono`} />
           </div>
           <div>
             <label className={s.label}>Client ID</label>
-            <input value={form.clientId} onChange={(e) => set("clientId", e.target.value)} className={`${s.input} font-mono`} />
+            <input value={form.clientId} onChange={(e) => set("clientId", e.target.value)} autoComplete="off"
+              placeholder={savedPlaceholder(mail.clientIdHint, "Paste the client ID")} className={`${s.input} font-mono`} />
           </div>
           <div>
             <label className={s.label}>Client secret</label>
             <input type="password" value={form.clientSecret} onChange={(e) => set("clientSecret", e.target.value)}
               autoComplete="new-password" disabled={!encryptionReady}
-              placeholder={mail.hasSecret ? "Saved — leave blank to keep the current secret" : mail.source === "env" ? "Currently read from .env" : "Paste the client secret"}
+              placeholder={mail.hasSecret || mail.source === "env" ? SECRET_DOTS : "Paste the client secret"}
               className={s.input} />
           </div>
           <div>
             <label className={s.label}>Send from</label>
-            <input type="email" value={form.senderEmail} onChange={(e) => set("senderEmail", e.target.value)}
-              placeholder="noreply@knetgh.com" className={s.input} />
+            <input type="email" value={form.senderEmail} onChange={(e) => set("senderEmail", e.target.value)} autoComplete="off"
+              placeholder={savedPlaceholder(mail.senderEmailHint, "noreply@knetgh.com")} className={s.input} />
           </div>
         </div>
 
         <div className="sm:max-w-xs">
           <label className={s.label}>Company email domain</label>
-          <input value={form.companyDomain} onChange={(e) => set("companyDomain", e.target.value)}
-            placeholder="knetgh.com" className={`${s.input} font-mono`} />
+          <input value={form.companyDomain} onChange={(e) => set("companyDomain", e.target.value)} autoComplete="off"
+            placeholder={savedPlaceholder(mail.companyDomainHint, "knetgh.com")} className={`${s.input} font-mono`} />
           <p className={`mt-1 text-[11px] ${s.muted}`}>Invited users on this domain are told to use single sign-on instead of setting a password.</p>
         </div>
 

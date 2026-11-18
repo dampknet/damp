@@ -42,6 +42,31 @@ async function audit(actor: string, title: string, details: string) {
   }).catch(() => {});
 }
 
+// The page never receives saved values (only a masked hint), so a blank field means
+// "keep what is saved": database first, then the .env fallback.
+function keep(typed: string, saved?: string | null, env?: string) {
+  return typed.trim() || saved || env || "";
+}
+
+function resolveProvider(
+  key: ProviderKey,
+  input: { clientId: string; tenantId: string; issuer: string },
+  saved: { clientId: string | null; tenantId: string | null; issuer: string | null } | null,
+) {
+  const e = process.env;
+  const envClientId = key === "google" ? e.GOOGLE_CLIENT_ID : key === "oidc" ? e.OIDC_CLIENT_ID : e.AZURE_AD_CLIENT_ID;
+  return {
+    clientId: keep(input.clientId, saved?.clientId, envClientId),
+    tenantId: key === "azure-ad" ? keep(input.tenantId, saved?.tenantId, e.AZURE_AD_TENANT_ID) : "",
+    issuer:   key === "oidc" ? keep(input.issuer, saved?.issuer, e.OIDC_ISSUER).replace(/\/$/, "") : "",
+  };
+}
+
+function changedFields(fields: Record<string, string>) {
+  const changed = Object.entries(fields).filter(([, v]) => v.trim()).map(([k]) => k);
+  return changed.length ? `Changed: ${changed.join(", ")}.` : "No values changed.";
+}
+
 function isHttpsUrl(value: string) {
   try {
     return new URL(value).protocol === "https:";
@@ -73,9 +98,7 @@ export async function saveProvider(key: ProviderKey, input: ProviderInput): Prom
     }
 
     const clientSecretEnc = newSecret ? encryptSecret(newSecret) : existing?.clientSecretEnc ?? null;
-    const clientId        = input.clientId.trim();
-    const tenantId        = input.tenantId.trim();
-    const issuer          = input.issuer.trim().replace(/\/$/, "");
+    const { clientId, tenantId, issuer } = resolveProvider(key, input, existing);
 
     if (input.enabled) {
       if (!clientId)        return { ok: false, message: "Client ID is required to turn this provider on." };
@@ -113,7 +136,7 @@ export async function saveProvider(key: ProviderKey, input: ProviderInput): Prom
     await audit(
       me.email,
       `Sign-in provider ${input.enabled ? "enabled" : "disabled"}: ${name}`,
-      `Provider: ${key}. Secret ${newSecret ? "replaced" : "unchanged"}. Changed by ${me.email}.`,
+      `Provider: ${key}. ${changedFields({ "Client ID": input.clientId, "Tenant ID": input.tenantId, "Issuer URL": input.issuer, "Client secret": input.clientSecret })} Changed by ${me.email}.`,
     );
 
     revalidatePath("/admin/sign-in-settings");
@@ -127,15 +150,18 @@ export async function testProvider(key: ProviderKey, input: ProviderInput): Prom
   try {
     await requireMaster();
 
+    const saved = await prisma.authProviderConfig.findUnique({ where: { provider: key } });
+    const ids   = resolveProvider(key, input, saved);
+
     if (key === "azure-ad") {
-      const tenant = input.tenantId.trim();
+      const tenant = ids.tenantId;
       if (!tenant) return { ok: false, message: "Enter the Tenant ID first." };
       await fetchDiscovery(`https://login.microsoftonline.com/${encodeURIComponent(tenant)}/v2.0/.well-known/openid-configuration`);
       return { ok: true, message: "Tenant found. The client secret is only checked when someone signs in, so try a Microsoft sign-in after saving." };
     }
 
     if (key === "google") {
-      const id = input.clientId.trim();
+      const id = ids.clientId;
       if (!id.endsWith(".apps.googleusercontent.com")) {
         return { ok: false, message: "Google client IDs end with .apps.googleusercontent.com — check you copied the right value." };
       }
@@ -143,7 +169,7 @@ export async function testProvider(key: ProviderKey, input: ProviderInput): Prom
       return { ok: true, message: "Client ID format is valid and Google is reachable. Try a Google sign-in after saving." };
     }
 
-    const issuer = input.issuer.trim().replace(/\/$/, "");
+    const issuer = ids.issuer;
     if (!isHttpsUrl(issuer)) return { ok: false, message: "Issuer URL must be a valid https:// address." };
     const doc = await fetchDiscovery(`${issuer}/.well-known/openid-configuration`);
     return { ok: true, message: `Provider found (${doc.issuer}). Try a sign-in after saving to confirm the client ID and secret.` };
@@ -165,19 +191,22 @@ export async function saveMail(input: MailInput): Promise<ActionResult> {
     }
 
     const clientSecretEnc = newSecret ? encryptSecret(newSecret) : existing?.clientSecretEnc ?? null;
-    const senderEmail     = input.senderEmail.trim().toLowerCase();
-    const companyDomain   = input.companyDomain.trim().toLowerCase().replace(/^@/, "");
+    const e               = process.env;
+    const tenantId        = keep(input.tenantId, existing?.tenantId, e.AZURE_AD_TENANT_ID);
+    const clientId        = keep(input.clientId, existing?.clientId, e.AZURE_AD_CLIENT_ID);
+    const senderEmail     = keep(input.senderEmail, existing?.senderEmail, e.GRAPH_SENDER_EMAIL).toLowerCase();
+    const companyDomain   = keep(input.companyDomain, existing?.companyDomain, e.COMPANY_EMAIL_DOMAIN).toLowerCase().replace(/^@/, "");
 
     if (input.enabled) {
-      if (!input.tenantId.trim() || !input.clientId.trim() || !clientSecretEnc || !senderEmail) {
+      if (!tenantId || !clientId || !clientSecretEnc || !senderEmail) {
         return { ok: false, message: "Tenant ID, client ID, client secret and sender email are all required." };
       }
     }
 
     const data = {
       enabled:     input.enabled,
-      tenantId:    input.tenantId.trim() || null,
-      clientId:    input.clientId.trim() || null,
+      tenantId:    tenantId || null,
+      clientId:    clientId || null,
       clientSecretEnc,
       senderEmail: senderEmail   || null,
       companyDomain: companyDomain || null,
@@ -191,7 +220,7 @@ export async function saveMail(input: MailInput): Promise<ActionResult> {
     });
 
     clearConfigCache();
-    await audit(me.email, "Email settings updated", `Sender: ${senderEmail || "—"}. Secret ${newSecret ? "replaced" : "unchanged"}. Changed by ${me.email}.`);
+    await audit(me.email, "Email settings updated", `${changedFields({ "Tenant ID": input.tenantId, "Client ID": input.clientId, "Client secret": input.clientSecret, "Send from": input.senderEmail, "Company domain": input.companyDomain })} Changed by ${me.email}.`);
 
     revalidatePath("/admin/sign-in-settings");
     return { ok: true, message: "Email settings saved." };

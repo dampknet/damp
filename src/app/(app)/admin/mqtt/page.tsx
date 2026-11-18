@@ -18,13 +18,16 @@ export default async function MqttSettingsPage() {
     if (!me?.isMasterAdmin) redirect("/dashboard");
 
     const connectionName = String(formData.get("connectionName") ?? "").trim();
-    const clusterUrl     = String(formData.get("clusterUrl")     ?? "").trim();
+    const newClusterUrl  = String(formData.get("clusterUrl")     ?? "").trim();
     const mqttPort       = Number(formData.get("mqttPort")       ?? 8883);
     const websocketPort  = Number(formData.get("websocketPort")  ?? 8884);
-    const username       = String(formData.get("username")       ?? "").trim();
+    const newUsername    = String(formData.get("username")       ?? "").trim();
     const newPassword    = String(formData.get("password")       ?? "").trim();
 
     const existing = await prisma.mqttConfig.findFirst();
+    // The page only shows masked values, so blank means "keep the saved one".
+    const username   = newUsername   || existing?.username   || "";
+    const clusterUrl = newClusterUrl || existing?.clusterUrl || "";
 
     if (!clusterUrl || !username || (!newPassword && !existing?.password)) {
       redirect("/admin/mqtt?error=Cluster+URL%2C+username+and+password+are+required");
@@ -53,7 +56,7 @@ export default async function MqttSettingsPage() {
         data: {
           type:       "SYSTEM_EVENT",
           title:      "HiveMQ settings updated",
-          details:    `Cluster: ${clusterUrl}. Password ${newPassword ? "replaced" : "unchanged"}. Changed by ${me.email}.`,
+          details:    `Cluster URL ${newClusterUrl ? "replaced" : "unchanged"}. Username ${newUsername ? "replaced" : "unchanged"}. Password ${newPassword ? "replaced" : "unchanged"}. Changed by ${me.email}.`,
           actorEmail: me.email,
           entityType: "SECURITY",
         },
@@ -76,10 +79,10 @@ export default async function MqttSettingsPage() {
       config={config ? {
         id:             config.id,
         connectionName: config.connectionName ?? "",
-        clusterUrl:     config.clusterUrl,
+        clusterUrlHint: config.clusterUrl ? `••••••••${config.clusterUrl.slice(-4)}` : "",
         mqttPort:       config.mqttPort,
         websocketPort:  config.websocketPort,
-        username:       config.username,
+        usernameHint:   config.username ? `••••••••${config.username.slice(-4)}` : "",
         hasPassword:    !!config.password,
       } : null}
       action={saveMqttConfig}
