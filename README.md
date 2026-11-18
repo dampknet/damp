@@ -14,7 +14,7 @@ DAMP is a full-stack web application built for KNET Ghana to manage broadcast si
 |-------|-----------|
 | Framework | Next.js 16 (App Router, Turbopack) |
 | Language | TypeScript |
-| Database ORM | Prisma 6 (binary engine) |
+| Database ORM | Prisma 7 (`@prisma/adapter-pg` driver adapter; DB URL in `prisma.config.ts`) |
 | Database | PostgreSQL 16 (self-hosted on Ubuntu) |
 | Auth | NextAuth.js — Email/Password + Microsoft Entra ID, Google, Generic OIDC (toggled in the app) |
 | Email | Microsoft Graph API (configured in the app) |
@@ -344,7 +344,7 @@ Payload: plain number (e.g. `67.5`)
 
 The MQTT subscriber service (`mqtt-subscriber.js`) runs on a separate server. Its `.env` needs `DATABASE_URL` **and the same `CONFIG_ENCRYPTION_KEY`**:
 ```bash
-npm install mqtt @prisma/client dotenv
+npm install mqtt @prisma/client @prisma/adapter-pg pg dotenv
 node mqtt-subscriber.js
 # Or with PM2 (keep running permanently):
 pm2 start mqtt-subscriber.js --name "damp-fuel"
