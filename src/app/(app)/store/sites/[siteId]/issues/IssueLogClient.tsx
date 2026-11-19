@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import ReceiveReturnDialog from "@/components/ReceiveReturnDialog";
 import { useThemeMode } from "@/context/ThemeContext";
 import { ChevronDown, ChevronUp, Download } from "lucide-react";
 import { ITEM_TYPE_LABEL } from "@/lib/item-types";
@@ -10,6 +11,9 @@ import { ITEM_TYPE_LABEL } from "@/lib/item-types";
 type IssueItem = {
   id:               string;
   quantityTaken:    number;
+  quantityUsed:     number | null;
+  quantityReturned: number;
+  destinationName:  string | null;
   expectedReturnAt: Date | null;
   returnedAt:       Date | null;
   status:           "OPEN" | "RETURNED";
@@ -22,9 +26,17 @@ type IssueItem = {
   };
   lines: {
     id:            string;
+    usedAt:        Date | null;
+    returnedAt:    Date | null;
     assetInstance: { id: string; entityCode: string; condition: string };
   }[];
 };
+
+// Units still out that can come back (not installed, not already returned).
+function outstanding(i: IssueItem) {
+  if (i.lines.length) return i.lines.filter((l) => !l.usedAt && !l.returnedAt).length;
+  return Math.max(0, i.quantityTaken - (i.quantityUsed ?? 0) - i.quantityReturned);
+}
 
 type Trip = {
   groupId:        string;
@@ -47,14 +59,16 @@ function conditionBadge(c: string, dark: boolean) {
 }
 
 function TripCard({
-  dark, trip, siteId, canEdit,
+  dark, trip, siteId, canEdit, onReturn, startOpen,
 }: {
-  dark:    boolean;
-  trip:    Trip;
-  siteId:  string;
-  canEdit: boolean;
+  dark:      boolean;
+  trip:      Trip;
+  siteId:    string;
+  canEdit:   boolean;
+  onReturn:  (issueId: string) => void;
+  startOpen: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(startOpen);
   const [downloading, setDownloading] = useState(false);
 
   const isOpen       = trip.status === "OPEN";
@@ -191,30 +205,33 @@ function TripCard({
 
                   <div className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
                     Qty: {item.quantityTaken}{item.inventoryItem.unit ? ` ${item.inventoryItem.unit}` : ""}
+                    {item.quantityUsed != null && ` · used ${item.quantityUsed}`}
+                    {item.quantityReturned > 0 && ` · returned ${item.quantityReturned}`}
+                    {item.destinationName && ` · to ${item.destinationName}`}
                     {isReturnable
                       ? ` · Returnable`
                       : ` · Non-returnable`}
-                    {item.returnedAt && ` · Returned ${new Date(item.returnedAt).toLocaleDateString()}`}
+                    {item.returnedAt && isReturnable && ` · Closed ${new Date(item.returnedAt).toLocaleDateString()}`}
                   </div>
                 </div>
 
-                {canEdit && !isItemReturned && isReturnable && (
-                  <Link
-                    href={`/store/sites/${siteId}/issues/${item.id}/return`}
+                {/* Any item with units still out can be returned — ticked returnable or not. */}
+                {canEdit && outstanding(item) > 0 && (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onReturn(item.id); }}
                     className={dark
                       ? "shrink-0 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20"
                       : "shrink-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                     }
                   >
-                    Return
-                  </Link>
+                    {isReturnable && !isItemReturned ? "Return" : "Return unused"}
+                  </button>
                 )}
-                {!isItemReturned && !isReturnable && (
+                {!isItemReturned && !isReturnable && !(canEdit && outstanding(item) > 0) && (
                   <span className={dark ? "shrink-0 text-xs text-slate-600" : "shrink-0 text-xs text-[#b0a79b]"}>
                     Non-returnable
                   </span>
                 )}
-                {isItemReturned && (
+                {isItemReturned && isReturnable && (
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className={dark ? "text-xs font-semibold text-emerald-400" : "text-xs font-semibold text-emerald-700"}>
                       ✓ Closed
@@ -268,7 +285,12 @@ export default function IssueLogClient({
   const { mode }     = useThemeMode();
   const dark         = mode === "dark";
   const searchParams = useSearchParams();
-  const success      = searchParams.get("success");
+  const router       = useRouter();
+  // ?return=<issueId> opens the return window straight away (links from older pages use this).
+  const [returnId, setReturnId] = useState<string | null>(searchParams.get("return"));
+  const [notice,   setNotice]   = useState<string | null>(searchParams.get("success"));
+  const success = notice;
+  const openTripOf = searchParams.get("return");
 
   return (
     <div className={dark
@@ -385,10 +407,18 @@ export default function IssueLogClient({
               trip={trip}
               siteId={site.id}
               canEdit={canEdit}
+              onReturn={(id) => { setNotice(null); setReturnId(id); }}
+              startOpen={!!openTripOf && trip.items.some((i) => i.id === openTripOf)}
             />
           ))}
         </div>
       </div>
+
+      {returnId && canEdit && (
+        <ReceiveReturnDialog issueId={returnId} dark={dark}
+          onClose={() => setReturnId(null)}
+          onDone={(msg) => { setReturnId(null); setNotice(msg); router.refresh(); }} />
+      )}
     </div>
   );
 }

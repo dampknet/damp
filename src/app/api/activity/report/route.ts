@@ -1,350 +1,114 @@
 import { NextResponse } from "next/server";
+import { Document, Packer, Paragraph, Table, AlignmentType } from "docx";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
-import { SECURITY_EVENT_WHERE } from "@/lib/security-events";
-import {
-  Document, Packer, Paragraph, Table, TableRow, TableCell,
-  TextRun, ImageRun, WidthType, AlignmentType, HeadingLevel,
-  ShadingType, HeightRule, VerticalAlign,
-} from "docx";
-import fs from "fs";
-import path from "path";
+import { getCurrentProfile, isAdminProfile } from "@/lib/auth";
+import { resolvePeriod } from "@/lib/reports/period";
+import { PAGE_MARGIN, reportHeader, text, gap, pageBreak } from "@/lib/reports/docx";
+import { activitySection, warehouseSection, siteStoresSection } from "@/lib/reports/sections";
 
-function getLogo(): Buffer | null {
-  try {
-    const p = path.join(process.cwd(), "public", "knet-logo.jpg");
-    if (fs.existsSync(p)) return fs.readFileSync(p);
-  } catch {}
-  return null;
-}
+export const maxDuration = 60;
 
-type Period = "TODAY" | "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH" | "THIS_YEAR";
+const TYPES = {
+  FULL:       "Full System Report",
+  WAREHOUSES: "Warehouse Report",
+  SITES:      "Site Stores Report",
+  ACTIVITY:   "Activity & Sign-ins Report",
+} as const;
+type ReportType = keyof typeof TYPES;
 
-function getPeriodRange(period: Period): { start: Date; end: Date; label: string } {
-  const now   = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  if (period === "TODAY") {
-    return {
-      start: today,
-      end:   new Date(today.getTime() + 86400000 - 1),
-      label: `Today (${today.toLocaleDateString("en-GB")})`,
-    };
-  }
-  if (period === "THIS_WEEK") {
-    const day  = today.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-    const mon  = new Date(today.getTime() - diff * 86400000);
-    const sun  = new Date(mon.getTime() + 6 * 86400000 + 86400000 - 1);
-    return { start: mon, end: sun, label: `This Week (${mon.toLocaleDateString("en-GB")} – ${sun.toLocaleDateString("en-GB")})` };
-  }
-  if (period === "LAST_WEEK") {
-    const day     = today.getDay();
-    const diff    = day === 0 ? 6 : day - 1;
-    const thisMon = new Date(today.getTime() - diff * 86400000);
-    const lastMon = new Date(thisMon.getTime() - 7 * 86400000);
-    const lastSun = new Date(thisMon.getTime() - 1);
-    return { start: lastMon, end: lastSun, label: `Last Week (${lastMon.toLocaleDateString("en-GB")} – ${lastSun.toLocaleDateString("en-GB")})` };
-  }
-  if (period === "THIS_MONTH") {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    return { start, end, label: start.toLocaleString("en-GB", { month: "long", year: "numeric" }) };
-  }
-  const start = new Date(now.getFullYear(), 0, 1);
-  const end   = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-  return { start, end, label: `Year ${now.getFullYear()}` };
-}
-
-function mkCell(text: string, opts: {
-  width?: number; bold?: boolean; fill?: string; size?: number;
-  align?: (typeof AlignmentType)[keyof typeof AlignmentType];
-} = {}) {
-  return new TableCell({
-    width:   opts.width ? { size: opts.width, type: WidthType.DXA } : undefined,
-    shading: opts.fill  ? { type: ShadingType.CLEAR, color: "auto", fill: opts.fill } : undefined,
-    verticalAlign: VerticalAlign.CENTER,
-    children: [new Paragraph({
-      alignment: opts.align ?? AlignmentType.LEFT,
-      children:  [new TextRun({ text: text ?? "", bold: opts.bold ?? false, size: opts.size ?? 18, font: "Arial" })],
-    })],
-  });
-}
-
+// POST /api/activity/report
+// { type, period, from?, to?, warehouseId?: "ALL"|id, siteScope?: "ALL"|"OTHER"|siteId }
 export async function POST(req: Request) {
   try {
     const profile = await getCurrentProfile();
     if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isAdminProfile(profile)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const isMasterAdmin = profile.isMasterAdmin;
+    const body = await req.json().catch(() => ({}));
+    const type = (Object.keys(TYPES).includes(body.type) ? body.type : "FULL") as ReportType;
 
-    const body    = await req.json();
-    const period  = (body.period  ?? "THIS_MONTH") as Period;
-    const siteId  = (body.siteId  ?? "ALL") as string;
+    const period = resolvePeriod(String(body.period ?? "THIS_MONTH"), body.from, body.to);
+    if ("error" in period) return NextResponse.json({ error: period.error }, { status: 400 });
 
-    const { start, end, label: periodLabel } = getPeriodRange(period);
+    const ctx = { start: period.start, end: period.end, isMasterAdmin: profile.isMasterAdmin };
 
-    const inventorySites = await prisma.inventorySite.findMany({
-      select: { id: true, name: true },
-    });
-    const siteMap  = Object.fromEntries(inventorySites.map((s) => [s.id, s.name]));
-    const siteName = siteId === "ALL" ? "All Sites" : (siteMap[siteId] ?? siteId);
+    // Scope: a single warehouse / site, or everything.
+    const warehouseId = type === "WAREHOUSES" && body.warehouseId && body.warehouseId !== "ALL" ? String(body.warehouseId) : null;
+    const siteScope   = type === "SITES" && body.siteScope ? String(body.siteScope) : "ALL";
 
-    const [logs, issues, restocks] = await Promise.all([
-      prisma.activityLog.findMany({
-        where: {
-          createdAt: { gte: start, lte: end },
-          ...(isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE }),
-        },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.warehouseIssue.findMany({
-        where: {
-          takenAt: { gte: start, lte: end },
-          ...(siteId !== "ALL" ? { inventorySiteId: siteId } : {}),
-        },
-        select: {
-          id:            true,
-          takenBy:       true,
-          takenAt:       true,
-          quantityTaken: true,
-          status:        true,
-          authorizedBy:  true,
-          purpose:       true,
-          inventoryItem: { select: { name: true, itemType: true, unit: true } },
-          inventorySite: { select: { name: true } },
-        },
-        orderBy: { takenAt: "asc" },
-      }),
-      prisma.inventoryRestock.findMany({
-        where: {
-          dateReceived: { gte: start, lte: end },
-          ...(siteId !== "ALL" ? { inventorySiteId: siteId } : {}),
-        },
-        select: {
-          quantityAdded: true,
-          dateReceived:  true,
-          supplier:      true,
-          receivedBy:    true,
-          note:          true,
-          inventoryItem: { select: { name: true, itemCode: true, unit: true } },
-          inventorySite: { select: { name: true } },
-        },
-        orderBy: { dateReceived: "asc" },
-      }),
-    ]);
-
-    const loginLogs = logs.filter((l) =>
-      l.type === "USER_LOGIN" &&
-      l.entityType !== "SECURITY" &&
-      !l.title.toLowerCase().includes("failed")
-    );
-    const loginsByUser: Record<string, number> = {};
-    for (const l of loginLogs) {
-      const email = l.actorEmail ?? "Unknown";
-      loginsByUser[email] = (loginsByUser[email] ?? 0) + 1;
+    let scopeLabel = "All warehouses, sites and places";
+    if (type === "WAREHOUSES") {
+      const w = warehouseId ? await prisma.inventorySite.findUnique({ where: { id: warehouseId }, select: { name: true } }) : null;
+      if (warehouseId && !w) return NextResponse.json({ error: "Warehouse not found" }, { status: 400 });
+      scopeLabel = w ? `Warehouse: ${w.name}` : "All warehouses";
+    } else if (type === "SITES") {
+      if (siteScope === "OTHER") scopeLabel = "Other places (not one of the 42 sites)";
+      else if (siteScope !== "ALL") {
+        const s = await prisma.site.findUnique({ where: { id: siteScope }, select: { name: true } });
+        if (!s) return NextResponse.json({ error: "Site not found" }, { status: 400 });
+        scopeLabel = `Site: ${s.name}`;
+      } else scopeLabel = "All 42 sites and other places";
+    } else if (type === "ACTIVITY") {
+      scopeLabel = profile.isMasterAdmin ? "Whole system, including sign-ins and security" : "Whole system (sign-ins and security are master-admin only)";
     }
 
-    const totalIssued     = issues.length;
-    const totalReturned   = issues.filter((i) => i.status === "RETURNED").length;
-    const totalRestocks   = restocks.length;
-    const totalLogins     = loginLogs.length;
-    const totalActivities = logs.length;
+    const blocks: (Paragraph | Table)[] = [];
+    if (type === "FULL") {
+      blocks.push(...await siteStoresSection(ctx, "ALL"), pageBreak());
+      blocks.push(...await warehouseSection(ctx, null), pageBreak());
+      blocks.push(...await activitySection(ctx));
+    } else if (type === "SITES") {
+      blocks.push(...await siteStoresSection(ctx, siteScope));
+    } else if (type === "WAREHOUSES") {
+      blocks.push(...await warehouseSection(ctx, warehouseId));
+    } else {
+      blocks.push(...await activitySection(ctx));
+    }
 
     const generatedAt = new Date().toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" });
-    const userName    = profile.fullName ?? profile.email ?? "Admin";
-    const logo        = getLogo();
-
-    const COL  = [500, 2200, 1800, 1400, 3460]; // issues table
-    const COL2 = [500, 3500, 1500, 3860];        // login table
-    const COL3 = [500, 2000, 1600, 1000, 1200, 3060]; // restocks table
+    const userName    = profile.fullName || profile.email;
 
     const doc = new Document({
+      creator: "KIMS",
+      title:   `${TYPES[type]} — ${period.label}`,
       sections: [{
-        properties: { page: { margin: { top: 900, bottom: 900, left: 1000, right: 1000 } } },
+        properties: { page: { margin: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN } } },
         children: [
-
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: logo
-              ? [new ImageRun({ data: logo, type: "jpg", transformation: { width: 80, height: 65 } })]
-              : [new TextRun({ text: "KNET", bold: true, size: 36, font: "Arial" })],
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: "KNET — GHANA DTT ASSET MANAGEMENT PLATFORM", bold: true, size: 26, font: "Arial" })],
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: "ACTIVITY REPORT", bold: true, size: 32, font: "Arial" })],
-          }),
-          new Paragraph({ children: [new TextRun({ text: "" })] }),
-
-          new Paragraph({ children: [new TextRun({ text: `Hello, ${userName}`, size: 22, font: "Arial" })] }),
-          new Paragraph({
-            children: [new TextRun({ text: `This is the ${periodLabel} report for ${siteName}.`, size: 22, font: "Arial" })],
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: `Generated: ${generatedAt}`, size: 18, font: "Arial", color: "666666" })],
-          }),
-          new Paragraph({ children: [new TextRun({ text: "" })] }),
-
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Summary", bold: true, size: 26, font: "Arial" })],
-          }),
-          new Table({
-            width: { size: 9360, type: WidthType.DXA },
-            columnWidths: [3120, 3120, 3120],
-            rows: [
-              new TableRow({ children: [
-                mkCell("Metric",  { width: 3120, bold: true, fill: "1D5FA8", size: 20 }),
-                mkCell("Count",   { width: 3120, bold: true, fill: "1D5FA8", size: 20 }),
-                mkCell("Notes",   { width: 3120, bold: true, fill: "1D5FA8", size: 20 }),
-              ]}),
-              ...[
-                ["Total System Activity", String(totalActivities), "All logged events"],
-                ...(isMasterAdmin ? [["User Logins", String(totalLogins), "Successful sign-ins"]] : []),
-                ["Items Issued",          String(totalIssued),     "Warehouse issues created"],
-                ["Items Returned",        String(totalReturned),   "Warehouse returns processed"],
-                ["Restock Operations",    String(totalRestocks),   "Items restocked to inventory"],
-              ].map(([metric, count, note]) =>
-                new TableRow({ children: [
-                  mkCell(metric, { width: 3120 }),
-                  mkCell(count,  { width: 3120, bold: true }),
-                  mkCell(note,   { width: 3120, size: 16 }),
-                ]})
-              ),
+          ...reportHeader({
+            title: TYPES[type],
+            lines: [
+              `Period: ${period.label}`,
+              `Covers: ${scopeLabel}`,
+              `Prepared for ${userName} · Generated ${generatedAt}`,
             ],
           }),
-          new Paragraph({ children: [new TextRun({ text: "" })] }),
-
-          ...(isMasterAdmin ? [
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "User Login Summary", bold: true, size: 26, font: "Arial" })],
-          }),
-          ...(Object.keys(loginsByUser).length === 0
-            ? [new Paragraph({ children: [new TextRun({ text: "No logins recorded in this period.", size: 18, font: "Arial", color: "666666" })] })]
-            : [new Table({
-                width: { size: 9360, type: WidthType.DXA },
-                columnWidths: COL2,
-                rows: [
-                  new TableRow({ children: [
-                    mkCell("No",     { width: COL2[0], bold: true, fill: "D9D9D9" }),
-                    mkCell("User",   { width: COL2[1], bold: true, fill: "D9D9D9" }),
-                    mkCell("Logins", { width: COL2[2], bold: true, fill: "D9D9D9" }),
-                    mkCell("",       { width: COL2[3], fill: "D9D9D9" }),
-                  ]}),
-                  ...Object.entries(loginsByUser).map(([email, count], i) =>
-                    new TableRow({ children: [
-                      mkCell(String(i + 1), { width: COL2[0] }),
-                      mkCell(email,          { width: COL2[1] }),
-                      mkCell(String(count),  { width: COL2[2], bold: true }),
-                      mkCell("",             { width: COL2[3] }),
-                    ]})
-                  ),
-                ],
-              })]),
-          new Paragraph({ children: [new TextRun({ text: "" })] }),
-          ] : []),
-
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Items Issued", bold: true, size: 26, font: "Arial" })],
-          }),
-          ...(issues.length === 0
-            ? [new Paragraph({ children: [new TextRun({ text: "No items were issued in this period.", size: 18, font: "Arial", color: "666666" })] })]
-            : [new Table({
-                width: { size: 9360, type: WidthType.DXA },
-                columnWidths: COL,
-                rows: [
-                  new TableRow({ children: [
-                    mkCell("No",                     { width: COL[0], bold: true, fill: "D9D9D9" }),
-                    mkCell("Item",                   { width: COL[1], bold: true, fill: "D9D9D9" }),
-                    mkCell("Site",                   { width: COL[2], bold: true, fill: "D9D9D9" }),
-                    mkCell("Qty",                    { width: COL[3], bold: true, fill: "D9D9D9" }),
-                    mkCell("Taken By / Purpose",     { width: COL[4], bold: true, fill: "D9D9D9" }),
-                  ]}),
-                  ...issues.map((issue, i) =>
-                    new TableRow({
-                      height: { value: 400, rule: HeightRule.ATLEAST },
-                      children: [
-                        mkCell(String(i + 1),                           { width: COL[0] }),
-                        mkCell(issue.inventoryItem.name,                 { width: COL[1] }),
-                        mkCell(issue.inventorySite.name,                 { width: COL[2] }),
-                        mkCell(`${issue.quantityTaken} ${issue.inventoryItem.unit ?? "pcs"}`, { width: COL[3] }),
-                        mkCell(`${issue.takenBy} — ${issue.purpose}`,   { width: COL[4], size: 16 }),
-                      ],
-                    })
-                  ),
-                ],
-              })]),
-          new Paragraph({ children: [new TextRun({ text: "" })] }),
-
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Restock Operations", bold: true, size: 26, font: "Arial" })],
-          }),
-          ...(restocks.length === 0
-            ? [new Paragraph({ children: [new TextRun({ text: "No restock operations in this period.", size: 18, font: "Arial", color: "666666" })] })]
-            : [new Table({
-                width: { size: 9360, type: WidthType.DXA },
-                columnWidths: COL3,
-                rows: [
-                  new TableRow({ children: [
-                    mkCell("No",          { width: COL3[0], bold: true, fill: "D9D9D9" }),
-                    mkCell("Item",        { width: COL3[1], bold: true, fill: "D9D9D9" }),
-                    mkCell("Site",        { width: COL3[2], bold: true, fill: "D9D9D9" }),
-                    mkCell("Qty",         { width: COL3[3], bold: true, fill: "D9D9D9" }),
-                    mkCell("Date",        { width: COL3[4], bold: true, fill: "D9D9D9" }),
-                    mkCell("Supplier / Received By", { width: COL3[5], bold: true, fill: "D9D9D9" }),
-                  ]}),
-                  ...restocks.map((r, i) =>
-                    new TableRow({
-                      height: { value: 400, rule: HeightRule.ATLEAST },
-                      children: [
-                        mkCell(String(i + 1),                                     { width: COL3[0] }),
-                        mkCell(r.inventoryItem.name,                              { width: COL3[1] }),
-                        mkCell(r.inventorySite.name,                              { width: COL3[2] }),
-                        mkCell(`${r.quantityAdded} ${r.inventoryItem.unit ?? "pcs"}`, { width: COL3[3] }),
-                        mkCell(new Date(r.dateReceived).toLocaleDateString("en-GB"), { width: COL3[4], size: 16 }),
-                        mkCell(`${r.supplier ?? "—"} / ${r.receivedBy ?? "—"}`,   { width: COL3[5], size: 16 }),
-                      ],
-                    })
-                  ),
-                ],
-              })]),
-          new Paragraph({ children: [new TextRun({ text: "" })] }),
-
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: `— End of Report — Generated by DAMP on ${generatedAt}`, size: 16, font: "Arial", color: "999999" })],
-          }),
+          ...blocks,
+          gap(),
+          text(`— End of report — KIMS · ${generatedAt}`, { size: 16, color: "999999", align: AlignmentType.CENTER }),
         ],
       }],
     });
 
     const buffer   = await Packer.toBuffer(doc);
-    const filename = `DAMP-Report-${period}-${siteName.replace(/\s+/g, "-")}.docx`;
+    const filename = `KIMS-${TYPES[type].replace(/[^A-Za-z]+/g, "-").replace(/-+$/, "")}-${period.slug}.docx`;
 
     await prisma.activityLog.create({
       data: {
         type:       "SYSTEM_EVENT",
-        title:      `Report generated: ${periodLabel} — ${siteName}`,
-        details:    `Downloaded by ${profile.email}. File: ${filename}`,
+        title:      `Report generated: ${TYPES[type]} — ${period.label}`,
+        details:    `${scopeLabel}. Downloaded by ${profile.email}. File: ${filename}`,
         actorEmail: profile.email,
         entityType: "SYSTEM",
       },
-    });
+    }).catch(() => {});
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type":        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "X-Report-Filename":   filename,
       },
     });
-
   } catch (error) {
     console.error("[REPORT_GENERATE]", error);
     return NextResponse.json({ error: "Report generation failed" }, { status: 500 });

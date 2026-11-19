@@ -46,7 +46,7 @@ function mkCell(text: string, opts: {
 function buildDoc(data: {
   requesterName: string;
   date:          string;
-  items: { description: string; itemCode: string; quantity: number; condition: string }[];
+  items: { description: string; itemCode: string; quantity: number; condition: string; location: string }[];
 }) {
   const logo = getLogo();
 
@@ -116,7 +116,7 @@ function buildDoc(data: {
         height: { value: 440, rule: HeightRule.ATLEAST },
         children: [
           mkCell(it?.description ?? "", { width: COL[0] }),
-          mkCell("",                     { width: COL[1] }),
+          mkCell(it?.location    ?? "", { width: COL[1] }),
           mkCell(it?.itemCode    ?? "", { width: COL[2] }),
           mkCell(it?.quantity != null ? String(it.quantity) : "", { width: COL[3], align: AlignmentType.CENTER }),
           mkCell(it?.condition   ?? "", { width: COL[4] }),
@@ -168,6 +168,7 @@ export async function GET(req: Request) {
       takenBy:          true,
       takenAt:          true,
       conditionAtIssue: true,   // ✅
+      destinationName:  true,
       inventoryItem: {
         select: { name: true, itemCode: true, unit: true },
       },
@@ -186,7 +187,7 @@ export async function GET(req: Request) {
   const first = issues[0];
 
   // Build one row per entity code (tracked) or one row per issue (bulk)
-  const rows: { description: string; itemCode: string; quantity: number; condition: string }[] = [];
+  const rows: { description: string; itemCode: string; quantity: number; condition: string; location: string }[] = [];
 
   for (const issue of issues) {
     if (issue.lines.length > 0) {
@@ -197,6 +198,7 @@ export async function GET(req: Request) {
           itemCode:    line.assetInstance.entityCode,
           quantity:    1,
           condition:   line.assetInstance.condition,
+          location:    issue.destinationName ?? "",
         });
       }
     } else {
@@ -206,6 +208,7 @@ export async function GET(req: Request) {
         itemCode:    issue.inventoryItem.itemCode ?? "",
         quantity:    issue.quantityTaken,
         condition:   issue.conditionAtIssue ?? "",
+        location:    issue.destinationName ?? "",
       });
     }
   }

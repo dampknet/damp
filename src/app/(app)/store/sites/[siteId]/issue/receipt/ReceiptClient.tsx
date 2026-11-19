@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { Download, ArrowLeft, Printer, Trash2, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { Download, ArrowLeft, Printer, Trash2, CheckCircle2, Loader2, AlertTriangle, CalendarClock, X } from "lucide-react";
+import { changeIssueDate } from "./actions";
 
 type ReceiptRow = {
   issueId:     string;
@@ -13,11 +14,12 @@ type ReceiptRow = {
   quantity:    number;
   condition:   string;
   returnable:  boolean;
+  destination: string;          // empty for issues made before destinations existed
 };
 
 export default function ReceiptClient({
   site, groupId, requesterName, requesterContact,
-  authorizedBy, purpose, date, rows,
+  authorizedBy, purpose, date, dateInput, enteredOn, canEditDate, rows,
 }: {
   site:             { id: string; name: string };
   groupId:          string;
@@ -26,11 +28,31 @@ export default function ReceiptClient({
   authorizedBy:     string;
   purpose:          string;
   date:             string;
+  dateInput:        string;          // YYYY-MM-DD of the issue date
+  enteredOn:        string | null;   // set when back-dated: the day it was entered in the system
+  canEditDate:      boolean;         // master admins only
   rows:             ReceiptRow[];
 }) {
   const { mode } = useThemeMode();
   const dark      = mode === "dark";
   const router    = useRouter();
+
+  const [dateOpen,  setDateOpen]  = useState(false);
+  const [newDate,   setNewDate]   = useState(dateInput);
+  const [dateMsg,   setDateMsg]   = useState<{ ok: boolean; text: string } | null>(null);
+  const [datePending, startDate]  = useTransition();
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD for the date input "max"
+
+  // The issue went through: the saved draft on the issue page is no longer needed.
+  useEffect(() => {
+    try { localStorage.removeItem(`kims:issue-draft:${site.id}`); } catch {}
+  }, [site.id]);
+
+  const saveDate = () => startDate(async () => {
+    const res = await changeIssueDate(groupId, newDate);
+    setDateMsg({ ok: res.ok, text: res.message });
+    if (res.ok) { setDateOpen(false); router.refresh(); }
+  });
 
   const [downloading,   setDownloading]   = useState(false);
   const [confirming,    setConfirming]    = useState(false);
@@ -115,7 +137,18 @@ export default function ReceiptClient({
             <ArrowLeft size={16} /> Back to {site.name} Inventory
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {canEditDate && (
+              <button onClick={() => { setNewDate(dateInput); setDateMsg(null); setDateOpen(true); }}
+                className={dark
+                  ? "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                  : "inline-flex items-center gap-2 rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:bg-[#f5f2ed]"
+                }
+              >
+                <CalendarClock size={16} /> Change issue date
+              </button>
+            )}
+
             <button onClick={() => window.print()}
               className={dark
                 ? "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
@@ -148,6 +181,14 @@ export default function ReceiptClient({
             )}
           </div>
         </div>
+
+        {dateMsg && (
+          <div className={`no-print mb-4 rounded-2xl border px-4 py-3 text-sm ${
+            dateMsg.ok
+              ? dark ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : dark ? "border-red-500/20 bg-red-500/10 text-red-300"             : "border-red-200 bg-red-50 text-red-700"
+          }`}>{dateMsg.text}</div>
+        )}
 
         {/* ── HINT ── */}
         <div className={dark
@@ -189,7 +230,14 @@ export default function ReceiptClient({
               dark ? "border-white/10 bg-white/5" : "border-[#e7dfd4] bg-[#fffdf9]"
             }`}>
               <InfoRow dark={dark} label="NAME"          value={requesterName} />
-              <InfoRow dark={dark} label="DATE"          value={date} />
+              <div>
+                <InfoRow dark={dark} label="DATE" value={date} />
+                {enteredOn && (
+                  <div className={`no-print mt-1 text-[11px] font-medium ${dark ? "text-amber-300" : "text-amber-700"}`}>
+                    Back-dated · entered in system on {enteredOn}
+                  </div>
+                )}
+              </div>
               <InfoRow dark={dark} label="CONTACT"       value={requesterContact || "—"} />
               <InfoRow dark={dark} label="AUTHORIZED BY" value={authorizedBy || "—"} />
               <div className="col-span-2">
@@ -244,9 +292,15 @@ export default function ReceiptClient({
                           {row.returnable ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className={dark ? "px-4 py-3 text-slate-600" : "px-4 py-3 text-[#b0a79b]"}>
-                        ___________
-                      </td>
+                      {row.destination ? (
+                        <td className={dark ? "px-4 py-3 font-medium text-slate-200" : "px-4 py-3 font-medium text-[#1a1814]"}>
+                          {row.destination}
+                        </td>
+                      ) : (
+                        <td className={dark ? "px-4 py-3 text-slate-600" : "px-4 py-3 text-[#b0a79b]"}>
+                          ___________
+                        </td>
+                      )}
                       {/* ✅ Delete button — no-print */}
                       <td className="px-3 py-3 no-print">
                         <button
@@ -337,6 +391,67 @@ export default function ReceiptClient({
                     : "rounded-xl border border-[#ddd5c9] bg-white px-5 py-2.5 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
                   }>
                   Go Back
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CHANGE ISSUE DATE (master admin) ── */}
+      {dateOpen && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.5)" }}
+          onClick={(e) => { if (e.target === e.currentTarget && !datePending) setDateOpen(false); }}
+        >
+          <div className={dark
+            ? "w-full max-w-sm overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1923] shadow-2xl"
+            : "w-full max-w-sm overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white shadow-2xl"
+          }>
+            <div className="h-1 bg-[linear-gradient(90deg,#b08b2c,#f59e0b)]" />
+            <div className="p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className={dark ? "text-base font-bold text-slate-100" : "text-base font-bold text-[#1a1814]"}>Change issue date</div>
+                  <div className={dark ? "mt-1 text-xs text-slate-400" : "mt-1 text-xs text-[#8b857c]"}>
+                    For items issued on a paper waybill before they were in the system. Applies to all {localRows.length} item{localRows.length !== 1 ? "s" : ""} on this waybill.
+                  </div>
+                </div>
+                <button onClick={() => setDateOpen(false)} disabled={datePending} aria-label="Close"
+                  className={dark ? "text-slate-500 hover:text-slate-300" : "text-[#9c9890] hover:text-[#1a1814]"}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <label className={dark ? "mb-1.5 block text-xs font-semibold text-slate-300" : "mb-1.5 block text-xs font-semibold text-[#1a1814]"}>
+                Real issue date
+              </label>
+              <input type="date" value={newDate} max={today} min="2020-01-01" onChange={(e) => setNewDate(e.target.value)}
+                className={dark
+                  ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
+                  : "w-full rounded-xl border border-[#ddd5c9] bg-white px-3 py-2.5 text-sm outline-none"
+                } />
+              <p className={dark ? "mt-2 text-[11px] text-slate-500" : "mt-2 text-[11px] text-[#8b857c]"}>
+                The change is recorded in the Activity log (old → new date). The day it was entered in the system is kept and shown on the waybill.
+              </p>
+
+              {dateMsg && !dateMsg.ok && (
+                <div className={dark ? "mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300" : "mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"}>
+                  {dateMsg.text}
+                </div>
+              )}
+
+              <div className="mt-5 flex gap-3">
+                <button onClick={saveDate} disabled={datePending || !newDate || newDate === dateInput}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#b08b2c] py-2.5 text-sm font-bold text-white hover:opacity-95 disabled:opacity-50">
+                  {datePending ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save date"}
+                </button>
+                <button onClick={() => setDateOpen(false)} disabled={datePending}
+                  className={dark
+                    ? "rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                    : "rounded-xl border border-[#ddd5c9] bg-white px-5 py-2.5 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                  }>
+                  Cancel
                 </button>
               </div>
             </div>

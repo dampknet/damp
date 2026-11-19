@@ -42,7 +42,46 @@ type BucketEntry = {
   bulkCondition?: string;
   availableQty?: number | null;
   unit?:        string | null;
+  // undefined = not chosen yet (filled from "Send all items to"); OTHER_DEST = typed place
+  destinationSiteId?: string;
+  destinationOther?:  string;
 };
+
+type Destination = { id: string; name: string };
+
+const OTHER_DEST = "__OTHER__";
+const OTHER_PLACES_LIST = "issue-other-places";
+
+function DestinationPicker({
+  destinations, siteId, other, onChange, dark, compact = false, label,
+}: {
+  destinations: Destination[];
+  siteId:       string;
+  other:        string;
+  onChange:     (siteId: string, other: string) => void;
+  dark:         boolean;
+  compact?:     boolean;
+  label:        string;
+}) {
+  const cls = `${compact ? "w-44 px-2 py-1.5 text-xs" : "w-full px-3 py-2.5 text-sm"} rounded-xl border outline-none ${
+    dark ? "border-white/10 bg-[#101720] text-slate-100" : "border-[#ddd5c9] bg-white text-slate-900"
+  } ${!siteId ? (dark ? "border-amber-500/50" : "border-amber-400") : ""}`;
+  return (
+    <div data-noscan className={`flex flex-col gap-1.5 ${compact ? "items-center" : ""}`}>
+      <select value={siteId} onChange={(e) => onChange(e.target.value, e.target.value === OTHER_DEST ? other : "")}
+        aria-label={label} title={label} className={cls}>
+        <option value="">Choose destination…</option>
+        {destinations.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        <option value={OTHER_DEST}>Other place (type it)…</option>
+      </select>
+      {siteId === OTHER_DEST && (
+        <input value={other} onChange={(e) => onChange(OTHER_DEST, e.target.value)} maxLength={120}
+          list={OTHER_PLACES_LIST} autoComplete="off"
+          placeholder="e.g. Head Office" aria-label={`${label} (other place)`} className={cls} />
+      )}
+    </div>
+  );
+}
 
 const SITE_PREFIXES = ALL_SITE_PREFIXES;
 const TYPE_SEGS     = ALL_CODE_SEGMENTS;
@@ -79,11 +118,15 @@ function conditionColor(c: string) {
 }
 
 export default function IssueInventoryItemClient({
-  site, items, action,
+  site, items, destinations, otherPlaces, canBackdate, today, action,
 }: {
-  site:   { id: string; name: string; location: string | null };
-  items:  ItemRow[];
-  action: (formData: FormData) => void;
+  site:         { id: string; name: string; location: string | null };
+  items:        ItemRow[];
+  destinations: Destination[];
+  otherPlaces:  string[];
+  canBackdate:  boolean;   // master admins can set the real issue date
+  today:        string;    // YYYY-MM-DD (server's today)
+  action:       (formData: FormData) => void;
 }) {
   const { mode }     = useThemeMode();
   const dark         = mode === "dark";
@@ -98,7 +141,98 @@ export default function IssueInventoryItemClient({
   const bucketRef = useRef<BucketEntry[]>([]);
   const itemsRef  = useRef<ItemRow[]>(items);
 
+  // "Send all items to": applied to every row, and to rows added afterwards.
+  const [defaultDest, setDefaultDest] = useState({ siteId: "", other: "" });
+
   useEffect(() => { bucketRef.current = bucket; }, [bucket]);
+
+  // Newly added rows start with the "Send all items to" destination.
+  useEffect(() => {
+    if (bucket.some((b) => b.destinationSiteId === undefined)) {
+      setBucket((prev) => prev.map((b) => b.destinationSiteId === undefined
+        ? { ...b, destinationSiteId: defaultDest.siteId, destinationOther: defaultDest.other }
+        : b));
+    }
+  }, [bucket, defaultDest]);
+
+  const setRowDest = (id: string, siteId: string, other: string) =>
+    setBucket((prev) => prev.map((b) => (b.id === id ? { ...b, destinationSiteId: siteId, destinationOther: other } : b)));
+
+  const setAllDest = (siteId: string, other: string) => {
+    setDefaultDest({ siteId, other });
+    setBucket((prev) => prev.map((b) => ({ ...b, destinationSiteId: siteId, destinationOther: other })));
+  };
+
+  // ── Draft: keep the bucket and typed details in this browser until the issue goes through ──
+  // (so an inactivity sign-out or a closed tab doesn't lose a half-finished issue)
+  const DRAFT_KEY   = `kims:issue-draft:${site.id}`;
+  const DRAFT_FIELDS = ["requesterName", "requesterContact", "department", "authorizedBy", "purpose", "issueDate"];
+  const formRef     = useRef<HTMLFormElement>(null);
+  const draftReady  = useRef(false);
+  const [restoredAt,   setRestoredAt]   = useState<number | null>(null);
+  const [droppedUnits, setDroppedUnits] = useState(0);
+
+  const fieldEl = (name: string) =>
+    (formRef.current?.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | null) ?? null;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as { savedAt: number; bucket: BucketEntry[]; defaultDest?: { siteId: string; other: string }; fields?: Record<string, string> };
+        // Only bring back items and units that are still available to issue.
+        const byId = new Map(items.map((i) => [i.id, i]));
+        let dropped = 0;
+        const restored = (d.bucket ?? []).flatMap((b) => {
+          const it = byId.get(b.id);
+          if (!it) { dropped += b.quantity || 1; return []; }
+          if (b.isBulk) return [b];
+          const avail = new Set(it.instances.map((x) => x.entityCode));
+          const conds = (b.conditions ?? []).filter((c) => avail.has(c.code));
+          dropped += (b.conditions?.length ?? 0) - conds.length;
+          return conds.length ? [{ ...b, conditions: conds, entityCodes: conds.map((c) => c.code), quantity: conds.length }] : [];
+        });
+        const fields = d.fields ?? {};
+        const hasFields = Object.entries(fields).some(([k, v]) => k !== "issueDate" && v);
+        if (restored.length || hasFields) {
+          setBucket(restored);
+          if (d.defaultDest) setDefaultDest(d.defaultDest);
+          for (const [name, value] of Object.entries(fields)) { const el = fieldEl(name); if (el && value) el.value = value; }
+          setRestoredAt(d.savedAt);
+          setDroppedUnits(dropped);
+        }
+      }
+    } catch {}
+    const t = setTimeout(() => { draftReady.current = true; }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveDraft = useCallback(() => {
+    if (!draftReady.current) return;
+    try {
+      const fields: Record<string, string> = {};
+      for (const name of DRAFT_FIELDS) { const el = fieldEl(name); if (el) fields[name] = el.value; }
+      const empty = bucket.length === 0 && Object.entries(fields).every(([k, v]) => k === "issueDate" || !v.trim());
+      if (empty) localStorage.removeItem(DRAFT_KEY);
+      else localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), bucket, defaultDest, fields }));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bucket, defaultDest, DRAFT_KEY]);
+
+  useEffect(() => { saveDraft(); }, [saveDraft]);
+
+  const discardDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    setBucket([]);
+    setDefaultDest({ siteId: "", other: "" });
+    formRef.current?.reset();
+    setRestoredAt(null);
+    setDroppedUnits(0);
+  };
+
+  const missingDestinations = bucket.filter((b) =>
+    !b.destinationSiteId || (b.destinationSiteId === OTHER_DEST && !(b.destinationOther ?? "").trim()));
   useEffect(() => { itemsRef.current  = items;  }, [items]);
 
   const scanBuffer    = useRef("");
@@ -228,6 +362,8 @@ export default function IssueInventoryItemClient({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Typing a destination place name is not a barcode scan.
+      if ((e.target as HTMLElement | null)?.closest?.("[data-noscan]")) return;
       const now = Date.now();
       if (now - lastKeyTime.current > 600) {
         scanBuffer.current    = "";
@@ -334,7 +470,12 @@ export default function IssueInventoryItemClient({
     alert(`No item found for: "${val}"\nTry the item code, entity code, or part of the name.`);
   };
 
-  const bucketJson = JSON.stringify(bucket);
+  // The server gets a site id, or an empty id plus the typed place for "Other".
+  const bucketJson = JSON.stringify(bucket.map((b) => ({
+    ...b,
+    destinationSiteId: b.destinationSiteId === OTHER_DEST ? "" : (b.destinationSiteId ?? ""),
+    destinationOther:  b.destinationSiteId === OTHER_DEST ? (b.destinationOther ?? "").trim() : "",
+  })));
 
   const inputCls = dark
     ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none"
@@ -403,16 +544,49 @@ export default function IssueInventoryItemClient({
             }>{error}</div>
           )}
 
+          {restoredAt && (
+            <div className={dark
+              ? "mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-200"
+              : "mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800"
+            }>
+              <span suppressHydrationWarning>
+                Restored your unfinished issue from {new Date(restoredAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}.
+                {droppedUnits > 0 && ` ${droppedUnits} unit${droppedUnits === 1 ? " is" : "s are"} no longer available and ${droppedUnits === 1 ? "was" : "were"} removed.`}
+              </span>
+              <button type="button" onClick={discardDraft} className="font-semibold underline">Discard and start fresh</button>
+            </div>
+          )}
+
           {isCameraActive && (
             <div className="mt-6 overflow-hidden rounded-2xl border-2 border-dashed border-sky-500/50 bg-sky-500/5 p-4">
               <div id="reader" className="mx-auto max-w-sm" />
             </div>
           )}
 
-          <div className={`mt-8 overflow-hidden rounded-2xl border ${
+          {/* Suggestions for "Other place" boxes — places typed on earlier issues */}
+          <datalist id={OTHER_PLACES_LIST}>
+            {otherPlaces.map((p) => <option key={p} value={p} />)}
+          </datalist>
+
+          <div className={`mt-8 flex flex-col gap-2 rounded-2xl border p-4 sm:flex-row sm:items-start sm:gap-4 ${
+            dark ? "border-white/10 bg-white/5" : "border-[#e7ded3] bg-[#fffdfa]"
+          }`}>
+            <div className="sm:w-56 sm:pt-2">
+              <div className={dark ? "text-sm font-semibold text-slate-100" : "text-sm font-semibold text-[#1a1814]"}>Send all items to</div>
+              <div className={dark ? "text-[11px] text-slate-500" : "text-[11px] text-[#8b857c]"}>
+                Sets every row (and new ones). You can still change any single item below.
+              </div>
+            </div>
+            <div className="flex-1">
+              <DestinationPicker dark={dark} destinations={destinations} label="Send all items to"
+                siteId={defaultDest.siteId} other={defaultDest.other} onChange={setAllDest} />
+            </div>
+          </div>
+
+          <div className={`mt-4 overflow-x-auto rounded-2xl border ${
             dark ? "border-white/10 bg-white/5" : "border-[#e7ded3] bg-white"
           }`}>
-            <table className="w-full text-left">
+            <table className="w-full min-w-[860px] text-left">
               <thead>
                 <tr className={`text-[10px] font-black uppercase tracking-widest ${
                   dark ? "bg-white/5 text-slate-500" : "bg-slate-100 text-slate-500"
@@ -422,13 +596,14 @@ export default function IssueInventoryItemClient({
                   <th className="px-6 py-4 text-center">Condition</th>
                   <th className="px-6 py-4 text-center">Qty</th>
                   <th className="px-6 py-4 text-center">Return Date</th>
+                  <th className="px-4 py-4 text-center">Destination</th>
                   <th className="px-6 py-4" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-500/10">
                 {bucket.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">
+                    <td colSpan={7} className="py-16 text-center opacity-30 italic font-black text-sm uppercase tracking-widest">
                       Point scanner at barcode or use camera...
                     </td>
                   </tr>
@@ -534,6 +709,12 @@ export default function IssueInventoryItemClient({
                       </label>
                     </td>
 
+                    <td className="px-4 py-4 text-center">
+                      <DestinationPicker dark={dark} compact destinations={destinations} label={`Destination for ${b.name}`}
+                        siteId={b.destinationSiteId ?? ""} other={b.destinationOther ?? ""}
+                        onChange={(siteId, other) => setRowDest(b.id, siteId, other)} />
+                    </td>
+
                     <td className="px-6 py-4 text-right">
                       <button type="button" title="Remove row" aria-label="Remove row"
                         onClick={() => setBucket((prev) => prev.filter((i) => i.id !== b.id))}
@@ -624,7 +805,7 @@ export default function IssueInventoryItemClient({
             </select>
           </div>
 
-          <form action={action} className="mt-10 space-y-8" onSubmit={() => setIsSubmitting(true)}>
+          <form ref={formRef} action={action} className="mt-10 space-y-8" onInput={saveDraft} onSubmit={() => setIsSubmitting(true)}>
             <input type="hidden" name="bucketData" value={bucketJson} />
 
             <section className={dark
@@ -660,6 +841,15 @@ export default function IssueInventoryItemClient({
                 <Field label="Authorized By" dark={dark}>
                   <input name="authorizedBy" required placeholder="Approving Officer" title="Authorized By" className={inputCls} />
                 </Field>
+                {canBackdate && (
+                  <Field label="Issue date (master admin)" dark={dark}>
+                    <input type="date" name="issueDate" defaultValue={today} max={today} min="2020-01-01" required
+                      title="Issue date" className={inputCls} />
+                    <div className={dark ? "mt-1 text-[11px] text-slate-500" : "mt-1 text-[11px] text-[#8b857c]"}>
+                      Leave as today, or set the real date for items already given out on a paper waybill.
+                    </div>
+                  </Field>
+                )}
               </div>
               <div className="mt-4">
                 <Field label="Purpose" dark={dark}>
@@ -675,6 +865,9 @@ export default function IssueInventoryItemClient({
                   if (bucket.length === 0) {
                     e.preventDefault();
                     alert("Bucket is empty! Scan or add items first.");
+                  } else if (missingDestinations.length > 0) {
+                    e.preventDefault();
+                    alert(`Choose a destination for:\n\n${missingDestinations.map((b) => `• ${b.name}`).join("\n")}`);
                   }
                 }}
                 className={dark

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { sessionProblem, sessionCookie } from "./src/lib/session-policy";
 
 
 const XSS_PATTERNS = [
@@ -117,12 +118,36 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
     pathname.startsWith("/store")     ||
     pathname.startsWith("/activity")  ||
     pathname.startsWith("/assets")    ||
+    pathname.startsWith("/notifications") ||
+    pathname.startsWith("/inventory") ||
     pathname.startsWith("/admin");
 
   if (isProtected) {
+    const toLogin = (error?: string) => {
+      const url = new URL("/auth/login", req.url);
+      if (error) url.searchParams.set("error", error);
+      // Come back to the same page after signing in (only for normal page visits).
+      if (req.method === "GET") url.searchParams.set("callbackUrl", req.nextUrl.pathname + req.nextUrl.search);
+      return url;
+    };
+
     if (!token) {
-      return NextResponse.redirect(new URL("/auth/login", req.url));
+      return NextResponse.redirect(toLogin());
     }
+
+    // Inactivity (30 min, 2 h on the issue page) or the 12-hour maximum: sign out on the server too.
+    const problem = sessionProblem(token);
+    if (problem) {
+      const out = NextResponse.redirect(toLogin(problem === "idle" ? "idle" : "session_expired"));
+      out.cookies.delete(sessionCookie().name);
+      return out;
+    }
+
+    // Keep the session cookie but drop its expiry date, so the browser deletes it when it closes.
+    const { name, secure } = sessionCookie();
+    const value = req.cookies.get(name)?.value;
+    if (value) res.cookies.set(name, value, { httpOnly: true, sameSite: "lax", path: "/", secure });
+
     res.headers.set("x-user-id", (token.userId as string) ?? token.sub ?? "");
   }
 

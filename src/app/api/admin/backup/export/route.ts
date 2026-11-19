@@ -21,6 +21,9 @@ export async function GET() {
       userProfiles,
       activityLogs,
       storeItems,
+      categories,
+      subcategories,
+      issueReturns,
     ] = await Promise.all([
       prisma.inventorySite.findMany({ orderBy: { createdAt: "asc" } }),
       prisma.inventoryItem.findMany({ orderBy: { createdAt: "asc" } }),
@@ -36,6 +39,10 @@ export async function GET() {
         take:    10000, // cap at 10k to keep file size reasonable
       }),
       prisma.storeItem.findMany({ orderBy: { createdAt: "asc" } }),
+      // Site assets need their categories, so a restore into an empty database works in one go.
+      prisma.category.findMany({ orderBy: { createdAt: "asc" } }),
+      prisma.subcategory.findMany({ orderBy: { createdAt: "asc" } }),
+      prisma.issueReturn.findMany({ orderBy: { receivedAt: "asc" } }),
     ]);
 
     const includeHashes = profile.isMasterAdmin;
@@ -61,8 +68,13 @@ export async function GET() {
           userProfiles:        userProfiles.length,
           activityLogs:        activityLogs.length,
           storeItems:          storeItems.length,
+          categories:          categories.length,
+          subcategories:       subcategories.length,
+          issueReturns:        issueReturns.length,
         },
       },
+      categories,
+      subcategories,
       inventorySites,
       inventoryItems,
       assetInstances,
@@ -74,6 +86,7 @@ export async function GET() {
       userProfiles: safeProfiles,
       activityLogs,
       storeItems,
+      issueReturns,
     };
 
     const json     = JSON.stringify(backup, null, 2);

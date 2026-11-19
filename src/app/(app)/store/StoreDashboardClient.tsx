@@ -27,6 +27,8 @@ type Summary = {
   centralStockCount:   number;
   restockCount:        number;
   issueCount:          number;
+  pendingDeliveries:   number;
+  awaitingReturns:     number;
 };
 
 type SearchResult = {
@@ -360,8 +362,10 @@ export default function StoreDashboardClient({
           ))}
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
+            { href: "/store/deliveries", label: "Pending Deliveries", sub: `${summary.pendingDeliveries} waiting at sites`, accent: "bg-[#7c3aed]" },
+            { href: "/store/returns",    label: "Awaiting Return",    sub: `${summary.awaitingReturns} unused unit${summary.awaitingReturns === 1 ? "" : "s"} to come back`, accent: "bg-[#0e7490]" },
             { href: "/store/restocks",  label: "Restock Log",  sub: `${summary.restockCount} restocks`,    accent: "bg-[#2a7d52]" },
             { href: "/store/issues",    label: "Issue Log",    sub: `${summary.issueCount} issues`,        accent: "bg-[#c8611a]" },
             { href: "/store/checkouts", label: "Checked Out",  sub: `${summary.checkedOutEquipment} open`, accent: "bg-[#1d5fa8]" },

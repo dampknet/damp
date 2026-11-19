@@ -8,6 +8,8 @@ import { prisma }          from "@/lib/prisma";
 import bcrypt              from "bcryptjs";
 import { getRequestInfo, formatRequestInfo, type RequestInfo } from "@/lib/request-info";
 import { getAuthProviders, type ResolvedProvider } from "@/lib/system-config";
+import { cookies }         from "next/headers";
+import { IDLE_MS, MAX_SESSION_MS, SIGNOUT_REASON_COOKIE, sessionProblem } from "@/lib/session-policy";
 
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCK_MINUTES        = 5;
@@ -219,17 +221,32 @@ function buildExternalProvider(p: ResolvedProvider): Provider {
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  // 12-hour maximum; the 30-minute / 2-hour inactivity limits are in src/lib/session-policy.ts
+  session: { strategy: "jwt", maxAge: MAX_SESSION_MS / 1000 },
+  jwt:     { maxAge: MAX_SESSION_MS / 1000 },
 
   providers: [credentialsProvider],
 
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile: oauthProfile }) {
       if (!user.email) return false;
 
       const email  = user.email.toLowerCase();
       const method = await methodLabel(account?.provider);
       const info   = await getRequestInfo();
+
+      // Accounts are matched by email, so only accept emails the provider has verified.
+      const verified = (oauthProfile as { email_verified?: boolean | string } | undefined)?.email_verified;
+      if ((account?.provider === "google" || account?.provider === "oidc") && (verified === false || verified === "false")) {
+        await logAuthEvent({
+          title:    `Blocked login — email not verified (${method})`,
+          email,
+          details:  `${method} reported ${email} as not verified, so the sign-in was refused.`,
+          security: true,
+          info,
+        });
+        return "/auth/login?error=unverified_email";
+      }
 
       const profile = await prisma.userProfile.findUnique({
         where:  { email },
@@ -305,11 +322,18 @@ export const authOptions: NextAuthOptions = {
         token.role     = profile?.role     ?? "VIEWER";
         token.fullName = profile?.fullName ?? user.name ?? "";
         token.userId   = profile?.id       ?? "";
+        // Fresh sign-in: start the 12-hour and inactivity clocks.
+        const now = Date.now();
+        token.loginAt    = now;
+        token.lastActive = now;
+        token.idleLimit  = IDLE_MS;
       }
       return token;
     },
 
     async session({ session, token }) {
+      // Past the inactivity limit or the 12-hour maximum: treat as signed out everywhere on the server.
+      if (sessionProblem(token)) session.invalid = true;
       if (session.user) {
         session.user.role     = token.role     as string;
         session.user.fullName = token.fullName as string;
@@ -323,9 +347,14 @@ export const authOptions: NextAuthOptions = {
     async signOut({ token }) {
       const email = (token?.email as string | undefined)?.toLowerCase();
       if (!email) return;
+      // The inactivity timer sets this short-lived cookie just before signing out.
+      const jar  = await cookies();
+      const idle = jar.get(SIGNOUT_REASON_COOKIE)?.value === "idle";
+      if (idle) { try { jar.delete(SIGNOUT_REASON_COOKIE); } catch {} }
+      const name = (token?.fullName as string | undefined) || email;
       await logAuthEvent({
         type:     "USER_LOGOUT",
-        title:    `${(token?.fullName as string | undefined) || email} signed out`,
+        title:    idle ? `${name} signed out automatically after inactivity` : `${name} signed out`,
         email,
         security: false,
       });

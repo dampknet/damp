@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 enum Role {
@@ -63,6 +63,14 @@ enum ActivityType {
   STORE_ITEM_DELETED
   WAREHOUSE_ISSUE_CREATED
   WAREHOUSE_ISSUE_RETURNED
+  INVENTORY_DELIVERY_CONFIRMED
+}
+
+// Delivery to one of the 42 broadcast sites. Null = no tracking (no destination, or an "Other" place).
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  RETURNED // everything came back to the store; nothing was used at the destination
 }
 
 enum StoreStatus {
@@ -108,26 +116,29 @@ enum WarehouseIssueStatus {
 }
 
 model UserProfile {
-  id                 String    @id @default(cuid())
-  email              String    @unique
-  fullName           String?
-  role               Role      @default(VIEWER)
-  isMasterAdmin      Boolean   @default(false)
-  passwordHash       String?
-  failedLoginCount   Int       @default(0)
-  lockedUntil        DateTime?
-  isEmergency        Boolean   @default(false)
-  accessExpiresAt    DateTime?
-  mustChangePassword Boolean   @default(false)
-  isSuspended        Boolean   @default(false)
-  suspendedAt        DateTime?
-  suspendedBy        String?
-  suspendReason      String?
-  lastLoginAt        DateTime?
-  lastLoginIp        String?
-  lastLoginMethod    String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  fullName            String?
+  role                Role      @default(VIEWER)
+  isMasterAdmin       Boolean   @default(false)
+  passwordHash        String?
+  failedLoginCount    Int       @default(0)
+  lockedUntil         DateTime?
+  isEmergency         Boolean   @default(false)
+  accessExpiresAt     DateTime?
+  mustChangePassword  Boolean   @default(false)
+  canSeeNotifications Boolean   @default(false)
+  // Master admins: security events after this time count on the Security badge.
+  securitySeenAt      DateTime?
+  isSuspended         Boolean   @default(false)
+  suspendedAt         DateTime?
+  suspendedBy         String?
+  suspendReason       String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  lastLoginMethod     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }
 
 model Account {
@@ -212,7 +223,8 @@ model Site {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  assets Asset[]
+  assets     Asset[]
+  deliveries WarehouseIssue[]
 
   @@unique([name, isDeleted])
   @@index([isDeleted])
@@ -443,29 +455,45 @@ model InventoryIssue {
 }
 
 model WarehouseIssue {
-  id               String               @id @default(cuid())
-  groupId          String?
-  inventorySiteId  String
-  inventoryItemId  String
-  quantityTaken    Int                  @default(1)
-  takenBy          String
-  takenByContact   String?
-  authorizedBy     String?
-  conditionAtIssue String?
-  purpose          String
-  takenAt          DateTime             @default(now())
-  expectedReturnAt DateTime?
-  returnedBy       String?
-  returnedAt       DateTime?
-  returnNote       String?
-  status           WarehouseIssueStatus @default(OPEN)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id                String               @id @default(cuid())
+  groupId           String?
+  inventorySiteId   String
+  inventoryItemId   String
+  quantityTaken     Int                  @default(1)
+  takenBy           String
+  takenByContact    String?
+  authorizedBy      String?
+  conditionAtIssue  String?
+  purpose           String
+  takenAt           DateTime             @default(now())
+  expectedReturnAt  DateTime?
+  returnedBy        String?
+  returnedAt        DateTime?
+  returnNote        String?
+  status            WarehouseIssueStatus @default(OPEN)
+  // Where the item is going: one of the 42 sites (destinationSiteId) or any typed place.
+  // destinationName always holds the readable name, so the waybill still reads correctly later.
+  destinationSiteId String?
+  destinationName   String?
+  deliveryStatus    DeliveryStatus?
+  deliveredAt       DateTime?
+  deliveredBy       String?
+  deliveryNote      String?
+  // Usage and partial returns: issued = used + returned + still out.
+  // quantityUsed is null until someone reports how many were used.
+  quantityUsed      Int?
+  quantityReturned  Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  inventorySite InventorySite        @relation(fields: [inventorySiteId], references: [id])
-  inventoryItem InventoryItem        @relation(fields: [inventoryItemId], references: [id])
-  lines         WarehouseIssueLine[]
+  inventorySite   InventorySite        @relation(fields: [inventorySiteId], references: [id])
+  inventoryItem   InventoryItem        @relation(fields: [inventoryItemId], references: [id])
+  lines           WarehouseIssueLine[]
+  destinationSite Site?                @relation(fields: [destinationSiteId], references: [id], onDelete: SetNull)
+  returns         IssueReturn[]
 
+  @@index([destinationSiteId])
+  @@index([deliveryStatus])
   @@index([groupId])
   @@index([inventorySiteId])
   @@index([inventoryItemId])
@@ -478,11 +506,60 @@ model WarehouseIssueLine {
   warehouseIssueId String
   assetInstanceId  String
 
+  // Tracked units: installed at the destination, or brought back to the store.
+  usedAt     DateTime?
+  returnedAt DateTime?
+
   warehouseIssue WarehouseIssue @relation(fields: [warehouseIssueId], references: [id], onDelete: Cascade)
   assetInstance  AssetInstance  @relation(fields: [assetInstanceId], references: [id])
 
   @@index([warehouseIssueId])
   @@index([assetInstanceId])
+}
+
+// One record per return received at the store (several partial returns are allowed per issued item).
+model IssueReturn {
+  id               String             @id @default(cuid())
+  warehouseIssueId String
+  quantity         Int
+  condition        EquipmentCondition
+  entityCodes      String[]           @default([])
+  returnedBy       String // person who brought it back
+  receivedBy       String // account that recorded it
+  note             String?
+  receivedAt       DateTime           @default(now())
+
+  warehouseIssue WarehouseIssue @relation(fields: [warehouseIssueId], references: [id], onDelete: Cascade)
+
+  @@index([warehouseIssueId])
+  @@index([receivedAt])
+}
+
+// Bell notifications. History is kept; NotificationRead records who has opened each one.
+model Notification {
+  id         String   @id @default(cuid())
+  type       String
+  title      String
+  body       String?
+  link       String?
+  actorEmail String?
+  createdAt  DateTime @default(now())
+
+  reads NotificationRead[]
+
+  @@index([createdAt])
+}
+
+model NotificationRead {
+  id             String   @id @default(cuid())
+  notificationId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId])
 }
 
 model MqttConfig {

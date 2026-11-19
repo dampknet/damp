@@ -1,17 +1,27 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
-import { SECURITY_EVENT_WHERE, SECURITY_ACTION_TYPES } from "@/lib/security-events";
+import { requireAdmin } from "@/lib/auth";
+import { SECURITY_EVENT_WHERE, SECURITY_ACTION_TYPES, SECURITY_ALERT_WHERE, isSecurityAlert } from "@/lib/security-events";
 import ActivityClient from "./ActivityClient";
 
-type Period = "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
+type Period = "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR" | "CUSTOM";
 
 type SearchParams = {
   q?:      string;
   type?:   string;
   period?: Period;
+  from?:   string;
+  to?:     string;
   site?:   string;
   view?:   string;
 };
+
+// "YYYY-MM-DD" from a date input → local date, or null if missing/invalid.
+function parseDay(value?: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -32,6 +42,7 @@ function activityIndicator(type: string, title: string, entityType: string | nul
     return { color: "bg-emerald-500", label: "UP"        as const };
   if (titleLower.includes("down"))
     return { color: "bg-red-500",     label: "DOWN"      as const };
+  if (t.includes("delivery_confirmed"))       return { color: "bg-violet-500",  label: "DELIVERED" as const };
   if (t.includes("warehouse_issue_created"))  return { color: "bg-amber-500",   label: "ISSUED"   as const };
   if (t.includes("warehouse_issue_returned")) return { color: "bg-emerald-500", label: "RETURNED" as const };
   if (t.includes("returned"))     return { color: "bg-emerald-500", label: "RETURNED"  as const };
@@ -105,6 +116,7 @@ const actionOptions = [
   { value: "INVENTORY_RESTOCK_ADDED",      label: "Restock Added"             },
   { value: "INVENTORY_ITEM_ISSUED",        label: "Item Issued"               },
   { value: "INVENTORY_EQUIPMENT_RETURNED", label: "Equipment Returned"        },
+  { value: "INVENTORY_DELIVERY_CONFIRMED", label: "Delivery Confirmed"        },
   { value: "INVENTORY_IMPORT",             label: "Inventory Import"          },
   { value: "INVENTORY_LOW_STOCK",          label: "Low Stock Alert"           },
   { value: "INVENTORY_OUT_OF_STOCK",       label: "Out of Stock Alert"        },
@@ -130,21 +142,41 @@ export default async function ActivityPage({
   const period  = sp.period ?? "ALL";
   const site    = (sp.site ?? "").trim();
 
-  const profile       = await getCurrentProfile();
-  const isMasterAdmin = !!profile?.isMasterAdmin;
+  // Audit trail: ADMIN and master admin only.
+  const profile       = await requireAdmin();
+  const isMasterAdmin = profile.isMasterAdmin;
   const view          = isMasterAdmin && sp.view === "security" ? "security" : "all";
   const type          = !isMasterAdmin && SECURITY_ACTION_TYPES.includes(rawType) ? "" : rawType;
-  const periodStart   = getPeriodStart(period);
 
-  const inventorySites = await prisma.inventorySite.findMany({
-    where:   { isDeleted: false },
-    orderBy: { name: "asc" },
-    select:  { id: true, name: true },
-  });
+  // Custom range: From (start of day) – To (end of day). Either side may be left open.
+  const fromDay = period === "CUSTOM" ? parseDay(sp.from) : null;
+  const toDay   = period === "CUSTOM" ? parseDay(sp.to)   : null;
+  const periodStart = period === "CUSTOM" ? fromDay : getPeriodStart(period);
+  const periodEnd   = toDay ? new Date(toDay.getFullYear(), toDay.getMonth(), toDay.getDate(), 23, 59, 59, 999) : null;
+  const from = fromDay ? (sp.from ?? "") : "";
+  const to   = toDay   ? (sp.to   ?? "") : "";
+
+  const [inventorySites, broadcastSites] = await Promise.all([
+    prisma.inventorySite.findMany({
+      where:   { isDeleted: false },
+      orderBy: { name: "asc" },
+      select:  { id: true, name: true },
+    }),
+    prisma.site.findMany({
+      where:   { isDeleted: false },
+      orderBy: { name: "asc" },
+      select:  { id: true, name: true },
+    }),
+  ]);
   const siteNameMap      = Object.fromEntries(inventorySites.map((s) => [s.id, s.name]));
   const selectedSiteName = site ? (siteNameMap[site] ?? "") : "";
 
-  const [activitiesRaw, securityRaw] = await Promise.all([
+  // Security badge: alerts since this master admin last clicked "Mark all as reviewed".
+  const seenAt = isMasterAdmin
+    ? (await prisma.userProfile.findUnique({ where: { id: profile.id }, select: { securitySeenAt: true } }))?.securitySeenAt ?? null
+    : null;
+
+  const [activitiesRaw, securityRaw, securityUnseen] = await Promise.all([
     prisma.activityLog.findMany({
       where: {
         AND: [
@@ -159,7 +191,9 @@ export default async function ActivityPage({
             ],
           } : {},
           type        ? { type: type as any }               : {},
-          periodStart ? { createdAt: { gte: periodStart } } : {},
+          periodStart || periodEnd
+            ? { createdAt: { ...(periodStart ? { gte: periodStart } : {}), ...(periodEnd ? { lte: periodEnd } : {}) } }
+            : {},
           site && selectedSiteName ? {
             OR: [
               { entityId: site },
@@ -179,6 +213,11 @@ export default async function ActivityPage({
           take:    300,
         })
       : Promise.resolve([]),
+    isMasterAdmin
+      ? prisma.activityLog.count({
+          where: { AND: [SECURITY_ALERT_WHERE, ...(seenAt ? [{ createdAt: { gt: seenAt } }] : [])] },
+        })
+      : Promise.resolve(0),
   ]);
 
   const mapLog = (a: (typeof activitiesRaw)[number], index: number) => ({
@@ -196,13 +235,19 @@ export default async function ActivityPage({
     exportTime:  a.createdAt.toISOString(),
     entityType:  a.entityType ?? "",
     entityId:    a.entityId   ?? "",
+    isNew:       isMasterAdmin && isSecurityAlert(a) && (!seenAt || a.createdAt > seenAt),
   });
 
   const activities         = activitiesRaw.map(mapLog);
   const securityActivities = securityRaw.map(mapLog);
 
-  const title = q || type || period !== "ALL" || site
-    ? `Activity Log${q ? ` — "${q}"` : ""}${type ? ` — ${getActionLabel(type)}` : ""}${period !== "ALL" ? ` — ${period}` : ""}${selectedSiteName ? ` — ${selectedSiteName}` : ""}`
+  const fmtDay = (d: Date) => d.toLocaleDateString("en-GB");
+  const periodLabel = period === "CUSTOM"
+    ? (fromDay || toDay ? `${fromDay ? fmtDay(fromDay) : "…"} – ${toDay ? fmtDay(toDay) : "…"}` : "")
+    : period !== "ALL" ? period : "";
+
+  const title = q || type || periodLabel || site
+    ? `Activity Log${q ? ` — "${q}"` : ""}${type ? ` — ${getActionLabel(type)}` : ""}${periodLabel ? ` — ${periodLabel}` : ""}${selectedSiteName ? ` — ${selectedSiteName}` : ""}`
     : "Activity Log";
 
   const exportSource = view === "security" ? securityActivities : activities;
@@ -238,16 +283,21 @@ export default async function ActivityPage({
       q={q}
       type={type}
       period={period}
+      from={from}
+      to={to}
       site={site}
       view={view}
       actionOptions={visibleActions}
       title={view === "security" ? "Security Events" : title}
       activities={activities}
       securityActivities={securityActivities}
+      securityUnseen={securityUnseen}
+      securitySeenAt={seenAt ? seenAt.toISOString() : null}
       isMasterAdmin={isMasterAdmin}
       exportRows={exportRows}
       exportCols={exportCols}
       inventorySites={inventorySites}
+      broadcastSites={broadcastSites}
     />
   );
 }

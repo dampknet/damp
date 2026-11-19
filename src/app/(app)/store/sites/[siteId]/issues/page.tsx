@@ -70,6 +70,10 @@ export default async function SiteIssueLogPage({
       returnedBy:       true,
       returnNote:       true,
       status:           true,
+      quantityUsed:     true,
+      quantityReturned: true,
+      deliveryStatus:   true,
+      destinationName:  true,
       inventoryItem: {
         select: {
           id:       true,
@@ -82,6 +86,8 @@ export default async function SiteIssueLogPage({
       lines: {
         select: {
           id: true,
+          usedAt:     true,
+          returnedAt: true,
           assetInstance: {
             select: { id: true, entityCode: true, condition: true },
           },

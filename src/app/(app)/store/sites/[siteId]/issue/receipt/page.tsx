@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
+import { toDateInput, isBackdated } from "@/lib/issue-date";
 import ReceiptClient from "./ReceiptClient";
 
 export default async function ReceiptPage({
@@ -14,7 +15,7 @@ export default async function ReceiptPage({
   const sp          = (await searchParams) ?? {};
   const groupId     = sp.groupId ?? "";
 
-  await getCurrentProfile(); // auth check
+  const profile = await getCurrentProfile(); // auth check
 
   const site = await prisma.inventorySite.findUnique({
     where:  { id: siteId },
@@ -35,9 +36,11 @@ export default async function ReceiptPage({
       authorizedBy:     true,
       purpose:          true,
       takenAt:          true,
+      createdAt:        true,
       expectedReturnAt: true,
       status:           true,
       conditionAtIssue: true,   // ✅
+      destinationName:  true,
       inventoryItem: {
         select: {
           id:       true,
@@ -71,6 +74,7 @@ export default async function ReceiptPage({
     quantity:    number;
     condition:   string;
     returnable:  boolean;
+    destination: string;
   }[] = [];
 
   for (const issue of issues) {
@@ -84,6 +88,7 @@ export default async function ReceiptPage({
           quantity:    1,
           condition:   line.assetInstance.condition,
           returnable:  !!issue.expectedReturnAt,
+          destination: issue.destinationName ?? "",
         });
       }
     } else {
@@ -95,6 +100,7 @@ export default async function ReceiptPage({
         quantity:    issue.quantityTaken,
         condition:   (issue as any).conditionAtIssue ?? "",
         returnable:  !!issue.expectedReturnAt,
+        destination: issue.destinationName ?? "",
       });
     }
   }
@@ -108,6 +114,9 @@ export default async function ReceiptPage({
       authorizedBy={first.authorizedBy ?? ""}
       purpose={first.purpose}
       date={first.takenAt.toLocaleDateString("en-GB")}
+      dateInput={toDateInput(first.takenAt)}
+      enteredOn={isBackdated(first.takenAt, first.createdAt) ? first.createdAt.toLocaleDateString("en-GB") : null}
+      canEditDate={!!profile?.isMasterAdmin}
       rows={receiptRows}
     />
   );

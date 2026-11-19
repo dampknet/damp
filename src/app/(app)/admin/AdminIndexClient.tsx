@@ -79,6 +79,18 @@ export default function AdminIndexClient({
       hoverCl:    dark ? "group-hover:text-violet-400" : "group-hover:text-violet-700",
     },
     {
+      masterOnly: true,
+      href:       "/admin/notifications",
+      emoji:      "🔔",
+      label:      "Notification Access",
+      sub:        "Choose which accounts see the notification bell",
+      accent:     "bg-[linear-gradient(90deg,#dc2626,#f59e0b)]",
+      iconBg:     dark ? "border-red-500/20 bg-red-500/10" : "border-red-200 bg-red-50",
+      tag:        "Issued · Delivered · Returned · Stock",
+      tagCls:     dark ? "border-red-500/20 bg-red-500/10 text-red-300" : "border-red-200 bg-red-50 text-red-700",
+      hoverCl:    dark ? "group-hover:text-red-400" : "group-hover:text-red-700",
+    },
+    {
       masterOnly: false,
       href:       "/activity",
       emoji:      "📋",

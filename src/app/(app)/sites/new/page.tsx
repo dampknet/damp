@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import type { TransmitterType, TowerType } from "@prisma/client";
 import NewSiteClient from "./NewSiteClient";
 
@@ -13,6 +13,9 @@ export default async function NewSitePage() {
 
   async function createSite(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    if (!(await getEditorProfile())) redirect("/sites");
 
     const name = String(formData.get("name") ?? "").trim();
     const regMFreqRaw = String(formData.get("regMFreq") ?? "").trim();

@@ -63,6 +63,7 @@ export default function DashboardClient({
   stats,
   inventorySiteCards,
   recentActivity,
+  canSeeActivity,
 }: {
   role:               Role;
   email:              string | null;
@@ -71,6 +72,7 @@ export default function DashboardClient({
   stats:              Stats;
   inventorySiteCards: InventorySiteCard[];
   recentActivity:     ActivityItem[];
+  canSeeActivity:     boolean;
 }) {
   const { mode } = useThemeMode();
   const dark     = mode === "dark";
@@ -250,9 +252,10 @@ export default function DashboardClient({
         </div>
 
         {/* ── BOTTOM ROW ── */}
-        <div className="mt-5 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className={canSeeActivity ? "mt-5 grid gap-4 lg:grid-cols-[1.7fr_1fr]" : "mt-5 grid gap-4"}>
 
-          {/* ✅ Recent Activity — no href on Card to avoid nested <a> */}
+          {/* ✅ Recent Activity — admins only; no href on Card to avoid nested <a> */}
+          {canSeeActivity && (
           <div className={dark
             ? "min-w-0 rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl"
             : "min-w-0 rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
@@ -311,9 +314,12 @@ export default function DashboardClient({
               ))}
             </div>
           </div>
+          )}
 
           {/* Quick Actions */}
           <Card dark={dark} title="Quick Actions">
+            {/* Without Recent Activity this card spans the row, so lay the actions out side by side */}
+            <div className={canSeeActivity ? "" : "grid gap-3 md:grid-cols-3 [&>*]:mb-0"}>
             <QuickAction dark={dark} href="/sites" title="Go to Sites"
               subtitle={`Manage all ${stats.sites} sites`}
               iconBg={dark ? "bg-[rgba(59,130,246,0.12)]" : "bg-[#e8f0fb]"}
@@ -329,6 +335,7 @@ export default function DashboardClient({
               iconBg={dark ? "bg-[rgba(248,113,113,0.12)]" : "bg-[#fdecea]"}
               iconColor="text-[#c0392b]" icon="⚠️"
             />
+            </div>
           </Card>
         </div>
 

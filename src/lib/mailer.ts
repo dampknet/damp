@@ -49,6 +49,11 @@ export async function sendEmail(to: string, subject: string, html: string, overr
   }
 }
 
+// Names come from user input — escape them before putting them into email HTML.
+function esc(value: string) {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
 export function baseTemplate(content: string) {
   return `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px;">
@@ -67,13 +72,13 @@ export async function sendSetPasswordEmail(to: string, setPasswordLink: string, 
     "Set your DAMP password — KNET Asset Management",
     baseTemplate(`
       <h1 style="font-size:22px;font-weight:700;color:#1a1814;margin:0 0 8px;">
-        Welcome to DAMP${fullName ? `, ${fullName}` : ""}
+        Welcome to DAMP${fullName ? `, ${esc(fullName)}` : ""}
       </h1>
       <p style="color:#6b655d;font-size:14px;margin:0 0 24px;">
         You've been granted access to the KNET Ghana DTT Asset Management Platform.
         Click below to set your password and get started.
       </p>
-      <a href="${setPasswordLink}"
+      <a href="${esc(setPasswordLink)}"
         style="display:inline-block;background:#1a1814;color:white;text-decoration:none;
                padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;">
         Set My Password →
@@ -92,7 +97,7 @@ export async function sendCompanyAccessEmail(to: string, fullName?: string) {
     "You have been granted access to DAMP — KNET Asset Management",
     baseTemplate(`
       <h1 style="font-size:22px;font-weight:700;color:#1a1814;margin:0 0 8px;">
-        Access Granted${fullName ? `, ${fullName}` : ""}
+        Access Granted${fullName ? `, ${esc(fullName)}` : ""}
       </h1>
       <p style="color:#6b655d;font-size:14px;margin:0 0 8px;">
         You have been granted access to the KNET Ghana DTT Asset Management Platform.

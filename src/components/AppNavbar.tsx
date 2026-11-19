@@ -1,4 +1,5 @@
 import { requireCurrentProfile } from "@/lib/auth";
+import { canSeeNotifications } from "@/lib/notifications";
 import AppNavbarClient from "@/components/AppNavbarClient";
 
 export default async function AppNavbar() {
@@ -16,6 +17,7 @@ export default async function AppNavbar() {
       isMasterAdmin={profile.isMasterAdmin}
       hasLocalPassword={profile.hasLocalPassword}
       displayName={displayName}
+      showNotifications={canSeeNotifications(profile)}
     />
   );
 }

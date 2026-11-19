@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
 import { generateItemCode } from "@/lib/inventory-upload";
@@ -57,6 +57,9 @@ export default async function RestockInventoryItemPage({
 
   async function restockItem(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    if (!(await getEditorProfile())) redirect(`/store/sites/${siteId}`);
 
     const inventoryItemId  = String(formData.get("inventoryItemId") ?? "").trim();
     const quantityAddedRaw = String(formData.get("quantityAdded")   ?? "").trim();

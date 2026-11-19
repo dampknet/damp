@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
+import { getAwaitingReturns } from "@/lib/deliveries";
 import StoreDashboardClient from "./StoreDashboardClient";
 
 export default async function StoreDashboardPage() {
@@ -20,6 +21,7 @@ export default async function StoreDashboardPage() {
     centralStockCount,
     restockCount,
     issueCount,
+    pendingDeliveries,
   ] = await Promise.all([
     prisma.inventorySite.findMany({
       where:   { isDeleted: false },
@@ -45,7 +47,9 @@ export default async function StoreDashboardPage() {
     prisma.storeItem.count(),
     prisma.inventoryRestock.count(),
     prisma.warehouseIssue.count(),
+    prisma.warehouseIssue.count({ where: { deliveryStatus: "PENDING" } }),
   ]);
+  const awaitingReturns = (await getAwaitingReturns()).reduce((s, r) => s + r.awaitingReturn, 0);
 
   const siteCards = inventorySites.map((site) => ({
     id:        site.id,
@@ -56,6 +60,9 @@ export default async function StoreDashboardPage() {
 
   async function createInventorySite(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    if (!(await getEditorProfile())) redirect("/store");
 
     if (!canEdit) redirect("/store");
 
@@ -109,6 +116,8 @@ export default async function StoreDashboardPage() {
         checkedOutEquipment,
         centralStockCount,
         restockCount,
+        pendingDeliveries,
+        awaitingReturns,
         issueCount,
       }}
       siteCards={siteCards}

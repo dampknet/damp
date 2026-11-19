@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isAdminProfile } from "@/lib/auth";
+import { SECURITY_EVENT_WHERE } from "@/lib/security-events";
 import DashboardClient from "./DashboardClient";
 
 function percent(part: number, total: number) {
@@ -23,6 +24,8 @@ function formatRelative(date: Date) {
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
+  // Recent Activity is part of the audit trail: admins only, security events for master admins only.
+  const canSeeActivity = isAdminProfile(profile);
 
   const dateLabel = new Date().toLocaleString("en-US", {
     month: "long",
@@ -55,10 +58,13 @@ export default async function DashboardPage() {
     prisma.storeItem.count(),
     prisma.storeItem.count({ where: { status: "RECEIVED" } }),
     prisma.storeItem.count({ where: { status: "NOT_RECEIVED" } }),
-    prisma.activityLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
+    canSeeActivity
+      ? prisma.activityLog.findMany({
+          where:   profile?.isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        })
+      : Promise.resolve([]),
     // ✅ Fetch inventory sites with item counts
     prisma.inventorySite.findMany({
       where:   { isDeleted: false },
@@ -127,6 +133,7 @@ export default async function DashboardPage() {
       }}
       inventorySiteCards={inventorySiteCards}  // ✅ NEW
       recentActivity={recentActivity}
+      canSeeActivity={canSeeActivity}
     />
   );
 }

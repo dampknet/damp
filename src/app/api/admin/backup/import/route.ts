@@ -20,8 +20,29 @@ export async function POST(req: Request) {
     }
 
     const results: Record<string, number> = {};
+    const skipped: string[] = [];
+
+    // Accounts and audit history can only be restored by a master admin.
+    // Otherwise an ADMIN could restore a file that adds a master-admin account
+    // with a password they know, or insert fake audit-trail entries.
+    if (!profile.isMasterAdmin) {
+      if (body.userProfiles?.length) skipped.push("user accounts");
+      if (body.activityLogs?.length) skipped.push("activity history");
+      body.userProfiles = [];
+      body.activityLogs = [];
+    }
 
     // ── Restore in dependency order (parents before children) ────────────────
+
+    // 0. Asset categories (site assets point to them; older backups don't include them)
+    if (body.categories?.length) {
+      await prisma.category.createMany({ data: body.categories, skipDuplicates: true });
+      results.categories = body.categories.length;
+    }
+    if (body.subcategories?.length) {
+      await prisma.subcategory.createMany({ data: body.subcategories, skipDuplicates: true });
+      results.subcategories = body.subcategories.length;
+    }
 
     // 1. Sites (broadcast)
     if (body.sites?.length) {
@@ -104,6 +125,12 @@ export async function POST(req: Request) {
       results.warehouseIssueLines = body.warehouseIssueLines.length;
     }
 
+    // 9b. Returns received at the store (depends on WarehouseIssue)
+    if (body.issueReturns?.length) {
+      await prisma.issueReturn.createMany({ data: body.issueReturns, skipDuplicates: true });
+      results.issueReturns = body.issueReturns.length;
+    }
+
     // 10. StoreItems
     if (body.storeItems?.length) {
       await prisma.storeItem.createMany({
@@ -127,7 +154,7 @@ export async function POST(req: Request) {
       data: {
         type:       "SYSTEM_EVENT",
         title:      "Data recovery performed",
-        details:    `Backup from ${body._meta.exportedAt} restored by ${profile.email}. Records: ${JSON.stringify(results)}`,
+        details:    `Backup from ${body._meta.exportedAt} restored by ${profile.email}. Records: ${JSON.stringify(results)}${skipped.length ? `. Skipped (master admin only): ${skipped.join(", ")}` : ""}`,
         actorEmail: profile.email,
         entityType: "SYSTEM",
       },
@@ -135,7 +162,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok:      true,
-      message: "Backup restored successfully",
+      message: skipped.length
+        ? `Backup restored. Skipped ${skipped.join(" and ")} — only a master admin can restore those.`
+        : "Backup restored successfully",
       results,
     });
 

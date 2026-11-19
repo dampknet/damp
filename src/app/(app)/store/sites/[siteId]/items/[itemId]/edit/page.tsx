@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
 import { VALID_ITEM_TYPES } from "@/lib/item-types";
@@ -58,6 +58,9 @@ export default async function EditInventoryItemPage({
 
   async function updateInventoryItem(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    if (!(await getEditorProfile())) redirect(`/store/sites/${siteId}`);
 
     const itemTypeRaw      = String(formData.get("itemType")         ?? "").trim();
     const name             = String(formData.get("name")             ?? "").trim();

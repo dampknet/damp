@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import type { StoreStatus } from "@prisma/client";
 import NewStoreItemClient from "./NewStoreItemClient";
 
@@ -13,6 +13,9 @@ export default async function NewStoreItemPage() {
 
   async function createItem(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    if (!(await getEditorProfile())) redirect("/store/central-stock");
 
     const itemNoRaw = String(formData.get("itemNo") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();

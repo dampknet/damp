@@ -72,6 +72,16 @@ export default async function SiteDetailsPage({
 
   const totalAssets = assets.length;
 
+  const deliveryGroups = await prisma.warehouseIssue.groupBy({
+    by:     ["deliveryStatus"],
+    where:  { destinationSiteId: site.id, deliveryStatus: { not: null } },
+    _count: { _all: true },
+  });
+  const deliveryCounts = {
+    pending:   deliveryGroups.find((g) => g.deliveryStatus === "PENDING")?._count._all   ?? 0,
+    delivered: deliveryGroups.find((g) => g.deliveryStatus === "DELIVERED")?._count._all ?? 0,
+  };
+
   const categoryCards = orderedCats.map((c) => {
     const count = categoryCount.get(c.id) ?? 0;
     const isTransmitter = c.name === "Transmitter";
@@ -105,6 +115,7 @@ export default async function SiteDetailsPage({
         totalAssets,
       }}
       categoryCards={categoryCards}
+      deliveryCounts={deliveryCounts}
     />
   );
 }

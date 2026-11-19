@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getEditorProfile } from "@/lib/auth";
 
 export async function POST(req: Request) {
+  if (!(await getEditorProfile())) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   const json = await req.json();
   const { itemId, ...data } = json;
 

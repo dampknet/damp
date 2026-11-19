@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
 import { generateItemCode, getSitePrefix } from "@/lib/inventory-upload";
@@ -31,6 +31,9 @@ export default async function NewInventoryItemPage({
 
   async function createInventoryItem(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    if (!(await getEditorProfile())) redirect(`/store/sites/${siteId}`);
 
     const itemTypeRaw    = String(formData.get("itemType")         ?? "EQUIPMENT").trim();
     const name           = String(formData.get("name")             ?? "").trim();

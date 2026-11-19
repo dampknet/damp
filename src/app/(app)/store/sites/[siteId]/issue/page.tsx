@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { notify, notifyStockLevels } from "@/lib/notifications";
+import { parseIssueDate, toDateInput } from "@/lib/issue-date";
 import IssueInventoryItemClient from "./IssueInventoryItemClient";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { randomUUID } from "crypto";
@@ -60,8 +62,38 @@ export default async function IssueInventoryItemPage({
     condition: item.condition,
   }));
 
+  // The 42 broadcast sites items can be sent to, plus "Other" places already used (for suggestions).
+  const [destinations, otherPlaceRows] = await Promise.all([
+    prisma.site.findMany({
+      where:   { isDeleted: false },
+      orderBy: { name: "asc" },
+      select:  { id: true, name: true },
+    }),
+    prisma.warehouseIssue.findMany({
+      where:    { destinationSiteId: null, destinationName: { not: null } },
+      distinct: ["destinationName"],
+      select:   { destinationName: true },
+      take:     200,
+    }),
+  ]);
+  const otherPlaces = otherPlaceRows.map((r) => r.destinationName as string).sort((a, b) => a.localeCompare(b));
+
   async function issueItemsAction(formData: FormData) {
     "use server";
+
+    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
+    const actor = await getEditorProfile();
+    if (!actor) redirect(`/store/sites/${siteId}`);
+
+    // Master admins may back-date an issue (paper waybills written before items were in the system).
+    let issuedAt = new Date();
+    const issueDateRaw = String(formData.get("issueDate") ?? "").trim();
+    if (actor.isMasterAdmin && issueDateRaw && issueDateRaw !== toDateInput(issuedAt)) {
+      const parsed = parseIssueDate(issueDateRaw);
+      if ("error" in parsed) redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent(parsed.error)}`);
+      issuedAt = parsed.date;
+    }
+    const backdated = toDateInput(issuedAt) !== toDateInput(new Date());
 
     const bucketDataRaw    = String(formData.get("bucketData")       ?? "").trim();
     const requesterName    = String(formData.get("requesterName")    ?? "").trim();
@@ -87,6 +119,39 @@ export default async function IssueInventoryItemPage({
     // ✅ Generate a groupId so all items in this trip are linked
     const groupId = randomUUID();
     let dbError: string | null = null;
+
+    // Every item needs a destination: one of the 42 sites (tracked as a delivery) or a typed place.
+    const [liveSites, knownPlaces] = await Promise.all([
+      prisma.site.findMany({ where: { isDeleted: false }, select: { id: true, name: true } }),
+      prisma.warehouseIssue.findMany({
+        where:    { destinationSiteId: null, destinationName: { not: null } },
+        distinct: ["destinationName"],
+        select:   { destinationName: true },
+      }),
+    ]);
+    const siteById    = new Map(liveSites.map((s) => [s.id, s.name]));
+    const siteByName  = new Map(liveSites.map((s) => [s.name.trim().toLowerCase(), s]));
+    const placeByName = new Map(knownPlaces.map((p) => [String(p.destinationName).trim().toLowerCase(), String(p.destinationName)]));
+    for (const entry of bucket) {
+      const destSiteId = String(entry.destinationSiteId ?? "").trim();
+      const destOther  = String(entry.destinationOther  ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
+      const typedSite  = destOther ? siteByName.get(destOther.toLowerCase()) : undefined;
+      if (destSiteId && siteById.has(destSiteId)) {
+        entry.destinationSiteId = destSiteId;
+        entry.destinationName   = siteById.get(destSiteId);
+      } else if (!destSiteId && typedSite) {
+        // Typed a site's name under "Other" — link it to that site.
+        entry.destinationSiteId = typedSite.id;
+        entry.destinationName   = typedSite.name;
+      } else if (!destSiteId && destOther) {
+        // Reuse the existing spelling of a place, so "head office" and "Head Office" stay one place.
+        entry.destinationSiteId = null;
+        entry.destinationName   = placeByName.get(destOther.toLowerCase()) ?? destOther;
+      } else {
+        redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent(`Choose a destination for "${entry.name}".`)}`);
+      }
+    }
+    const destinationSummary = [...new Set(bucket.map((b) => String(b.destinationName)))].join(", ");
 
     // ✅ Check for duplicates BEFORE the transaction to save time
     for (const entry of bucket) {
@@ -122,10 +187,15 @@ export default async function IssueInventoryItemPage({
               purpose,
               conditionAtIssue: entry.bulkCondition ?? entry.conditions?.[0]?.condition ?? null,
               // ✅ Non-returnable items = RETURNED immediately so they show as CLOSED in DB
+              takenAt:     issuedAt,
               status:      entry.returnable ? "OPEN"     : "RETURNED",
-              returnedAt:  entry.returnable ? null        : new Date(),
+              returnedAt:  entry.returnable ? null        : issuedAt,
               returnedBy:  entry.returnable ? null        : "Non-returnable",
               expectedReturnAt: entry.returnable ? new Date() : null,
+              destinationSiteId: entry.destinationSiteId ?? null,
+              destinationName:   entry.destinationName,
+              // Sites and "Other" places are both tracked until a master admin confirms delivery.
+              deliveryStatus:    "PENDING",
               lines: Array.isArray(entry.entityCodes) && entry.entityCodes.length > 0
                 ? {
                     create: entry.entityCodes.map((code: string) => ({
@@ -159,10 +229,27 @@ export default async function IssueInventoryItemPage({
       await logActivity({
         type:       "INVENTORY_ITEM_ISSUED",
         title:      `Issue: ${bucket.length} item type(s) — ${requesterName}`,
-        details:    `Site: ${siteName}. Authorized by: ${authorizedBy}. Purpose: ${purpose}. Group: ${groupId}`,
+        details:    `Site: ${siteName}. Destination: ${destinationSummary}. Authorized by: ${authorizedBy}. Purpose: ${purpose}.${backdated ? ` Back-dated to ${issuedAt.toLocaleDateString("en-GB")} by ${actor.email}.` : ""} Group: ${groupId}`,
         actorEmail: profile?.email ?? null,
         entityType: "INVENTORY_ITEM",
       });
+
+      const totalUnits = bucket.reduce((sum, b) => sum + (Number(b.quantity) || 1), 0);
+      const itemNames  = bucket.map((b) => String(b.name ?? "")).filter(Boolean);
+      await notify({
+        type:       "ITEM_ISSUED",
+        title:      `${totalUnits} item${totalUnits === 1 ? "" : "s"} issued from ${siteName} → ${destinationSummary}`,
+        body:       `${itemNames.slice(0, 4).join(", ")}${itemNames.length > 4 ? ` and ${itemNames.length - 4} more` : ""}. Taken by ${requesterName}, authorized by ${authorizedBy || "—"}. Purpose: ${purpose}`,
+        link:       `/store/sites/${siteId}/issue/receipt?groupId=${groupId}`,
+        actorEmail: profile?.email ?? null,
+      });
+
+      await notifyStockLevels(
+        bucket.filter((b) => !b.uncountable).map((b) => ({ itemId: String(b.id), taken: Number(b.quantity) || 1 })),
+        siteName,
+        siteId,
+        profile?.email ?? null,
+      );
 
     } catch (e) {
       if (isRedirectError(e)) throw e;
@@ -182,6 +269,10 @@ export default async function IssueInventoryItemPage({
     <IssueInventoryItemClient
       site={site}
       items={items as any}
+      destinations={destinations}
+      otherPlaces={otherPlaces}
+      canBackdate={!!profile?.isMasterAdmin}
+      today={toDateInput(new Date())}
       action={issueItemsAction}
     />
   );

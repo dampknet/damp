@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getEditorProfile } from "@/lib/auth";
 
 type MuxKey = "MUX1" | "MUX2" | "MUX3";
 
 export async function PATCH(req: Request) {
   try {
+    if (!(await getEditorProfile())) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = (await req.json()) as {
       siteId?: string;
       mux?: MuxKey;

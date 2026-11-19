@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import SettingsMenu from "@/components/SettingsMenu";
+import NotificationBell from "@/components/NotificationBell";
 import { useThemeMode } from "@/context/ThemeContext";
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
   isMasterAdmin:    boolean;
   hasLocalPassword: boolean;
   displayName:      string;
+  showNotifications: boolean;
 };
 
 const LINKS = [
@@ -25,6 +27,7 @@ export default function AppNavbarClient({
   isMasterAdmin,
   hasLocalPassword,
   displayName,
+  showNotifications,
 }: Props) {
   const { mode } = useThemeMode();
   const isDark = mode === "dark";
@@ -83,13 +86,16 @@ export default function AppNavbarClient({
           ))}
         </nav>
 
-        <SettingsMenu
-          email={email}
-          role={role}
-          isMasterAdmin={isMasterAdmin}
-          hasLocalPassword={hasLocalPassword}
-          displayName={displayName}
-        />
+        <div className="flex items-center gap-2">
+          {showNotifications && <NotificationBell isDark={isDark} />}
+          <SettingsMenu
+            email={email}
+            role={role}
+            isMasterAdmin={isMasterAdmin}
+            hasLocalPassword={hasLocalPassword}
+            displayName={displayName}
+          />
+        </div>
       </div>
 
       <div

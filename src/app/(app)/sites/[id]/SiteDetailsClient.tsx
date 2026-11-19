@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { useThemeMode } from "@/context/ThemeContext";
 
 type SiteInfo = {
@@ -32,9 +33,11 @@ function accentForCard(name: string) {
 export default function SiteDetailsClient({
   site,
   categoryCards,
+  deliveryCounts,
 }: {
   site: SiteInfo;
   categoryCards: CategoryCard[];
+  deliveryCounts: { pending: number; delivered: number };
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
@@ -140,6 +143,46 @@ export default function SiteDetailsClient({
             </div>
           </div>
         </section>
+
+        {/* Site store: items issued from the warehouses to this site */}
+        <Link
+          href={`/sites/${site.id}/store`}
+          aria-label={`Open the site store for ${site.name}`}
+          className={
+            dark
+              ? "group mt-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/8 sm:flex-row sm:items-center sm:justify-between"
+              : "group mt-6 flex flex-col gap-4 rounded-3xl border border-[#e4dbd0] bg-white p-5 shadow-[0_10px_30px_rgba(26,24,20,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(26,24,20,0.08)] sm:flex-row sm:items-center sm:justify-between"
+          }
+        >
+          <div>
+            <div className={dark ? "text-lg font-semibold tracking-tight text-slate-100" : "text-lg font-semibold tracking-tight text-[#1a1814]"}>
+              📦 Site Store
+            </div>
+            <p className={dark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-[#7b756d]"}>
+              Items issued to {site.name} from the warehouses: pending delivery and delivered.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-3 py-1 text-xs font-bold ${
+              deliveryCounts.pending
+                ? dark ? "border-amber-500/30 bg-amber-500/10 text-amber-300" : "border-amber-200 bg-amber-50 text-amber-700"
+                : dark ? "border-white/10 bg-white/5 text-slate-400" : "border-[#e0dbd2] bg-[#f5f2ed] text-[#6b655d]"
+            }`}>
+              {deliveryCounts.pending} pending
+            </span>
+            <span className={`rounded-full border px-3 py-1 text-xs font-bold ${dark ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+              {deliveryCounts.delivered} delivered
+            </span>
+            <span className={
+              dark
+                ? "ml-1 inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition group-hover:opacity-90"
+                : "ml-1 inline-flex items-center gap-1.5 rounded-xl bg-[#1a1814] px-4 py-2 text-sm font-semibold text-white shadow-sm transition group-hover:bg-[#2d2924]"
+            }>
+              Open store
+              <ChevronRight size={16} className="transition group-hover:translate-x-0.5" />
+            </span>
+          </div>
+        </Link>
 
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           {categoryCards.map((c) => (

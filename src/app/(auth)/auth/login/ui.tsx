@@ -4,10 +4,12 @@ import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { signIn, getProviders } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { safeCallbackPath } from "@/lib/session-policy";
 
 function errorMessage(code: string | null): string | null {
   if (!code) return null;
   if (code === "not_invited")   return "Your account has not been granted access. Contact your admin.";
+  if (code === "unverified_email") return "Your email address isn't verified with that sign-in provider. Verify it there, or use another sign-in method.";
   if (code === "link_expired")  return "Your invite link has expired. Ask your admin to re-invite you.";
   if (code === "AccessDenied")  return "Access denied. Contact your system administrator.";
   if (code === "OAuthSignin")   return "That sign-in provider is unavailable right now. Try another method.";
@@ -17,6 +19,8 @@ function errorMessage(code: string | null): string | null {
     const mins = Number(code.split(":")[1]) || 5;
     return `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}, or ask a master admin to unlock your account.`;
   }
+  if (code === "idle")            return "You were signed out after a period of inactivity. Please sign in again.";
+  if (code === "session_expired") return "Your session has ended (sessions last up to 12 hours). Please sign in again.";
   if (code === "not_authorized") return null;
   return "Invalid email or password, or your account doesn't have access.";
 }
@@ -53,6 +57,8 @@ function ProviderIcon({ id }: { id: string }) {
 function LoginFormInner() {
   const searchParams = useSearchParams();
   const urlError     = searchParams.get("error");
+  // After an inactivity sign-out, go back to the page the user was on (only pages inside this app).
+  const returnTo     = safeCallbackPath(searchParams.get("callbackUrl")) ?? "/dashboard";
   const message      = searchParams.get("message");
 
   const [email,    setEmail]    = useState("");
@@ -85,7 +91,7 @@ function LoginFormInner() {
       return;
     }
 
-    window.location.href = "/dashboard";
+    window.location.href = returnTo;
   };
 
   useEffect(() => {
@@ -101,7 +107,7 @@ function LoginFormInner() {
 
   const handleProvider = (id: string) => {
     setSsoLoad(id);
-    signIn(id, { callbackUrl: "/dashboard" });
+    signIn(id, { callbackUrl: returnTo });
   };
 
   return (
