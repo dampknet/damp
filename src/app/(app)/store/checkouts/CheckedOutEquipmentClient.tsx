@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
@@ -56,12 +57,7 @@ export default function CheckedOutEquipmentClient({
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <div className="flex flex-col items-start gap-3">
-                <Link href="/store" className={dark
-                  ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                  : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-                }>
-                  ← Back to Store Dashboard
-                </Link>
+                <Breadcrumbs className="mb-1" items={[{ label: "Store", href: "/store" }, { label: "Checked Out" }]} />
                 <div className={dark
                   ? "inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#ef4444]"
                   : "inline-flex w-fit items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c0392b]"

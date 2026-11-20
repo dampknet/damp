@@ -1,9 +1,10 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { Download, ArrowLeft, Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 
 type Trip = {
   groupId: string;
@@ -56,13 +57,7 @@ export default function WaybillsClient({
         }>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#10b981)]" />
 
-          <Link href={`/store/sites/${site.id}`}
-            className={dark
-              ? "mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-              : "mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-            }>
-            <ArrowLeft size={16} /> Back to {site.name} Inventory
-          </Link>
+          <Breadcrumbs items={[{ label: "Store", href: "/store" }, { label: site.name, href: `/store/sites/${site.id}` }, { label: "Waybills" }]} />
 
           <h1 className={dark
             ? "mt-3 text-3xl font-semibold text-slate-100"

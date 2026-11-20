@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
@@ -141,16 +142,7 @@ export default function SiteSubcategoryClient({
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <Link
-                href={`/sites/${siteId}`}
-                className={
-                  dark
-                    ? "inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                    : "inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-                }
-              >
-                ← Back to Site
-              </Link>
+              <Breadcrumbs items={[{ label: "Sites", href: "/sites" }, { label: siteName, href: `/sites/${siteId}` }, { label: subName }]} />
 
               <div
                 className={

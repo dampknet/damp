@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -192,12 +193,7 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <Link href="/store" className={dark
-                ? "mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                : "mb-3 inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-              }>
-                ← Back to Store Dashboard
-              </Link>
+              <Breadcrumbs items={[{ label: "Store", href: "/store" }, { label: site.name }]} />
               <h1 className={dark
                 ? "text-3xl font-semibold tracking-tight text-slate-100 md:text-4xl"
                 : "text-3xl font-semibold tracking-tight text-[#1a1814] md:text-4xl"

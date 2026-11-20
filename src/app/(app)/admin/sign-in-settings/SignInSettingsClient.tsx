@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -7,7 +8,7 @@ import {
   saveProvider, testProvider, saveMail, testMail,
   type ActionResult, type ProviderInput,
 } from "./actions";
-import { ArrowLeft, Copy, Loader2, Lock, Mail, ShieldCheck, KeyRound, AlertTriangle } from "lucide-react";
+import { Copy, Loader2, Lock, Mail, ShieldCheck, KeyRound, AlertTriangle } from "lucide-react";
 
 export type ProviderView = {
   key:         "azure-ad" | "google" | "oidc";
@@ -363,9 +364,7 @@ export default function SignInSettingsClient({
       <div className="mx-auto max-w-4xl px-4 py-8 md:px-6">
         <section className={`${s.card} relative p-6`}>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]" />
-          <Link href="/admin" className={`mb-4 inline-flex items-center gap-2 text-sm font-medium ${s.muted} hover:underline`}>
-            <ArrowLeft size={16} /> Back to Admin
-          </Link>
+          <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Sign-in & Email Settings" }]} />
           <h1 className={`text-2xl font-semibold tracking-tight ${s.txt}`}>Sign-in & Email Settings</h1>
           <p className={`mt-1 text-sm ${s.muted}`}>
             Choose which identity providers appear on the login page and manage their credentials. Secrets are encrypted and never shown again after saving.

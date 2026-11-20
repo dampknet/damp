@@ -1,8 +1,9 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Package, Undo2 } from "lucide-react";
+import { Clock, CheckCircle2, Package, Undo2 } from "lucide-react";
 import { useThemeMode } from "@/context/ThemeContext";
 import DeliveriesTable from "@/components/DeliveriesTable";
 import type { DeliveryRow } from "@/lib/deliveries";
@@ -48,9 +49,7 @@ export default function SiteStoreClient({
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
         <div className={`${card} p-6`}>
-          <Link href={`/sites/${site.id}`} className={`mb-4 inline-flex items-center gap-2 text-sm font-medium ${muted} hover:underline`}>
-            <ArrowLeft size={16} /> Back to {site.name}
-          </Link>
+          <Breadcrumbs items={[{ label: "Sites", href: "/sites" }, { label: site.name, href: `/sites/${site.id}` }, { label: "Site Store" }]} />
           <div className={dark ? "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#f97316]" : "mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#c8611a]"}>
             Site store
           </div>

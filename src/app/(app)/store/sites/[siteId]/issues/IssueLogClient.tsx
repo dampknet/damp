@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -310,10 +311,7 @@ export default function IssueLogClient({
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <Link href={`/store/sites/${site.id}`}
-                className={dark ? "mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline" : "mb-3 inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"}>
-                ← Back to {site.name} Inventory
-              </Link>
+              <Breadcrumbs items={[{ label: "Store", href: "/store" }, { label: site.name, href: `/store/sites/${site.id}` }, { label: "Issue Log" }]} />
               <h1 className={dark ? "mt-3 text-3xl font-semibold text-slate-100 md:text-4xl" : "mt-3 text-3xl font-semibold text-[#1a1814] md:text-4xl"}>
                 {site.name} Issue Log
               </h1>

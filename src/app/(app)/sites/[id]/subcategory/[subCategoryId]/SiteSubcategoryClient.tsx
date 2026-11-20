@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
@@ -50,16 +51,7 @@ export default function SiteSubcategoryClient({
       <div className="mx-auto max-w-6xl px-4 py-10 print:py-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link
-              href={`/sites/${siteId}`}
-              className={
-                dark
-                  ? "text-sm text-slate-400 hover:underline print:hidden"
-                  : "text-sm text-gray-600 hover:underline print:hidden"
-              }
-            >
-              ← Back to Site
-            </Link>
+            <Breadcrumbs items={[{ label: "Sites", href: "/sites" }, { label: siteName, href: `/sites/${siteId}` }, { label: subName }]} />
 
             <h1
               className={

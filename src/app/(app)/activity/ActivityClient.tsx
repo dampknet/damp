@@ -1,11 +1,12 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import { useThemeMode } from "@/context/ThemeContext";
-import { FileText, Loader2, X, ShieldAlert, RefreshCw, ArrowLeft, CheckCheck } from "lucide-react";
+import { FileText, Loader2, X, ShieldAlert, RefreshCw, CheckCheck } from "lucide-react";
 import { PERIOD_OPTIONS } from "@/lib/reports/period";
 import { markSecurityReviewed } from "./actions";
 
@@ -212,6 +213,7 @@ export default function ActivityClient({
       : "min-h-screen bg-[#f5f2ed]"
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+        <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Activity Audit Log" }]} />
 
         <div className={dark
           ? "rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
@@ -289,13 +291,6 @@ export default function ActivityClient({
                 rows={exportRows}
                 columns={exportCols}
               />
-
-              <Link href="/admin" className={dark
-                ? "inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/25"
-                : "inline-flex items-center gap-1.5 rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:border-[#4a4740]"
-              }>
-                <ArrowLeft size={15} /> Admin Settings
-              </Link>
             </div>
           </div>
 

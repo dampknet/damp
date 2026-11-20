@@ -1,9 +1,10 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { Download, ArrowLeft, Printer, Trash2, CheckCircle2, Loader2, AlertTriangle, CalendarClock, X } from "lucide-react";
+import { Download, Printer, Trash2, CheckCircle2, Loader2, AlertTriangle, CalendarClock, X } from "lucide-react";
 import { changeIssueDate } from "./actions";
 
 type ReceiptRow = {
@@ -128,14 +129,7 @@ export default function ReceiptClient({
 
         {/* ── ACTION BAR ── */}
         <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
-          <button onClick={() => router.push(`/store/sites/${site.id}`)}
-            className={dark
-              ? "inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-200"
-              : "inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:text-[#1a1814]"
-            }
-          >
-            <ArrowLeft size={16} /> Back to {site.name} Inventory
-          </button>
+          <Breadcrumbs className="" items={[{ label: "Store", href: "/store" }, { label: site.name, href: `/store/sites/${site.id}` }, { label: "Issue Receipt" }]} />
 
           <div className="flex flex-wrap items-center gap-2">
             {canEditDate && (

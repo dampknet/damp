@@ -1,11 +1,12 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import { X, Trash2, Loader2, QrCode, ArrowLeft } from "lucide-react";
+import { X, Trash2, Loader2, QrCode } from "lucide-react";
 import { ALL_CODE_SEGMENTS, ALL_SITE_PREFIXES } from "@/lib/item-types";
 
 type InstanceRow = {
@@ -510,12 +511,7 @@ export default function IssueInventoryItemClient({
           } />
 
           <div className="flex flex-col gap-3">
-            <Link href={`/store/sites/${site.id}`} className={dark
-              ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-              : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-            }>
-              <ArrowLeft size={16} /> Back to {site.name} Inventory
-            </Link>
+            <Breadcrumbs className="mb-1" items={[{ label: "Store", href: "/store" }, { label: site.name, href: `/store/sites/${site.id}` }, { label: "Issue Items" }]} />
 
             <div className="flex items-center justify-between">
               <div className={dark

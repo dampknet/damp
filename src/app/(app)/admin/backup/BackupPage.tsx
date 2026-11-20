@@ -1,9 +1,10 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
-import { Download, Upload, ShieldCheck, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, Database } from "lucide-react";
+import { Download, Upload, ShieldCheck, AlertTriangle, CheckCircle2, Loader2, Database } from "lucide-react";
 
 export default function BackupPage() {
   const { mode } = useThemeMode();
@@ -113,12 +114,7 @@ export default function BackupPage() {
             : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#2a7d52)]"
           } />
 
-          <Link href="/admin" className={dark
-            ? "mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-            : "mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-          }>
-            <ArrowLeft size={16} /> Back to Admin
-          </Link>
+          <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Data Backup & Recovery" }]} />
 
           <div className="mt-3 flex items-center gap-3">
             <div className={dark

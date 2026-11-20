@@ -1,11 +1,12 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import { QrCode, X, Loader2, CheckCircle2, PlusCircle, ArrowLeft, Printer, Trash2 } from "lucide-react";
+import { QrCode, X, Loader2, CheckCircle2, PlusCircle, Printer, Trash2 } from "lucide-react";
 
 export default function DeviceManagementClient({ item, canEdit }: any) {
   const { mode } = useThemeMode();
@@ -225,10 +226,7 @@ export default function DeviceManagementClient({ item, canEdit }: any) {
         {/* Header */}
         <div className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
           <div className="header-nav">
-            <Link href={`/store/sites/${item.inventorySiteId}`}
-              className="inline-flex items-center gap-2 text-sm font-bold opacity-60 hover:text-sky-500 mb-4">
-              <ArrowLeft size={16} /> Back
-            </Link>
+            <Breadcrumbs items={[{ label: "Store", href: "/store" }, { label: item.inventorySite?.name ?? "Warehouse", href: `/store/sites/${item.inventorySiteId}` }, { label: item.name }]} />
             <h1 className="text-4xl font-black tracking-tight">{item.name}</h1>
             {item.itemCode && (
               <div className="mt-1 font-mono text-sm opacity-50">{item.itemCode}</div>

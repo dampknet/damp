@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -23,16 +24,7 @@ export default function NewSiteClient({
       }
     >
       <div className="mx-auto max-w-xl px-4 py-10">
-        <Link
-          href="/sites"
-          className={
-            dark
-              ? "text-sm text-slate-400 hover:underline"
-              : "text-sm text-gray-600 hover:underline"
-          }
-        >
-          ← Back to Sites
-        </Link>
+        <Breadcrumbs items={[{ label: "Sites", href: "/sites" }, { label: "New Site" }]} />
 
         <h1
           className={

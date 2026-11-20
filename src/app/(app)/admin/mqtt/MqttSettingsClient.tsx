@@ -1,10 +1,11 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
-import { ArrowLeft, Wifi, Loader2 } from "lucide-react";
+import { Wifi, Loader2 } from "lucide-react";
 
 type MqttConfig = {
   id:             string;
@@ -65,12 +66,7 @@ export default function MqttSettingsClient({
         }>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#10b981)]" />
 
-          <Link href="/admin" className={dark
-            ? "mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-            : "mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-          }>
-            <ArrowLeft size={16} /> Back to Admin
-          </Link>
+          <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "HiveMQ Fuel Monitor" }]} />
 
           <div className="mt-2 flex items-center gap-4">
             <div className={dark

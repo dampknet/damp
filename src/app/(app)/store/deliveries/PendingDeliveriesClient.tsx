@@ -1,7 +1,8 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
-import { ArrowLeft, Truck } from "lucide-react";
+import { Truck } from "lucide-react";
 import { useThemeMode } from "@/context/ThemeContext";
 import DeliveriesTable from "@/components/DeliveriesTable";
 import type { DeliveryRow } from "@/lib/deliveries";
@@ -53,9 +54,7 @@ export default function PendingDeliveriesClient({
     }>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
         <div className={`${card} p-6`}>
-          <Link href="/store" className={`mb-4 inline-flex items-center gap-2 text-sm font-medium ${muted} hover:underline`}>
-            <ArrowLeft size={16} /> Back to Store
-          </Link>
+          <Breadcrumbs items={[{ label: "Store", href: "/store" }, { label: "Pending Deliveries" }]} />
           <h1 className={`flex items-center gap-2 text-3xl font-semibold tracking-tight ${txt}`}>
             <Truck size={26} /> Pending Deliveries
           </h1>

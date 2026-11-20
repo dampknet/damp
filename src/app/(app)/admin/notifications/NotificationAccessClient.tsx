@@ -1,8 +1,9 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { ArrowLeft, Bell, Crown, Loader2 } from "lucide-react";
+import { Bell, Crown, Loader2 } from "lucide-react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { setNotificationAccess } from "./actions";
 
@@ -50,9 +51,7 @@ export default function NotificationAccessClient({ users }: { users: UserRow[] }
       <div className="mx-auto max-w-4xl px-4 py-8 md:px-6">
         <section className={`${card} relative overflow-hidden p-6`}>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#dc2626,#f59e0b)]" />
-          <Link href="/admin" className={`mb-4 inline-flex items-center gap-2 text-sm font-medium ${muted} hover:underline`}>
-            <ArrowLeft size={16} /> Back to Admin
-          </Link>
+          <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Notification Access" }]} />
           <h1 className={`flex items-center gap-2 text-2xl font-semibold tracking-tight ${txt}`}>
             <Bell size={22} /> Notification Access
           </h1>

@@ -1,9 +1,10 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCheck, Bell, ArrowLeft } from "lucide-react";
+import { CheckCheck, Bell } from "lucide-react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { NotificationIcon, markRead, timeAgo } from "@/components/NotificationBell";
 
@@ -77,6 +78,7 @@ export default function NotificationsClient({
       : "min-h-screen bg-[#f5f2ed]"
     }>
       <div className="mx-auto max-w-4xl px-4 py-8 md:px-6">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Notifications" }]} />
         <div className={`${card} p-6`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -105,12 +107,6 @@ export default function NotificationsClient({
                   <CheckCheck size={15} /> Mark all read
                 </button>
               )}
-              <Link href="/dashboard" className={dark
-                ? "inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-white/25"
-                : "inline-flex items-center gap-1.5 rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:border-[#4a4740]"
-              }>
-                <ArrowLeft size={15} /> Dashboard
-              </Link>
             </div>
           </div>
         </div>

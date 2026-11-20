@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -204,16 +205,7 @@ export default function DeletedItemsClient({
       }
     >
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <Link
-          href="/dashboard"
-          className={
-            dark
-              ? "text-sm text-slate-400 hover:underline"
-              : "text-sm text-gray-600 hover:underline"
-          }
-        >
-          ← Back to Dashboard
-        </Link>
+        <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Recycle Bin" }]} />
 
         <h1
           className={

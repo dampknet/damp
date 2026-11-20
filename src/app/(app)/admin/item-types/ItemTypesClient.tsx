@@ -1,9 +1,10 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Layers, Loader2, Pencil, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Layers, Loader2, Pencil, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { createItemType, renameItemType, setTracked, setWarehouseType, deleteItemType } from "./actions";
 
@@ -46,7 +47,7 @@ export default function ItemTypesClient({ warehouses, mains, clashes }: { wareho
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <section className={`${card} relative overflow-hidden p-6`}>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]" />
-          <Link href="/admin" className={`mb-4 inline-flex items-center gap-2 text-sm font-medium ${muted} hover:underline`}><ArrowLeft size={16} /> Back to Admin</Link>
+          <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Item Types" }]} />
           <h1 className={`flex items-center gap-2 text-2xl font-semibold tracking-tight ${txt}`}><Layers size={22} /> Item Types</h1>
           <p className={`mt-1 text-sm ${muted}`}>
             Item types and their optional sub-types, which warehouses use them, and each warehouse&apos;s short code

@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
@@ -54,6 +55,7 @@ export default function AssetsClient({
       }
     >
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Assets" }]} />
         <div
           className={
             dark
@@ -118,17 +120,6 @@ export default function AssetsClient({
                 rows={exportRows}
                 columns={exportCols}
               />
-
-              <Link
-                href="/dashboard"
-                className={
-                  dark
-                    ? "rounded-xl border border-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/25"
-                    : "rounded-xl border border-[#e0dbd2] bg-white px-4 py-2 text-sm font-semibold text-[#1a1814] hover:border-[#4a4740]"
-                }
-              >
-                Back to Dashboard
-              </Link>
             </div>
           </div>
 

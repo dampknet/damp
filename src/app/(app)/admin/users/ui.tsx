@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -334,11 +335,7 @@ export default function UsersTable({
           </div>
         )}
 
-        <nav className={`mb-6 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.15em] ${muted}`}>
-          <Link href="/admin" className={`rounded px-1 py-0.5 transition ${hoverBg} ${muted}`}>Admin</Link>
-          <ChevronRight size={13} className="opacity-40" />
-          <span className={txt}>Access Control</span>
-        </nav>
+        <Breadcrumbs className="mb-6" items={[{ label: "Admin", href: "/admin" }, { label: "Access Control" }]} />
 
         <div className={`mb-8 flex flex-col gap-4 border-b ${border} pb-6 md:flex-row md:items-end md:justify-between`}>
           <div>

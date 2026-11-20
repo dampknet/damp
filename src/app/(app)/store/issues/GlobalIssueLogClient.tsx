@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
@@ -247,12 +248,7 @@ export default function GlobalIssueLogClient({
             : "pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1d5fa8,#3b82f6,#c8611a)]"
           } />
 
-          <Link href="/store" className={dark
-            ? "mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-            : "mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-          }>
-            ← Back to Store Dashboard
-          </Link>
+          <Breadcrumbs items={[{ label: "Store", href: "/store" }, { label: "Issue Log" }]} />
 
           <div className="flex items-start justify-between gap-4">
             <div>

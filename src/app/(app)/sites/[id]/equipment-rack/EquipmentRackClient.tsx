@@ -1,5 +1,6 @@
 "use client";
 
+import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 import { useThemeMode } from "@/context/ThemeContext";
 
@@ -71,16 +72,7 @@ export default function EquipmentRackClient({
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <div className="flex flex-col gap-3">
-                <Link
-                  href={`/sites/${siteId}`}
-                  className={
-                    dark
-                      ? "inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-400 hover:underline"
-                      : "inline-flex w-fit items-center gap-2 text-sm font-medium text-[#6f6a62] hover:underline"
-                  }
-                >
-                  ← Back to {siteName}
-                </Link>
+                <Breadcrumbs className="mb-1" items={[{ label: "Sites", href: "/sites" }, { label: siteName, href: `/sites/${siteId}` }, { label: "Equipment Rack" }]} />
 
                 <div
                   className={
