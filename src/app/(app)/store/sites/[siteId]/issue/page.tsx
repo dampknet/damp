@@ -4,6 +4,9 @@ import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { notify, notifyStockLevels } from "@/lib/notifications";
 import { parseIssueDate, toDateInput } from "@/lib/issue-date";
+import { typeLabel, ALL_SITE_PREFIXES } from "@/lib/item-types";
+import { codeSegmentsFor } from "@/lib/item-type-registry";
+import { getSitePrefix } from "@/lib/inventory-upload";
 import IssueInventoryItemClient from "./IssueInventoryItemClient";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { randomUUID } from "crypto";
@@ -38,6 +41,8 @@ export default async function IssueInventoryItemPage({
       id:           true,
       name:         true,
       itemType:     true,
+      typeRef:      { select: { name: true, tracked: true } },
+      subType:      { select: { name: true } },
       itemCode:     true,
       quantity:     true,
       uncountable:  true,
@@ -57,10 +62,17 @@ export default async function IssueInventoryItemPage({
     },
   });
 
-  const items = rawItems.map((item) => ({
+  const items = rawItems.map(({ typeRef, subType, ...item }) => ({
     ...item,
+    itemType:  typeLabel({ itemType: item.itemType, typeRef, subType }),
+    // Units tracked one by one: from the item type's setting (older items: Equipment / Cooling).
+    tracked:   typeRef?.tracked ?? (item.itemType === "EQUIPMENT" || item.itemType === "COOLING_INFRASTRUCTURE"),
     condition: item.condition,
   }));
+
+  // Barcode matching: this warehouse's short codes and label prefix.
+  const [codeSegments, ownPrefix] = await Promise.all([codeSegmentsFor(siteId), getSitePrefix(siteId)]);
+  const sitePrefixes = [...new Set([`${ownPrefix.toUpperCase()}-`, ...ALL_SITE_PREFIXES])].sort((a, b) => b.length - a.length);
 
   // The 42 broadcast sites items can be sent to, plus "Other" places already used (for suggestions).
   const [destinations, otherPlaceRows] = await Promise.all([
@@ -272,6 +284,8 @@ export default async function IssueInventoryItemPage({
       destinations={destinations}
       otherPlaces={otherPlaces}
       canBackdate={!!profile?.isMasterAdmin}
+      codeSegments={codeSegments}
+      sitePrefixes={sitePrefixes}
       today={toDateInput(new Date())}
       action={issueItemsAction}
     />

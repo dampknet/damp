@@ -79,6 +79,18 @@ export default function AdminIndexClient({
       hoverCl:    dark ? "group-hover:text-violet-400" : "group-hover:text-violet-700",
     },
     {
+      masterOnly: false,
+      href:       "/admin/item-types",
+      emoji:      "🗂️",
+      label:      "Item Types",
+      sub:        "Item types, sub-types, which warehouses use them and their short codes",
+      accent:     "bg-[linear-gradient(90deg,#0e7490,#22d3ee)]",
+      iconBg:     dark ? "border-cyan-500/20 bg-cyan-500/10" : "border-cyan-200 bg-cyan-50",
+      tag:        "Types · Sub-types · Codes",
+      tagCls:     dark ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300" : "border-cyan-200 bg-cyan-50 text-cyan-700",
+      hoverCl:    dark ? "group-hover:text-cyan-400" : "group-hover:text-cyan-700",
+    },
+    {
       masterOnly: true,
       href:       "/admin/notifications",
       emoji:      "🔔",

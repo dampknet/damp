@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import DeletedItemsClient from "./ui";
+import { TYPE_NAMES, typeLabel } from "@/lib/item-types";
 
 export default async function DeletedItemsPage() {
   const me = await getCurrentProfile();
@@ -43,6 +44,7 @@ export default async function DeletedItemsPage() {
         id:             true,
         name:           true,
         itemType:       true,
+        ...TYPE_NAMES,
         itemCode:       true,   // ✅ replaces stockNumber
         deletedAt:      true,
         deletedByEmail: true,
@@ -100,7 +102,7 @@ export default async function DeletedItemsPage() {
         return {
           id:    x.id,
           label: x.name,
-          subLabel: `${x.itemType} • ${x.inventorySite.name}${codeSuffix}`,
+          subLabel: `${typeLabel(x)} • ${x.inventorySite.name}${codeSuffix}`,
           deletedAt:      x.deletedAt?.toISOString() ?? null,
           deletedByEmail: x.deletedByEmail ?? null,
           deleteReason:   x.deleteReason  ?? null,

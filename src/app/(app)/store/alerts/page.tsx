@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import AlertsClient from "./AlertsClient";
+import { TYPE_NAMES, typeLabel } from "@/lib/item-types";
 
 type SearchParams = {
   q?: string;
@@ -41,6 +42,7 @@ export default async function StoreAlertsPage({
       id:               true,
       name:             true,
       itemType:         true,
+      ...TYPE_NAMES,
       quantity:         true,
       unit:             true,
       reorderLevel:     true,
@@ -68,7 +70,7 @@ export default async function StoreAlertsPage({
   const items = rawItems.map((row) => ({
     id:               row.id,
     name:             row.name,
-    itemType:         row.itemType,
+    itemType:         typeLabel(row) as any,
     quantity:         row.quantity,
     unit:             row.unit,
     reorderLevel:     row.reorderLevel,

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Pencil, Trash2 } from "lucide-react";
 import { ITEM_TYPE_LABEL } from "@/lib/item-types";
 
 const STATUS_STYLE: Record<string, { dark: string; light: string; dot: string }> = {
@@ -16,7 +16,11 @@ const STATUS_STYLE: Record<string, { dark: string; light: string; dot: string }>
   INACTIVE:     { dark: "border-slate-500/30 bg-slate-500/10 text-slate-400",       light: "border-slate-200 bg-slate-50 text-slate-600",       dot: "bg-slate-400"   },
 };
 
-type SiteCard = { id: string; name: string; location: string; itemCount: number };
+type SiteCard = {
+  id: string; name: string; location: string; rawLocation: string; description: string;
+  itemCount: number;
+  blockers: string[]; // why it can't be deleted (empty = can be)
+};
 
 type Summary = {
   totalInventoryItems: number;
@@ -65,14 +69,17 @@ function SummaryCard({ dark, label, value, sub, accent, href }: {
 }
 
 export default function StoreDashboardClient({
-  role, canEdit, email, summary, siteCards, createSiteAction,
+  role, canEdit, email, summary, siteCards, isAdmin, createSiteAction, updateSiteAction, deleteSiteAction,
 }: {
   role:              string;
   canEdit:           boolean;
   email:             string | null;
   summary:           Summary;
   siteCards:         SiteCard[];
+  isAdmin:           boolean;
   createSiteAction?: (formData: FormData) => void;
+  updateSiteAction?: (formData: FormData) => void;
+  deleteSiteAction?: (formData: FormData) => void;
 }) {
   const { mode }     = useThemeMode();
   const dark         = mode === "dark";
@@ -87,10 +94,13 @@ export default function StoreDashboardClient({
   const [searched,    setSearched]     = useState("");
   const [isPending,   startTransition] = useTransition();
   const [showNewSite, setShowNewSite]  = useState(false);
+  const [editSite,    setEditSite]     = useState<SiteCard | null>(null);
+  const [deleteSite,  setDeleteSite]   = useState<SiteCard | null>(null);
 
+  // Close any open site dialog after a save/delete (success or error message comes back in the URL).
   useEffect(() => {
-    if (siteSuccess) setShowNewSite(false);
-  }, [siteSuccess]);
+    if (siteSuccess || siteError) { setShowNewSite(false); setEditSite(null); setDeleteSite(null); }
+  }, [siteSuccess, siteError]);
 
   const handleSearch = async () => {
     const query = q.trim();
@@ -339,14 +349,14 @@ export default function StoreDashboardClient({
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {siteCards.map((site) => (
-            <Link key={site.id} href={`/store/sites/${site.id}`} className="block">
-              <div className={dark
-                ? "overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/20"
-                : "overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-              }>
+            <div key={site.id} className={dark
+              ? "relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/20"
+              : "relative overflow-hidden rounded-2xl border border-[#e6ddd1] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            }>
+              <Link href={`/store/sites/${site.id}`} className="block">
                 <div className="h-1 bg-[#1d5fa8]" />
                 <div className="p-5">
-                  <div className={dark ? "text-base font-bold text-slate-100" : "text-base font-bold text-[#1a1814]"}>{site.name} Inventory</div>
+                  <div className={`pr-16 ${dark ? "text-base font-bold text-slate-100" : "text-base font-bold text-[#1a1814]"}`}>{site.name} Inventory</div>
                   <div className={dark ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-[#8b857c]"}>Location: {site.location}</div>
                   <div className="mt-4">
                     <span className={dark
@@ -357,8 +367,33 @@ export default function StoreDashboardClient({
                     </span>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+
+              {(updateSiteAction || deleteSiteAction) && (
+                <div className="absolute right-3 top-4 flex gap-1">
+                  {updateSiteAction && (
+                    <button type="button" title="Edit site details" aria-label={`Edit ${site.name}`}
+                      onClick={() => setEditSite(site)}
+                      className={dark
+                        ? "rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:bg-white/10 hover:text-slate-100"
+                        : "rounded-lg border border-[#e0dbd2] bg-white p-1.5 text-[#8b857c] hover:bg-[#f5f2ed] hover:text-[#1a1814]"
+                      }>
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                  {deleteSiteAction && (
+                    <button type="button" title="Delete site" aria-label={`Delete ${site.name}`}
+                      onClick={() => setDeleteSite(site)}
+                      className={dark
+                        ? "rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+                        : "rounded-lg border border-[#e0dbd2] bg-white p-1.5 text-[#8b857c] hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                      }>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </div>
 
@@ -454,6 +489,152 @@ export default function StoreDashboardClient({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {editSite && updateSiteAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.5)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditSite(null); }}
+        >
+          <div className={dark
+            ? "w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1923] shadow-2xl"
+            : "w-full max-w-md overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white shadow-2xl"
+          }>
+            <div className={dark
+              ? "flex items-center justify-between border-b border-white/10 px-6 py-4"
+              : "flex items-center justify-between border-b border-[#eee7dd] px-6 py-4"
+            }>
+              <div>
+                <div className={dark ? "text-base font-bold text-slate-100" : "text-base font-bold text-[#1a1814]"}>Edit Inventory Site</div>
+                <div className={dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"}>{editSite.name}</div>
+              </div>
+              <button onClick={() => setEditSite(null)}
+                className={dark ? "text-slate-500 hover:text-slate-300" : "text-[#9c9890] hover:text-[#1a1814]"}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form key={editSite.id} action={updateSiteAction} className="p-6 space-y-4">
+              <input type="hidden" name="id" value={editSite.id} />
+              <div>
+                <label className={dark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-gray-600"}>
+                  Site Name <span className="text-red-500">*</span>
+                </label>
+                <input name="name" required defaultValue={editSite.name} className={fieldCls} />
+              </div>
+              <div>
+                <label className={dark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-gray-600"}>
+                  Location
+                </label>
+                <input name="location" defaultValue={editSite.rawLocation} placeholder="e.g. Adjangotey, Accra" className={fieldCls} />
+              </div>
+              <div>
+                <label className={dark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-gray-600"}>
+                  Description (optional)
+                </label>
+                <textarea name="description" rows={3} defaultValue={editSite.description} placeholder="Brief description of this inventory site…" className={fieldCls} />
+              </div>
+              <p className={dark ? "text-[11px] text-slate-500" : "text-[11px] text-[#8b857c]"}>
+                Renaming doesn&apos;t change existing item codes or history.
+              </p>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit"
+                  className={dark
+                    ? "flex-1 rounded-xl bg-[linear-gradient(135deg,#1d5fa8,#3b82f6)] py-2.5 text-sm font-bold text-white hover:opacity-95"
+                    : "flex-1 rounded-xl bg-[#1a1814] py-2.5 text-sm font-bold text-white hover:bg-[#2d2924]"
+                  }
+                >
+                  Save Changes
+                </button>
+                <button type="button" onClick={() => setEditSite(null)}
+                  className={dark
+                    ? "rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                    : "rounded-xl border border-[#ddd5c9] bg-white px-5 py-2.5 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                  }
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteSite && deleteSiteAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.5)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setDeleteSite(null); }}
+        >
+          <div className={dark
+            ? "w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1923] shadow-2xl"
+            : "w-full max-w-md overflow-hidden rounded-[28px] border border-[#e7ded3] bg-white shadow-2xl"
+          }>
+            <div className={dark
+              ? "flex items-center justify-between border-b border-white/10 px-6 py-4"
+              : "flex items-center justify-between border-b border-[#eee7dd] px-6 py-4"
+            }>
+              <div className={dark ? "text-base font-bold text-slate-100" : "text-base font-bold text-[#1a1814]"}>
+                Delete {deleteSite.name}?
+              </div>
+              <button onClick={() => setDeleteSite(null)}
+                className={dark ? "text-slate-500 hover:text-slate-300" : "text-[#9c9890] hover:text-[#1a1814]"}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {deleteSite.blockers.length > 0 ? (
+                <>
+                  <div className={dark
+                    ? "rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+                    : "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                  }>
+                    <div className="font-semibold">This site can&apos;t be deleted because it has:</div>
+                    <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                      {deleteSite.blockers.map((b) => <li key={b}>{b}</li>)}
+                    </ul>
+                  </div>
+                  <p className={dark ? "text-xs text-slate-500" : "text-xs text-[#8b857c]"}>
+                    Only a site with no items and no restock or issue history can be deleted, so no records are lost.
+                  </p>
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => setDeleteSite(null)}
+                      className={dark
+                        ? "rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                        : "rounded-xl border border-[#ddd5c9] bg-white px-5 py-2.5 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                      }
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <form action={deleteSiteAction} className="space-y-4">
+                  <input type="hidden" name="id" value={deleteSite.id} />
+                  <p className={dark ? "text-sm text-slate-300" : "text-sm text-[#5b564d]"}>
+                    This site has no items and no history, so it can be deleted. This can&apos;t be undone.
+                  </p>
+                  <div className="flex gap-3">
+                    <button type="submit"
+                      className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700"
+                    >
+                      Delete Site
+                    </button>
+                    <button type="button" onClick={() => setDeleteSite(null)}
+                      className={dark
+                        ? "rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                        : "rounded-xl border border-[#ddd5c9] bg-white px-5 py-2.5 text-sm font-semibold text-[#1a1814] hover:bg-[#faf7f2]"
+                      }
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import GlobalRestockLogClient from "./GlobalRestockLogClient";
+import { TYPE_NAMES, typeLabel } from "@/lib/item-types";
 
 type SearchParams = {
   q?: string;
@@ -50,6 +51,7 @@ export default async function GlobalRestockLogPage({
           id:       true,
           name:     true,
           itemType: true,
+          ...TYPE_NAMES,
           itemCode: true,
           unit:     true,
           instances: {
@@ -86,7 +88,7 @@ export default async function GlobalRestockLogPage({
     No:              index + 1,
     Site:            row.inventorySite.name,
     Item:            row.inventoryItem.name,
-    Type:            row.inventoryItem.itemType,
+    Type:            typeLabel(row.inventoryItem),
     "Item Code":     row.inventoryItem.itemCode ?? "",
     "Quantity Added":`${row.quantityAdded}${row.inventoryItem.unit ? ` ${row.inventoryItem.unit}` : ""}`,
     "Date Bought":   row.dateBought?.toISOString() ?? "",

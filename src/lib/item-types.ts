@@ -16,6 +16,44 @@ export const ITEM_TYPE_LABEL: Record<string, string> = Object.fromEntries(
   ITEM_TYPES.map((t) => [t.value, t.label])
 );
 
+// Display name for an item's type: managed type (+ sub-type) when loaded, else the old fixed label.
+// e.g. "Equipment › Solar Equipment"
+export function typeLabel(item: {
+  itemType?: string | null;
+  typeRef?:  { name: string } | null;
+  subType?:  { name: string } | null;
+}) {
+  const main = item.typeRef?.name ?? (item.itemType ? ITEM_TYPE_LABEL[item.itemType] ?? item.itemType : "—");
+  return item.subType?.name ? `${main} › ${item.subType.name}` : main;
+}
+
+// Add to a Prisma `select` next to `itemType: true` to load the managed type / sub-type names.
+export const TYPE_NAMES = {
+  typeRef: { select: { name: true } },
+  subType: { select: { name: true } },
+} as const;
+
+// Walks query results: wherever an object has itemType + typeRef/subType, itemType becomes the display
+// name ("Equipment › Solar Equipment") and the helper fields are removed. Screens keep showing `itemType`.
+export function withTypeLabels<T>(data: T): T {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== "object" || v instanceof Date) return v;
+    const o = v as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(o)) if (k !== "typeRef" && k !== "subType") out[k] = walk(val);
+    if ("itemType" in o && ("typeRef" in o || "subType" in o)) {
+      out.itemType = typeLabel({
+        itemType: o.itemType as string,
+        typeRef:  o.typeRef as { name: string } | null,
+        subType:  o.subType as { name: string } | null,
+      });
+    }
+    return out;
+  };
+  return walk(data) as T;
+}
+
 export const ITEM_CODE_SEGMENT: Record<string, string> = Object.fromEntries(
   ITEM_TYPES.map((t) => [t.value, t.code])
 );

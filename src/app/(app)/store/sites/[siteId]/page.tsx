@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
+import { typeLabel } from "@/lib/item-types";
 import InventorySiteClient from "./InventorySiteClient";
 
 export default async function InventorySitePage({
@@ -28,6 +29,10 @@ export default async function InventorySitePage({
           id:           true,
           name:         true,
           itemType:     true,
+          typeId:       true,
+          subTypeId:    true,
+          typeRef:      { select: { name: true, tracked: true } },
+          subType:      { select: { name: true } },
           description:  true,
           itemCode:     true,
           manufacturer: true,
@@ -53,15 +58,19 @@ export default async function InventorySitePage({
 
   if (!site) return notFound();
 
-  const itemsWithCondition = site.items.map((item) => ({
+  const itemsWithCondition = site.items.map(({ typeRef, subType, ...item }) => ({
     ...item,
-    condition: item.condition,
+    typeName:    typeRef?.name ?? null,
+    subTypeName: subType?.name ?? null,
+    typeLabel:   typeLabel({ itemType: item.itemType, typeRef, subType }),
+    tracked:     typeRef?.tracked ?? item.itemType === "EQUIPMENT",
+    condition:   item.condition,
   }));
 
   const summary = {
     totalItems:      String(site.items.length),
-    equipmentCount:  String(site.items.filter((i) => i.itemType === "EQUIPMENT").length),
-    materialCount:   String(site.items.filter((i) => i.itemType !== "EQUIPMENT").length),
+    equipmentCount:  String(itemsWithCondition.filter((i) => i.tracked).length),   // tracked item types (Equipment, …)
+    materialCount:   String(itemsWithCondition.filter((i) => !i.tracked).length),
     lowStockCount:   String(site.items.filter((i) => i.status === "LOW_STOCK" || i.status === "OUT_OF_STOCK").length),
     checkedOutCount: String(site.items.filter((i) => i.status === "CHECKED_OUT").length),
   };

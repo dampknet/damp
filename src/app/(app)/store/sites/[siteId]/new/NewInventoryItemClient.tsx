@@ -4,20 +4,26 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
-import { ITEM_TYPES } from "@/lib/item-types";
+import ItemTypePicker from "@/components/ItemTypePicker";
+import type { TypeOption } from "@/lib/item-type-registry";
 
 export default function NewInventoryItemClient({
-  site, action,
+  site, action, typeOptions, canManageTypes,
 }: {
-  site:   { id: string; name: string; location: string | null };
-  action: (formData: FormData) => void;
+  site:           { id: string; name: string; location: string | null };
+  action:         (formData: FormData) => void;
+  typeOptions:    TypeOption[];
+  canManageTypes: boolean;
 }) {
   const { mode }     = useThemeMode();
   const dark         = mode === "dark";
   const searchParams = useSearchParams();
   const error        = searchParams.get("error");
 
-  const [itemType,       setItemType]       = useState("EQUIPMENT");
+  const firstHere = typeOptions.find((o) => o.enabledHere);
+  const [typeId,         setTypeId]         = useState(firstHere?.id ?? "");
+  const [subTypeId,      setSubTypeId]      = useState("");
+  const chosen = typeOptions.find((o) => o.id === typeId);
   const [uncountable,    setUncountable]    = useState(false);
   const [quantity,       setQuantity]       = useState(0);
   const [createEntities, setCreateEntities] = useState(false);
@@ -75,7 +81,8 @@ export default function NewInventoryItemClient({
           <div className="mt-5 flex flex-wrap gap-2">
             <Chip dark={dark} label="Site"     value={site.name} />
             <Chip dark={dark} label="Location" value={site.location ?? "-"} />
-            <Chip dark={dark} label="Category" value={ITEM_TYPES.find(t => t.value === itemType)?.label ?? itemType} />
+            <Chip dark={dark} label="Item type" value={chosen ? `${chosen.name}${subTypeId ? ` › ${[...chosen.subTypes, ...chosen.otherSubTypes].find((s) => s.id === subTypeId)?.name ?? ""}` : ""}` : "—"} />
+            {chosen && <Chip dark={dark} label="Code" value={`…-${chosen.code}-###`} />}
           </div>
 
           {error && (
@@ -87,22 +94,14 @@ export default function NewInventoryItemClient({
 
           <form action={action} className="mt-6 space-y-5">
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Item Category" dark={dark}>
-                <select name="itemType" value={itemType}
-                  onChange={(e) => setItemType(e.target.value)}
-                  title="Item Category" className={inputCls}
-                >
-                  {ITEM_TYPES.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Item Name" dark={dark}>
-                <input name="name" required placeholder="e.g. UHF Amplifier, Ladder, RF Cable"
-                  title="Item Name" className={inputCls} />
-              </Field>
-            </div>
+            <ItemTypePicker siteId={site.id} options={typeOptions} canManage={canManageTypes}
+              typeId={typeId} subTypeId={subTypeId} dark={dark} inputCls={inputCls}
+              onChange={(t, s) => { setTypeId(t); setSubTypeId(s); }} />
+
+            <Field label="Item Name" dark={dark}>
+              <input name="name" required placeholder="e.g. UHF Amplifier, Ladder, RF Cable"
+                title="Item Name" className={inputCls} />
+            </Field>
 
             <Field label="Description" dark={dark}>
               <textarea name="description" rows={3}

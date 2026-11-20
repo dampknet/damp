@@ -1,10 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile, isAdminProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
-import { VALID_ITEM_TYPES } from "@/lib/item-types";
-import type { EquipmentCondition, InventoryItemStatus, InventoryItemType } from "@prisma/client";
+import { getWarehouseTypeOptions, resolveItemTypeForSave, legacyKeyFor } from "@/lib/item-type-registry";
+import type { EquipmentCondition, InventoryItemStatus } from "@prisma/client";
 import EditInventoryItemClient from "./EditInventoryItemClient";
 
 const VALID_CONDITIONS = ["NEW", "UNUSED", "USED", "FAULTY"];
@@ -35,6 +35,8 @@ export default async function EditInventoryItemPage({
     select: {
       id:               true,
       itemType:         true,
+      typeId:           true,
+      subTypeId:        true,
       name:             true,
       description:      true,
       itemCode:         true,
@@ -56,13 +58,22 @@ export default async function EditInventoryItemPage({
   const safeItem      = rest;
   const instanceCount = _count.instances;
 
+  // Types for this warehouse; the item's current type/sub-type always stays selectable (even if switched off here).
+  const canManageTypes = isAdminProfile(profile);
+  const allOptions     = await getWarehouseTypeOptions(siteId, true);
+  const typeOptions    = canManageTypes ? allOptions : allOptions
+    .filter((o) => o.enabledHere || o.id === item.typeId)
+    .map((o) => ({ ...o, otherSubTypes: o.otherSubTypes.filter((s) => s.id === item.subTypeId) }));
+
   async function updateInventoryItem(formData: FormData) {
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    if (!(await getEditorProfile())) redirect(`/store/sites/${siteId}`);
+    const actor = await getEditorProfile();
+    if (!actor) redirect(`/store/sites/${siteId}`);
 
-    const itemTypeRaw      = String(formData.get("itemType")         ?? "").trim();
+    const typeIdRaw        = String(formData.get("typeId")           ?? "").trim();
+    const subTypeIdRaw     = String(formData.get("subTypeId")        ?? "").trim();
     const name             = String(formData.get("name")             ?? "").trim();
     const description      = String(formData.get("description")      ?? "").trim();
     const itemCode         = String(formData.get("itemCode")         ?? "").trim();
@@ -77,13 +88,21 @@ export default async function EditInventoryItemPage({
     const uncountable      = formData.get("uncountable") === "on";
     const generateEntities = formData.get("generateEntities") === "on";
 
-    const itemType  = VALID_ITEM_TYPES.includes(itemTypeRaw as any) ? itemTypeRaw : "GENERAL";
     const condition = (VALID_CONDITIONS.includes(conditionRaw) ? conditionRaw : "NEW") as EquipmentCondition;
 
     const fail = (msg: string) =>
       redirect(`/store/sites/${siteId}/items/${itemId}/edit?error=${encodeURIComponent(msg)}`);
 
     if (!name) fail("Item name is required");
+
+    // Keeping the current type/sub-type is always allowed; changing to one not used here needs an admin.
+    const keepsType = typeIdRaw === safeItem.typeId && (subTypeIdRaw || null) === safeItem.subTypeId;
+    let typeData: { itemType: ReturnType<typeof legacyKeyFor>; typeId: string; subTypeId: string | null } | null = null;
+    if (!keepsType) {
+      const resolved = await resolveItemTypeForSave(siteId, typeIdRaw, subTypeIdRaw || null, isAdminProfile(actor));
+      if (!resolved.ok) return fail(resolved.message);
+      typeData = { itemType: legacyKeyFor(resolved.type), typeId: resolved.type.id, subTypeId: resolved.subTypeId };
+    }
 
     const quantity    = uncountable ? 0 : (quantityRaw   === "" ? 0    : Number(quantityRaw));
     const reorder     = uncountable ? 0 : (reorderRaw    === "" ? 0    : Number(reorderRaw));
@@ -125,7 +144,7 @@ export default async function EditInventoryItemPage({
         const saved = await tx.inventoryItem.update({
           where: { id: itemId },
           data: {
-            itemType:         itemType as InventoryItemType,
+            ...(typeData ?? {}),
             name,
             description:      description  || null,
             itemCode:         itemCode     || null,
@@ -212,6 +231,8 @@ export default async function EditInventoryItemPage({
       item={safeItem}
       instanceCount={instanceCount}
       action={updateInventoryItem}
+      typeOptions={typeOptions}
+      canManageTypes={canManageTypes}
     />
   );
 }

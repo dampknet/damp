@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
 import PrintExportButton from "@/components/PrintExportButton";
-import { ITEM_TYPE_LABEL } from "@/lib/item-types";
+import { typeLabel } from "@/lib/item-types";
 
 type RestockRow = {
   id:           string;
@@ -241,7 +241,7 @@ export default function RestockLogClient({
                       </div>
                     </td>
                     <td className={dark ? "px-5 py-3 text-slate-300" : "px-5 py-3 text-[#5d584f]"}>
-                      {ITEM_TYPE_LABEL[row.inventoryItem.itemType] ?? row.inventoryItem.itemType}
+                      {typeLabel(row.inventoryItem as any)}
                     </td>
                     <td className={dark ? "px-5 py-3 text-slate-300 text-center" : "px-5 py-3 text-[#5d584f] text-center"}>
                       {row.quantityAdded}{row.inventoryItem.unit ? ` ${row.inventoryItem.unit}` : ""}

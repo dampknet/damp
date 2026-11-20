@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { ChevronDown, ChevronUp, Download } from "lucide-react";
-import { ITEM_TYPE_LABEL } from "@/lib/item-types";
+import { typeLabel } from "@/lib/item-types";
 
 type IssueItem = {
   id:               string;
@@ -160,7 +160,7 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
                       {item.inventoryItem.name}
                     </span>
                     <span className={dark ? "text-[10px] text-slate-500" : "text-[10px] text-[#8b857c]"}>
-                      {ITEM_TYPE_LABEL[item.inventoryItem.itemType] ?? item.inventoryItem.itemType}
+                      {typeLabel(item.inventoryItem as any)}
                     </span>
                     {item.inventoryItem.itemCode && (
                       <span className={`font-mono text-[10px] ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
@@ -217,8 +217,9 @@ function TripCard({ dark, trip, canEdit }: { dark: boolean; trip: Trip; canEdit:
 }
 
 export default function GlobalIssueLogClient({
-  role, canEdit, q, status, type, summary, trips,
+  role, canEdit, q, status, type, summary, trips, typeOptions,
 }: {
+  typeOptions: { id: string; name: string }[];
   role:     string;
   canEdit:  boolean;
   q:        string;
@@ -293,8 +294,8 @@ export default function GlobalIssueLogClient({
                 }
               >
                 <option value="ALL">All Categories</option>
-                {Object.entries(ITEM_TYPE_LABEL).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
+                {typeOptions.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
               <select name="status" defaultValue={status} title="Status filter"

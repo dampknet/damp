@@ -24,6 +24,8 @@ export async function GET() {
       categories,
       subcategories,
       issueReturns,
+      itemTypes,
+      warehouseItemTypes,
     ] = await Promise.all([
       prisma.inventorySite.findMany({ orderBy: { createdAt: "asc" } }),
       prisma.inventoryItem.findMany({ orderBy: { createdAt: "asc" } }),
@@ -43,6 +45,9 @@ export async function GET() {
       prisma.category.findMany({ orderBy: { createdAt: "asc" } }),
       prisma.subcategory.findMany({ orderBy: { createdAt: "asc" } }),
       prisma.issueReturn.findMany({ orderBy: { receivedAt: "asc" } }),
+      // Main types first, then sub-types, so a restore can insert parents before children.
+      prisma.itemType.findMany({ orderBy: [{ parentId: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }] }),
+      prisma.warehouseItemType.findMany(),
     ]);
 
     const includeHashes = profile.isMasterAdmin;
@@ -71,10 +76,14 @@ export async function GET() {
           categories:          categories.length,
           subcategories:       subcategories.length,
           issueReturns:        issueReturns.length,
+          itemTypes:           itemTypes.length,
+          warehouseItemTypes:  warehouseItemTypes.length,
         },
       },
       categories,
       subcategories,
+      itemTypes,
+      warehouseItemTypes,
       inventorySites,
       inventoryItems,
       assetInstances,

@@ -337,6 +337,7 @@ model InventorySite {
   restocks        InventoryRestock[]
   issues          InventoryIssue[]
   warehouseIssues WarehouseIssue[]
+  itemTypes       WarehouseItemType[]
 
   @@unique([name, isDeleted])
   @@index([isDeleted])
@@ -346,7 +347,11 @@ model InventorySite {
 model InventoryItem {
   id               String              @id @default(cuid())
   inventorySiteId  String
+  // Legacy fixed category (kept filled so older code and rollbacks still work; custom types store GENERAL).
   itemType         InventoryItemType
+  // Managed item type + optional sub-type (Admin → Item Types).
+  typeId           String?
+  subTypeId        String?
   itemCode         String?             @unique
   name             String
   description      String?
@@ -367,6 +372,8 @@ model InventoryItem {
   updatedAt        DateTime            @updatedAt
 
   inventorySite   InventorySite      @relation(fields: [inventorySiteId], references: [id])
+  typeRef         ItemType?          @relation("ItemMainType", fields: [typeId], references: [id], onDelete: Restrict)
+  subType         ItemType?          @relation("ItemSubType", fields: [subTypeId], references: [id], onDelete: Restrict)
   instances       AssetInstance[]
   restocks        InventoryRestock[]
   issues          InventoryIssue[]
@@ -374,6 +381,8 @@ model InventoryItem {
 
   @@index([inventorySiteId])
   @@index([itemType])
+  @@index([typeId])
+  @@index([subTypeId])
   @@index([itemCode])
   @@index([status])
   @@index([name])
@@ -596,4 +605,42 @@ model MailConfig {
   companyDomain   String?
   updatedBy       String?
   updatedAt       DateTime @updatedAt
+}
+
+// Item types (main) and sub-types (parentId set). Managed by admins in Admin → Item Types.
+model ItemType {
+  id          String             @id @default(cuid())
+  name        String
+  parentId    String? // null = main item type; set = sub-type of that type
+  legacyKey   InventoryItemType? @unique // the 9 original fixed types
+  defaultCode String? // main types: short code suggested for warehouses
+  tracked     Boolean            @default(false) // main types: units tracked one by one (like Equipment)
+  createdBy   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  parent     ItemType?           @relation("ItemTypeTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children   ItemType[]          @relation("ItemTypeTree")
+  warehouses WarehouseItemType[]
+  items      InventoryItem[]     @relation("ItemMainType")
+  subItems   InventoryItem[]     @relation("ItemSubType")
+
+  @@index([parentId])
+}
+
+// Which warehouses use which item types / sub-types, and each warehouse's short code for a main type.
+model WarehouseItemType {
+  id              String   @id @default(cuid())
+  inventorySiteId String
+  itemTypeId      String
+  code            String? // main types only: short code used in this warehouse's item codes
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id], onDelete: Cascade)
+  itemType      ItemType      @relation(fields: [itemTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([inventorySiteId, itemTypeId])
+  @@index([itemTypeId])
 }

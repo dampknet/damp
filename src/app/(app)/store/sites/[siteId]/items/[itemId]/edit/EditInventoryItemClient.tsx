@@ -4,15 +4,20 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
-import { ITEM_TYPES } from "@/lib/item-types";
+import ItemTypePicker from "@/components/ItemTypePicker";
+import type { TypeOption } from "@/lib/item-type-registry";
 
 export default function EditInventoryItemClient({
-  site, item, instanceCount, action,
+  site, item, instanceCount, action, typeOptions, canManageTypes,
 }: {
   site: { id: string; name: string; location: string | null };
+  typeOptions:    TypeOption[];
+  canManageTypes: boolean;
   item: {
     id:               string;
     itemType:         string;
+    typeId:           string | null;
+    subTypeId:        string | null;
     name:             string;
     description:      string | null;
     itemCode:         string | null;
@@ -34,7 +39,8 @@ export default function EditInventoryItemClient({
   const searchParams = useSearchParams();
   const error        = searchParams.get("error");
 
-  const [itemType,    setItemType]    = useState(item.itemType);
+  const [typeId,      setTypeId]      = useState(item.typeId ?? "");
+  const [subTypeId,   setSubTypeId]   = useState(item.subTypeId ?? "");
   const [uncountable, setUncountable] = useState(item.uncountable);
   const [quantity,    setQuantity]    = useState(item.quantity);
   const [generate,    setGenerate]    = useState(false);
@@ -93,22 +99,17 @@ export default function EditInventoryItemClient({
 
           <form action={action} className="mt-6 space-y-5">
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Item Category" dark={dark}>
-                <select name="itemType" value={itemType}
-                  onChange={(e) => setItemType(e.target.value)}
-                  title="Item Category" className={inputCls}
-                >
-                  {ITEM_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Item Name" dark={dark}>
-                <input name="name" defaultValue={item.name} required
-                  title="Item Name" className={inputCls} />
-              </Field>
-            </div>
+            <ItemTypePicker siteId={site.id} options={typeOptions} canManage={canManageTypes}
+              typeId={typeId} subTypeId={subTypeId} dark={dark} inputCls={inputCls}
+              onChange={(t, s) => { setTypeId(t); setSubTypeId(s); }} />
+            <p className={dark ? "-mt-3 text-[11px] text-slate-500" : "-mt-3 text-[11px] text-[#8b857c]"}>
+              Changing the type doesn&apos;t change the existing item code.
+            </p>
+
+            <Field label="Item Name" dark={dark}>
+              <input name="name" defaultValue={item.name} required
+                title="Item Name" className={inputCls} />
+            </Field>
 
             <Field label="Description" dark={dark}>
               <textarea name="description" rows={3}

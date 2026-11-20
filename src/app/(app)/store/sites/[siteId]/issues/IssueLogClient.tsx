@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ReceiveReturnDialog from "@/components/ReceiveReturnDialog";
 import { useThemeMode } from "@/context/ThemeContext";
 import { ChevronDown, ChevronUp, Download } from "lucide-react";
-import { ITEM_TYPE_LABEL } from "@/lib/item-types";
+import { typeLabel } from "@/lib/item-types";
 
 type IssueItem = {
   id:               string;
@@ -184,7 +184,7 @@ function TripCard({
                       {item.inventoryItem.name}
                     </span>
                     <span className={dark ? "text-[10px] text-slate-500" : "text-[10px] text-[#8b857c]"}>
-                      {ITEM_TYPE_LABEL[item.inventoryItem.itemType] ?? item.inventoryItem.itemType}
+                      {typeLabel(item.inventoryItem as any)}
                     </span>
                     {item.inventoryItem.itemCode && (
                       <span className={`font-mono text-[10px] ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>

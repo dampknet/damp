@@ -27,9 +27,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Please choose an Excel file" }, { status: 400 });
     }
 
-    const { preview, validRows } = await parseInventoryFile({ file, siteId });
+    const { preview, validRows, missing, codeHints } = await parseInventoryFile({ file, siteId });
 
-    return NextResponse.json({ ok: true, preview, validRows });
+    return NextResponse.json({ ok: true, preview, validRows, missing, codeHints });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to preview uploaded file";
     return NextResponse.json({ error: message }, { status: 400 });

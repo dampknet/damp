@@ -1,11 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
+import { getCurrentProfile, getEditorProfile, isAdminProfile } from "@/lib/auth";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
 import { generateItemCode, getSitePrefix } from "@/lib/inventory-upload";
-import { VALID_ITEM_TYPES } from "@/lib/item-types";
-import type { EquipmentCondition, InventoryItemType } from "@prisma/client";
+import { getWarehouseTypeOptions, resolveItemTypeForSave, legacyKeyFor } from "@/lib/item-type-registry";
+import type { EquipmentCondition } from "@prisma/client";
 import NewInventoryItemClient from "./NewInventoryItemClient";
 
 export default async function NewInventoryItemPage({
@@ -28,14 +28,18 @@ export default async function NewInventoryItemPage({
   if (!site) return notFound();
 
   const siteName = site.name;
+  const canManageTypes = isAdminProfile(profile);
+  const typeOptions    = await getWarehouseTypeOptions(siteId, canManageTypes);
 
   async function createInventoryItem(formData: FormData) {
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    if (!(await getEditorProfile())) redirect(`/store/sites/${siteId}`);
+    const actor = await getEditorProfile();
+    if (!actor) redirect(`/store/sites/${siteId}`);
 
-    const itemTypeRaw    = String(formData.get("itemType")         ?? "EQUIPMENT").trim();
+    const typeIdRaw      = String(formData.get("typeId")           ?? "").trim();
+    const subTypeIdRaw   = String(formData.get("subTypeId")        ?? "").trim();
     const name           = String(formData.get("name")             ?? "").trim();
     const description    = String(formData.get("description")      ?? "").trim();
     const itemCodeRaw    = String(formData.get("itemCode")         ?? "").trim();
@@ -49,11 +53,14 @@ export default async function NewInventoryItemPage({
     const uncountable    = formData.get("uncountable")    === "on";
     const createEntities = formData.get("createEntities") === "on";
 
-    const itemType = VALID_ITEM_TYPES.includes(itemTypeRaw as any) ? itemTypeRaw : "GENERAL";
-
     if (!name) {
       redirect(`/store/sites/${siteId}/new?error=${encodeURIComponent("Item name is required")}`);
     }
+
+    // Item type + optional sub-type. Admins may pick ones not used here yet — they get switched on.
+    const resolved = await resolveItemTypeForSave(siteId, typeIdRaw, subTypeIdRaw || null, isAdminProfile(actor));
+    if (!resolved.ok) redirect(`/store/sites/${siteId}/new?error=${encodeURIComponent(resolved.message)}`);
+    const itemType = legacyKeyFor(resolved.type);
 
     const quantity    = uncountable ? 0 : (quantityRaw === "" ? 0 : Number(quantityRaw));
     const reorder     = uncountable ? 0 : (reorderRaw  === "" ? 0 : Number(reorderRaw));
@@ -71,7 +78,7 @@ export default async function NewInventoryItemPage({
     let itemCode = itemCodeRaw || null;
     if (!itemCode) {
       const prefix = await getSitePrefix(siteId);
-      itemCode = await generateItemCode({ itemType: itemType as InventoryItemType, sitePrefix: prefix });
+      itemCode = await generateItemCode({ code: resolved.code, sitePrefix: prefix });
     } else {
       const existing = await prisma.inventoryItem.findFirst({
         where: { itemCode }, select: { id: true },
@@ -86,7 +93,9 @@ export default async function NewInventoryItemPage({
         const created = await tx.inventoryItem.create({
           data: {
             inventorySiteId:  siteId,
-            itemType:         itemType as InventoryItemType,
+            itemType,
+            typeId:           resolved.type.id,
+            subTypeId:        resolved.subTypeId,
             itemCode,
             name,
             description:      description  || null,
@@ -130,5 +139,5 @@ export default async function NewInventoryItemPage({
     redirect(`/store/sites/${siteId}`);
   }
 
-  return <NewInventoryItemClient site={site} action={createInventoryItem} />;
+  return <NewInventoryItemClient site={site} action={createInventoryItem} typeOptions={typeOptions} canManageTypes={canManageTypes} />;
 }

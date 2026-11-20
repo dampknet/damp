@@ -44,6 +44,15 @@ export async function POST(req: Request) {
       results.subcategories = body.subcategories.length;
     }
 
+    // 0b. Item types (main types before sub-types)
+    if (body.itemTypes?.length) {
+      const mains = body.itemTypes.filter((t: any) => !t.parentId);
+      const subs  = body.itemTypes.filter((t: any) =>  t.parentId);
+      await prisma.itemType.createMany({ data: mains, skipDuplicates: true });
+      if (subs.length) await prisma.itemType.createMany({ data: subs, skipDuplicates: true });
+      results.itemTypes = body.itemTypes.length;
+    }
+
     // 1. Sites (broadcast)
     if (body.sites?.length) {
       await prisma.site.createMany({
@@ -80,6 +89,12 @@ export async function POST(req: Request) {
       results.inventorySites = body.inventorySites.length;
     }
 
+    // 4b. Which warehouses use which item types (depends on InventorySite + ItemType)
+    if (body.warehouseItemTypes?.length) {
+      await prisma.warehouseItemType.createMany({ data: body.warehouseItemTypes, skipDuplicates: true });
+      results.warehouseItemTypes = body.warehouseItemTypes.length;
+    }
+
     // 5. InventoryItems (depends on InventorySite)
     if (body.inventoryItems?.length) {
       await prisma.inventoryItem.createMany({
@@ -87,6 +102,12 @@ export async function POST(req: Request) {
         skipDuplicates: true,
       });
       results.inventoryItems = body.inventoryItems.length;
+
+      // Older backups have no item types: link those items to their type (same as the upgrade did).
+      const legacyTypes = await prisma.itemType.findMany({ where: { legacyKey: { not: null } }, select: { id: true, legacyKey: true } });
+      for (const t of legacyTypes) {
+        await prisma.inventoryItem.updateMany({ where: { typeId: null, itemType: t.legacyKey! }, data: { typeId: t.id } });
+      }
     }
 
     // 6. AssetInstances (depends on InventoryItem)

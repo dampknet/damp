@@ -5,6 +5,7 @@ import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { logActivity } from "@/lib/activity";
 import { generateItemCode } from "@/lib/inventory-upload";
 import RestockInventoryItemClient from "./RestockInventoryItemClient";
+import { TYPE_NAMES } from "@/lib/item-types";
 
 export default async function RestockInventoryItemPage({
   params,
@@ -35,6 +36,7 @@ export default async function RestockInventoryItemPage({
       id:               true,
       name:             true,
       itemType:         true,
+      ...TYPE_NAMES,
       itemCode:         true,
       quantity:         true,
       uncountable:      true,

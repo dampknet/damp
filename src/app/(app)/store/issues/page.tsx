@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import GlobalIssueLogClient from "./GlobalIssueLogClient";
+import { TYPE_NAMES } from "@/lib/item-types";
 
 type SearchParams = {
   q?:      string;
@@ -44,7 +45,7 @@ export default async function GlobalIssueLogPage({
           ],
         } : {},
         status !== "ALL" ? { status } : {},
-        typeRaw !== "ALL" ? { inventoryItem: { itemType: typeRaw as any } } : {},
+        typeRaw !== "ALL" ? { inventoryItem: { typeId: typeRaw } } : {},
       ],
     },
     orderBy: { takenAt: "desc" },
@@ -67,6 +68,7 @@ export default async function GlobalIssueLogPage({
           id:       true,
           name:     true,
           itemType: true,
+          ...TYPE_NAMES,
           itemCode: true,
           unit:     true,
         },
@@ -114,12 +116,10 @@ export default async function GlobalIssueLogPage({
   const [openCount, returnedCount, equipmentCount, othersCount] = await Promise.all([
     prisma.warehouseIssue.count({ where: { status: "OPEN" } }),
     prisma.warehouseIssue.count({ where: { status: "RETURNED" } }),
-    prisma.warehouseIssue.count({ where: { inventoryItem: { itemType: "EQUIPMENT" } } }),
+    prisma.warehouseIssue.count({ where: { inventoryItem: { typeRef: { is: { tracked: true } } } } }),
     prisma.warehouseIssue.count({
       where: {
-        inventoryItem: {
-          itemType: { not: "EQUIPMENT" },
-        },
+        inventoryItem: { typeRef: { is: { tracked: false } } },
       },
     }),
   ]);
@@ -133,6 +133,7 @@ export default async function GlobalIssueLogPage({
       type={typeRaw}
       summary={{ openCount, returnedCount, equipmentCount, othersCount }}
       trips={trips as any}
+      typeOptions={await prisma.itemType.findMany({ where: { parentId: null }, orderBy: { name: "asc" }, select: { id: true, name: true } })}
     />
   );
 }

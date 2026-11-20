@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useFormStatus } from "react-dom";
-import { ITEM_TYPE_LABEL, ITEM_TYPE_UPLOAD_HINT } from "@/lib/item-types";
+import type { MissingType, CodeHint } from "@/lib/inventory-upload";
+import { createItemType, setWarehouseType } from "@/app/(app)/admin/item-types/actions";
 
 type PreviewRow = {
   rowNumber:   number;
@@ -20,6 +21,8 @@ type PreviewRow = {
 
 type ValidRow = {
   itemType:         string;
+  typeId:           string;
+  subTypeId:        string | null;
   name:             string;
   description:      string | null;
   manufacturer:     string | null;
@@ -76,6 +79,8 @@ export default function UploadInventoryExcelClient({
   templateFileName,
   serverError,
   serverSuccess,
+  canManageTypes,
+  typesHere,
 }: {
   site:             { id: string; name: string; location: string | null };
   confirmAction:    (formData: FormData) => void;
@@ -83,9 +88,20 @@ export default function UploadInventoryExcelClient({
   templateFileName: string;
   serverError:      string | null;
   serverSuccess:    string | null;
+  canManageTypes:   boolean;
+  typesHere:        { name: string; code: string; subTypes: string[] }[];
 }) {
   const { mode } = useThemeMode();
   const dark = mode === "dark";
+
+  // Types / sub-types the file needs that aren't set up here, and item-code hints (admins can fix them here).
+  const [missing,   setMissing]   = useState<MissingType[]>([]);
+  const [codeHints, setCodeHints] = useState<CodeHint[]>([]);
+  const [lastFile,  setLastFile]  = useState<File | null>(null);
+  const [fixMsg,    setFixMsg]    = useState<{ ok: boolean; text: string } | null>(null);
+  const [fixing,    startFix]     = useTransition();
+  const [newCodes,  setNewCodes]  = useState<Record<string, string>>({});
+  const [newTracked, setNewTracked] = useState<Record<string, boolean>>({});
 
   const [clientFileError, setClientFileError] = useState<string | null>(null);
   const [previewError,    setPreviewError]     = useState<string | null>(null);
@@ -127,33 +143,30 @@ export default function UploadInventoryExcelClient({
     }
   }
 
-  async function handlePreviewSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPreviewError(null);
-
-    const formData = new FormData(e.currentTarget);
-    const file     = formData.get("file");
-
-    if (!(file instanceof File)) { setPreviewError("Please choose an Excel file"); return; }
-    if (clientFileError) return;
-
+  async function runPreview(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
     formData.append("siteId", site.id);
     setPreviewLoading(true);
+    setPreviewError(null);
 
     try {
       const res  = await fetch("/store/api/inventory-upload-preview", { method: "POST", body: formData });
       const data = await res.json().catch(() => null) as {
         ok?: boolean; error?: string; preview?: PreviewRow[]; validRows?: ValidRow[];
+        missing?: MissingType[]; codeHints?: CodeHint[];
       } | null;
 
       if (!res.ok || !data?.ok) {
-        setPreviewRows([]); setValidRows([]);
+        setPreviewRows([]); setValidRows([]); setMissing([]); setCodeHints([]);
         setPreviewError(data?.error ?? "Failed to preview uploaded file");
         return;
       }
 
       setPreviewRows(data.preview ?? []);
       setValidRows(data.validRows ?? []);
+      setMissing(data.missing ?? []);
+      setCodeHints(data.codeHints ?? []);
       setEntityRows(new Set());
 
       if ((data.validRows ?? []).length === 0) {
@@ -166,6 +179,28 @@ export default function UploadInventoryExcelClient({
       setPreviewLoading(false);
     }
   }
+
+  async function handlePreviewSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPreviewError(null);
+    setFixMsg(null);
+
+    const file = new FormData(e.currentTarget).get("file");
+    if (!(file instanceof File)) { setPreviewError("Please choose an Excel file"); return; }
+    if (clientFileError) return;
+
+    setLastFile(file);
+    await runPreview(file);
+  }
+
+  // Admin fixes (create / switch on a type or sub-type, adopt a short code), then check the same file again.
+  const fix = (fn: () => Promise<{ ok: boolean; message: string }>) => startFix(async () => {
+    const r = await fn();
+    setFixMsg({ ok: r.ok, text: r.message });
+    if (r.ok && lastFile) await runPreview(lastFile);
+  });
+
+  const suggestCode = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4) || "NEW";
 
   const enrichedValidRows: ValidRow[] = validRows.map((row, idx) => ({
     ...row,
@@ -254,7 +289,9 @@ export default function UploadInventoryExcelClient({
                   reorderlevel, targetstock level, condition
                 </div>
                 <div className={`mt-3 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
-                  <span className="font-semibold">itemtype:</span> {ITEM_TYPE_UPLOAD_HINT}
+                  <span className="font-semibold">itemtype</span> (and optional <span className="font-semibold">subtype</span>) used in {site.name}:{" "}
+                  {typesHere.length ? typesHere.map((t) => `${t.name}${t.subTypes.length ? ` (${t.subTypes.join(", ")})` : ""}`).join(" · ") : "none yet"}
+                  {canManageTypes && <> — new ones can be set up from the preview.</>}
                 </div>
                 <div className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-[#8b857c]"}`}>
                   <span className="font-semibold">condition:</span> NEW · UNUSED · USED · FAULTY
@@ -353,6 +390,56 @@ export default function UploadInventoryExcelClient({
           )}
         </section>
 
+        {(missing.length > 0 || codeHints.length > 0 || fixMsg) && (
+          <section className={dark ? "mt-6 rounded-3xl border border-amber-500/20 bg-amber-500/5 p-5" : "mt-6 rounded-3xl border border-amber-200 bg-amber-50/60 p-5"}>
+            <div className={dark ? "text-sm font-bold text-amber-200" : "text-sm font-bold text-amber-900"}>Item types in this file that need setting up for {site.name}</div>
+            {!canManageTypes && missing.length > 0 && (
+              <p className={dark ? "mt-1 text-xs text-amber-200/80" : "mt-1 text-xs text-amber-800"}>Those rows are skipped. Ask an admin to set these up (Admin → Item Types), then preview again.</p>
+            )}
+            {fixMsg && <div className={`mt-2 text-xs font-semibold ${fixMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{fixMsg.text}</div>}
+            <div className="mt-3 space-y-2">
+              {missing.map((m) => (
+                <div key={m.key} className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm ${dark ? "border-white/10 bg-white/5 text-slate-200" : "border-[#e7dfd4] bg-white text-[#1a1814]"}`}>
+                  {m.kind === "type" && (<>
+                    <span>New item type <b>{m.name}</b></span>
+                    {canManageTypes && (<>
+                      <input value={newCodes[m.key] ?? suggestCode(m.name)} maxLength={8} aria-label={`Short code for ${m.name}`}
+                        onChange={(e) => setNewCodes((p) => ({ ...p, [m.key]: e.target.value.toUpperCase() }))}
+                        className={`w-24 rounded-lg border px-2 py-1 font-mono text-xs ${dark ? "border-white/10 bg-white/5" : "border-[#ddd5c9] bg-white"}`} />
+                      <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={!!newTracked[m.key]} onChange={(e) => setNewTracked((p) => ({ ...p, [m.key]: e.target.checked }))} className="h-3.5 w-3.5" /> track units one by one</label>
+                      <button type="button" disabled={fixing} className="rounded-lg bg-[#1d5fa8] px-2.5 py-1 text-xs font-bold text-white disabled:opacity-50"
+                        onClick={() => fix(() => createItemType({ name: m.name, code: newCodes[m.key] ?? suggestCode(m.name), tracked: !!newTracked[m.key], warehouseIds: [site.id] }))}>Create for {site.name}</button>
+                    </>)}
+                  </>)}
+                  {m.kind === "include-type" && (<>
+                    <span><b>{m.name}</b> exists but isn&apos;t used in {site.name} yet</span>
+                    {canManageTypes && <button type="button" disabled={fixing} className="rounded-lg bg-[#1d5fa8] px-2.5 py-1 text-xs font-bold text-white disabled:opacity-50"
+                      onClick={() => fix(() => setWarehouseType(site.id, m.id, { enabled: true }))}>Switch on here (code {m.code})</button>}
+                  </>)}
+                  {m.kind === "subtype" && (<>
+                    <span>New sub-type <b>{m.name}</b> under {m.parentName}</span>
+                    {canManageTypes && <button type="button" disabled={fixing} className="rounded-lg bg-[#1d5fa8] px-2.5 py-1 text-xs font-bold text-white disabled:opacity-50"
+                      onClick={() => fix(() => createItemType({ name: m.name, parentId: m.parentId, warehouseIds: [site.id] }))}>Create for {site.name}</button>}
+                  </>)}
+                  {m.kind === "include-subtype" && (<>
+                    <span>Sub-type <b>{m.name}</b> ({m.parentName}) exists but isn&apos;t used in {site.name} yet</span>
+                    {canManageTypes && <button type="button" disabled={fixing} className="rounded-lg bg-[#1d5fa8] px-2.5 py-1 text-xs font-bold text-white disabled:opacity-50"
+                      onClick={() => fix(() => setWarehouseType(site.id, m.id, { enabled: true }))}>Switch on here</button>}
+                  </>)}
+                </div>
+              ))}
+              {codeHints.map((h) => (
+                <div key={`${h.typeId}:${h.used}`} className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm ${dark ? "border-white/10 bg-white/5 text-slate-200" : "border-[#e7dfd4] bg-white text-[#1a1814]"}`}>
+                  <span>{h.count} row{h.count === 1 ? "" : "s"} use <b className="font-mono">{h.used}</b> for {h.typeName}; {site.name} is set to <b className="font-mono">{h.current}</b> (rows still import with the codes in the file).</span>
+                  {canManageTypes && <button type="button" disabled={fixing} className="rounded-lg border border-[#1d5fa8] px-2.5 py-1 text-xs font-bold text-[#1d5fa8] disabled:opacity-50"
+                    onClick={() => fix(() => setWarehouseType(site.id, h.typeId, { code: h.used }))}>Use {h.used} for new {h.typeName} items here</button>}
+                </div>
+              ))}
+            </div>
+            {fixing && <div className="mt-2 text-xs opacity-70">Updating and checking the file again…</div>}
+          </section>
+        )}
+
         {previewRows.length > 0 && (
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <StatCard dark={dark} label="Rows Read"          value={String(previewRows.length)} />
@@ -401,7 +488,7 @@ export default function UploadInventoryExcelClient({
                       >
                         <td className="px-5 py-3 opacity-50 font-mono text-xs">{row.rowNumber}</td>
                         <td className="px-5 py-3 text-xs font-bold uppercase opacity-60">
-                          {ITEM_TYPE_LABEL[row.itemType] ?? row.itemType}
+                          {row.itemType}
                         </td>
                         <td className={`px-5 py-3 font-semibold ${dark ? "text-slate-100" : "text-[#1a1814]"}`}>
                           {row.name || "-"}

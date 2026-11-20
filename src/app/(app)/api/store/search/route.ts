@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
+import { TYPE_NAMES, typeLabel } from "@/lib/item-types";
 
 export async function GET(req: Request) {
   const profile = await getCurrentProfile();
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
       id:          true,
       name:        true,
       itemType:    true,
+      ...TYPE_NAMES,
       itemCode:    true,
       quantity:    true,
       uncountable: true,
@@ -51,7 +53,7 @@ export async function GET(req: Request) {
   const results = items.map((item) => ({
     itemId:      item.id,
     itemName:    item.name,
-    itemType:    item.itemType,
+    itemType:    typeLabel(item),
     itemCode:    item.itemCode,
     quantity:    item.quantity,
     uncountable: item.uncountable,

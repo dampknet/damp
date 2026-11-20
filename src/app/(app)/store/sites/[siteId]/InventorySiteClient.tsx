@@ -6,7 +6,7 @@ import { useThemeMode } from "@/context/ThemeContext";
 import { useRouter } from "next/navigation";
 import PrintExportButton from "@/components/PrintExportButton";
 import DeleteInventoryItemsDialog from "@/components/DeleteInventoryItemsDialog";
-import { ITEM_TYPES, ITEM_TYPE_LABEL } from "@/lib/item-types";
+
 
 const ITEM_TYPE_COLOR_DARK: Record<string, string> = {
   EQUIPMENT:              "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -74,7 +74,8 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
 
   const [q, setQ] = useState("");
 
-  const [categoryFilter,  setCategoryFilter]  = useState("");
+  const [categoryFilter,  setCategoryFilter]  = useState("");   // item type id
+  const [subTypeFilter,   setSubTypeFilter]   = useState("");   // sub-type id
   const [conditionFilter, setConditionFilter] = useState("");
   const [statusFilter,    setStatusFilter]    = useState("");
 
@@ -83,10 +84,17 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
   const [deleteReason,       setDeleteReason]       = useState("");
   const [isDeleting,         setIsDeleting]         = useState(false);
 
+  // Item types (and sub-types of the chosen type) that items in this warehouse actually use.
   const siteCategories = useMemo(() => {
-    const present = new Set(items.map((i: any) => i.itemType));
-    return ITEM_TYPES.filter((t) => present.has(t.value));
+    const m = new Map<string, string>();
+    for (const i of items as any[]) if (i.typeId) m.set(i.typeId, i.typeName ?? i.typeLabel);
+    return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [items]);
+  const siteSubTypes = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of items as any[]) if (i.subTypeId && i.typeId === categoryFilter) m.set(i.subTypeId, i.subTypeName);
+    return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [items, categoryFilter]);
 
   const filteredItems = useMemo(() => {
     const qLow = q.toLowerCase().trim();
@@ -95,8 +103,7 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
         item.name,
         item.description,
         item.itemCode,
-        ITEM_TYPE_LABEL[item.itemType],
-        item.itemType,
+        item.typeLabel,
         item.manufacturer,
         item.model,
         item.unit,
@@ -104,13 +111,13 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
         ...(item.instances ?? []).map((inst: any) => inst.entityCode),
       ].some((val: string | null | undefined) => val?.toLowerCase().includes(qLow));
 
-      const matchesCategory  = !categoryFilter  || item.itemType  === categoryFilter;
+      const matchesCategory  = (!categoryFilter || item.typeId === categoryFilter) && (!subTypeFilter || item.subTypeId === subTypeFilter);
       const matchesCondition = !conditionFilter || item.condition === conditionFilter;
       const matchesStatus    = !statusFilter    || item.status    === statusFilter;
 
       return matchesQ && matchesCategory && matchesCondition && matchesStatus;
     });
-  }, [items, q, categoryFilter, conditionFilter, statusFilter]);
+  }, [items, q, categoryFilter, subTypeFilter, conditionFilter, statusFilter]);
 
   const filteringActive = categoryFilter || conditionFilter || statusFilter || q.trim();
 
@@ -124,7 +131,7 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
     No:           index + 1,
     Item:         item.name,
     Description:  item.description ?? "",
-    Category:     ITEM_TYPE_LABEL[item.itemType] ?? item.itemType,
+    Category:     item.typeLabel,
     "Item Code":  item.itemCode ?? "",
     Manufacturer: item.manufacturer ?? "",
     Model:        item.model ?? "",
@@ -162,6 +169,7 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
   const clearAllFilters = () => {
     setQ("");
     setCategoryFilter("");
+    setSubTypeFilter("");
     setConditionFilter("");
     setStatusFilter("");
   };
@@ -345,7 +353,7 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                     <div className="no-print">
                       <select
                         value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        onChange={(e) => { setCategoryFilter(e.target.value); setSubTypeFilter(""); }}
                         title="Filter by category"
                         className={headerSelectCls(dark)}
                       >
@@ -354,6 +362,12 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
                           <option key={t.value} value={t.value}>{t.label}</option>
                         ))}
                       </select>
+                      {siteSubTypes.length > 0 && (
+                        <select value={subTypeFilter} onChange={(e) => setSubTypeFilter(e.target.value)} title="Filter by sub-type" className={`${headerSelectCls(dark)} mt-1`}>
+                          <option value="">All sub-types</option>
+                          {siteSubTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      )}
                     </div>
                   </th>
 
@@ -428,7 +442,7 @@ export default function InventorySiteClient({ role, canEdit, site, summary, item
 
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${dark ? (ITEM_TYPE_COLOR_DARK[item.itemType] ?? ITEM_TYPE_COLOR_DARK.GENERAL) : (ITEM_TYPE_COLOR_LIGHT[item.itemType] ?? ITEM_TYPE_COLOR_LIGHT.GENERAL)}`}>
-                        {ITEM_TYPE_LABEL[item.itemType] ?? item.itemType}
+                        {item.typeLabel}
                       </span>
                     </td>
 

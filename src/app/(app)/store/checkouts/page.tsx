@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import CheckedOutEquipmentClient from "./CheckedOutEquipmentClient";
+import { TYPE_NAMES, typeLabel } from "@/lib/item-types";
 
 type SearchParams = { q?: string };
 
@@ -53,6 +54,7 @@ export default async function GlobalCheckedOutEquipmentPage({
           id:       true,
           name:     true,
           itemType: true,
+          ...TYPE_NAMES,
           itemCode: true,
           unit:     true,
         },
@@ -83,7 +85,7 @@ export default async function GlobalCheckedOutEquipmentPage({
         : "N/A",
     inventoryItem: {
       name:     row.inventoryItem.name,
-      itemType: row.inventoryItem.itemType,
+      itemType: typeLabel(row.inventoryItem),
       itemCode: row.inventoryItem.itemCode,
       unit:     row.inventoryItem.unit,
     },
@@ -96,7 +98,7 @@ export default async function GlobalCheckedOutEquipmentPage({
     Item:              row.inventoryItem.name,
     "Item Code":       row.inventoryItem.itemCode ?? "",
     "Entity Codes":    row.entityCodePreview,
-    "Type":            row.inventoryItem.itemType,
+    "Type":            typeLabel(row.inventoryItem),
     Quantity:          `${row.quantityTaken}${row.inventoryItem.unit ? ` ${row.inventoryItem.unit}` : ""}`,
     "Taken By":        row.takenBy,
     Contact:           row.takenByContact ?? "",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useThemeMode } from "@/context/ThemeContext";
+import { typeLabel } from "@/lib/item-types";
 
 const ITEM_TYPE_LABEL: Record<string, string> = {
   EQUIPMENT:              "Equipment",
@@ -128,7 +129,7 @@ export default function RestockInventoryItemClient({
                         {item.name}
                         {item.itemCode ? ` · ${item.itemCode}` : ""}
                         {" — "}
-                        {ITEM_TYPE_LABEL[item.itemType] ?? item.itemType}
+                        {typeLabel(item as any)}
                         {" — Qty: "}
                         {item.uncountable ? "N/A" : item.quantity}
                         {item.unit ? ` ${item.unit}` : ""}
@@ -151,7 +152,7 @@ export default function RestockInventoryItemClient({
                   ? "mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300 space-y-1"
                   : "mt-4 rounded-xl border border-[#ebe3d8] bg-[#fcfaf7] p-4 text-sm text-[#5b564d] space-y-1"
                 }>
-                  <div><span className="font-semibold">Category:</span> {ITEM_TYPE_LABEL[selected.itemType] ?? selected.itemType}</div>
+                  <div><span className="font-semibold">Category:</span> {typeLabel(selected as any)}</div>
                   <div><span className="font-semibold">Item Code:</span> <span className="font-mono">{selected.itemCode ?? "—"}</span></div>
                   <div>
                     <span className="font-semibold">Current Qty:</span>{" "}

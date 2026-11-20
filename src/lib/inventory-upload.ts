@@ -12,6 +12,16 @@ import type {
   InventoryItemType,
 } from "@prisma/client";
 
+// Types / sub-types an upload needs that aren't available in this warehouse yet (admins can fix in the preview).
+export type MissingType =
+  | { kind: "type";            key: string; name: string }
+  | { kind: "include-type";    key: string; id: string; name: string; code: string }
+  | { kind: "subtype";         key: string; name: string; parentId: string; parentName: string }
+  | { kind: "include-subtype"; key: string; id: string; name: string; parentName: string };
+
+// Item codes in the file that use a different short code than this warehouse's setting for that type.
+export type CodeHint = { typeId: string; typeName: string; used: string; current: string; count: number };
+
 export type PreviewRow = {
   rowNumber:   number;
   itemType:    string;
@@ -25,7 +35,9 @@ export type PreviewRow = {
 };
 
 export type ValidRow = {
-  itemType:         InventoryItemType;
+  itemType:         InventoryItemType;   // legacy category (kept filled)
+  typeId:           string;
+  subTypeId:        string | null;
   name:             string;
   description:      string | null;
   manufacturer:     string | null;
@@ -87,7 +99,7 @@ export async function parseInventoryFile({
 }: {
   file:   File;
   siteId: string;
-}): Promise<{ preview: PreviewRow[]; validRows: ValidRow[] }> {
+}): Promise<{ preview: PreviewRow[]; validRows: ValidRow[]; missing: MissingType[]; codeHints: CodeHint[] }> {
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
   const MAX_ROWS      = 5000;
 
@@ -119,6 +131,25 @@ export async function parseInventoryFile({
 
   const seenUploadItemCodes = new Set<string>();
 
+  // Managed item types: match by name (or the old fixed names), and check what this warehouse uses.
+  const [allTypes, links] = await Promise.all([
+    prisma.itemType.findMany({ select: { id: true, name: true, parentId: true, legacyKey: true, defaultCode: true } }),
+    prisma.warehouseItemType.findMany({ where: { inventorySiteId: siteId }, select: { itemTypeId: true, enabled: true, code: true } }),
+  ]);
+  const linkOf   = new Map(links.map((l) => [l.itemTypeId, l]));
+  const isOn     = (id: string) => !!linkOf.get(id)?.enabled;
+  const mains    = allTypes.filter((t) => !t.parentId);
+  const mainByName = new Map(mains.map((t) => [t.name.trim().toUpperCase(), t]));
+  const findMain = (raw: string) => {
+    const key    = raw.replace(/\s+/g, " ").trim();
+    const legacy = resolveItemType(key);
+    return mainByName.get(key) ?? (legacy ? mains.find((t) => t.legacyKey === legacy) : undefined);
+  };
+  const codeFor  = (t: { id: string; defaultCode: string | null }) => linkOf.get(t.id)?.code || t.defaultCode || "GEN";
+
+  const missing   = new Map<string, MissingType>();
+  const hints     = new Map<string, CodeHint>();
+
   const preview:   PreviewRow[] = [];
   const validRows: ValidRow[]   = [];
 
@@ -129,7 +160,9 @@ export async function parseInventoryFile({
     const allEmpty = Object.values(r).every((v) => String(v ?? "").trim() === "");
     if (allEmpty) continue;
 
-    const itemTypeRaw  = normalizeUpper(r["itemtype"] ?? r["itemType"] ?? r["item type"] ?? r["Item Type"] ?? "");
+    const itemTypeText = normalizeText(r["itemtype"] ?? r["itemType"] ?? r["item type"] ?? r["Item Type"] ?? "").replace(/\s+/g, " ");
+    const itemTypeRaw  = itemTypeText.toUpperCase();
+    const subTypeText  = normalizeText(r["subtype"] ?? r["subType"] ?? r["sub type"] ?? r["Sub Type"] ?? r["sub-type"] ?? r["Sub-type"] ?? "").replace(/\s+/g, " ");
     const name         = normalizeText(r["name"] ?? r["Name"] ?? "");
     const description  = normalizeText(r["description"] ?? r["Description"] ?? "");
     const manufacturer = normalizeText(r["manufacturer"] ?? r["Manufacturer"] ?? "");
@@ -144,12 +177,37 @@ export async function parseInventoryFile({
 
     let error: string | null = null;
 
-    const itemType = resolveItemType(itemTypeRaw);
-    if (!itemType) {
-      error = itemTypeRaw
-        ? `"${itemTypeRaw}" is not a recognised item type. Valid types: ${ITEM_TYPE_UPLOAD_HINT}`
-        : `itemtype is required. Valid types: ${ITEM_TYPE_UPLOAD_HINT}`;
+    // Item type (main) and optional sub-type.
+    const main = itemTypeRaw ? findMain(itemTypeRaw) : undefined;
+    let subId: string | null = null;
+    let typeDisplay = itemTypeText;
+    if (!itemTypeRaw) {
+      error = `itemtype is required. Types used here: ${mains.filter((t) => isOn(t.id)).map((t) => t.name).join(" · ") || ITEM_TYPE_UPLOAD_HINT}`;
+    } else if (!main) {
+      error = `Item type "${itemTypeText}" doesn't exist yet`;
+      missing.set(`type:${itemTypeRaw}`, { kind: "type", key: `type:${itemTypeRaw}`, name: itemTypeText });
+    } else {
+      typeDisplay = main.name;
+      if (!isOn(main.id)) {
+        error = `"${main.name}" isn't used in this warehouse yet`;
+        missing.set(`inc:${main.id}`, { kind: "include-type", key: `inc:${main.id}`, id: main.id, name: main.name, code: codeFor(main) });
+      }
+      if (subTypeText) {
+        const sub = allTypes.find((t) => t.parentId === main.id && t.name.trim().toUpperCase() === subTypeText.toUpperCase());
+        typeDisplay = `${main.name} › ${sub?.name ?? subTypeText}`;
+        if (!sub) {
+          error = error ?? `Sub-type "${subTypeText}" doesn't exist under ${main.name} yet`;
+          missing.set(`sub:${main.id}:${subTypeText.toUpperCase()}`, { kind: "subtype", key: `sub:${main.id}:${subTypeText.toUpperCase()}`, name: subTypeText, parentId: main.id, parentName: main.name });
+        } else {
+          subId = sub.id;
+          if (!isOn(sub.id)) {
+            error = error ?? `Sub-type "${sub.name}" isn't used in this warehouse yet`;
+            missing.set(`incsub:${sub.id}`, { kind: "include-subtype", key: `incsub:${sub.id}`, id: sub.id, name: sub.name, parentName: main.name });
+          }
+        }
+      }
     }
+    const itemType: InventoryItemType | null = main ? (main.legacyKey ?? "GENERAL") : null;
 
     if (!error && !name) error = "name is required";
 
@@ -186,7 +244,7 @@ export async function parseInventoryFile({
 
     preview.push({
       rowNumber,
-      itemType:    itemType ?? itemTypeRaw,
+      itemType:    typeDisplay,
       name,
       itemCode:    itemCodeRaw || "(auto)",
       quantity:    uncountable ? "N/A" : String(quantity),
@@ -196,11 +254,22 @@ export async function parseInventoryFile({
       error,
     });
 
-    if (!error && itemType) {
+    if (!error && itemType && main) {
       if (itemCodeKey) seenUploadItemCodes.add(itemCodeKey);
+
+      // Item code given in the file with a different short code than this warehouse uses for the type?
+      const seg = /^[^-]+-([^-]+)-\d/.exec(itemCodeKey)?.[1];
+      if (seg && seg !== codeFor(main).toUpperCase()) {
+        const k = `${main.id}:${seg}`;
+        const h = hints.get(k) ?? { typeId: main.id, typeName: main.name, used: seg, current: codeFor(main), count: 0 };
+        h.count++;
+        hints.set(k, h);
+      }
 
       validRows.push({
         itemType,
+        typeId:    main.id,
+        subTypeId: subId,
         name,
         description:      description  || null,
         manufacturer:     manufacturer || null,
@@ -220,17 +289,21 @@ export async function parseInventoryFile({
     }
   }
 
-  return { preview, validRows };
+  return { preview, validRows, missing: [...missing.values()], codeHints: [...hints.values()] };
 }
 
+// Next free item code: PREFIX-CODE-001. Pass the warehouse's short code for the item type
+// (from item-type-registry), or a legacy itemType to use its standard code.
 export async function generateItemCode({
   itemType,
+  code,
   sitePrefix,
 }: {
-  itemType:   InventoryItemType;
+  itemType?:  InventoryItemType;
+  code?:      string;
   sitePrefix: string;
 }): Promise<string> {
-  const typeCode = ITEM_CODE_SEGMENT[itemType] ?? "GEN";
+  const typeCode = code || (itemType ? ITEM_CODE_SEGMENT[itemType] : undefined) || "GEN";
   const pattern  = `${sitePrefix}-${typeCode}-`;
 
   const existing = await prisma.inventoryItem.findMany({

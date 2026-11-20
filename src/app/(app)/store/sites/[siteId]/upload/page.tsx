@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isAdminProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { getWarehouseTypeOptions } from "@/lib/item-type-registry";
 import {
   generateItemCode,
   generateEntityCodes,
@@ -15,6 +16,7 @@ async function buildInventoryTemplateDataUrl() {
 
   const headers = [
     "itemtype",
+    "subtype",
     "name",
     "description",
     "manufacturer",
@@ -104,21 +106,61 @@ export default async function UploadInventoryExcelPage({
 
     const sitePrefix = await getSitePrefix(siteId);
 
+    // Re-check every row's type on the server: it must be switched on for this warehouse.
+    const [typeRows, siteLinks] = await Promise.all([
+      prisma.itemType.findMany({ select: { id: true, parentId: true, legacyKey: true, defaultCode: true } }),
+      prisma.warehouseItemType.findMany({ where: { inventorySiteId: siteId, enabled: true }, select: { itemTypeId: true, code: true } }),
+    ]);
+    const typeById = new Map(typeRows.map((t) => [t.id, t]));
+    const onHere   = new Map(siteLinks.map((l) => [l.itemTypeId, l]));
+    for (const row of validRows) {
+      const t = typeById.get(row.typeId);
+      const s = row.subTypeId ? typeById.get(row.subTypeId) : null;
+      if (!t || t.parentId || !onHere.has(t.id) || (row.subTypeId && (!s || s.parentId !== t.id || !onHere.has(s.id)))) {
+        redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent(`"${row.name}": its item type isn't set up for this warehouse — preview the file again.`)}`);
+      }
+      row.itemType = t.legacyKey ?? "GENERAL";
+    }
+
+    // Allocate auto item codes up front, in sequence per short code. (Generating them one by one inside the
+    // transaction can't see the rows just created in it, so every row got the same code.)
+    const autoCodes = new Map<number, string>();
+    const nextNum   = new Map<string, number>();
+    for (let i = 0; i < validRows.length; i++) {
+      if ((validRows[i].itemCode ?? "").trim()) continue;
+      const t    = typeById.get(validRows[i].typeId)!;
+      const code = onHere.get(t.id)?.code || t.defaultCode || "GEN";
+      const pattern = `${sitePrefix}-${code}-`;
+      if (!nextNum.has(pattern)) {
+        const first = await generateItemCode({ code, sitePrefix });   // next free number in the database
+        let n = parseInt(first.slice(pattern.length), 10);
+        // Don't collide with codes typed into this same file.
+        for (const r of validRows) {
+          const c = (r.itemCode ?? "").trim().toUpperCase();
+          if (c.startsWith(pattern.toUpperCase())) n = Math.max(n, (parseInt(c.slice(pattern.length).split("-")[0], 10) || 0) + 1);
+        }
+        nextNum.set(pattern, n);
+      }
+      const n = nextNum.get(pattern)!;
+      autoCodes.set(i, `${pattern}${String(n).padStart(3, "0")}`);
+      nextNum.set(pattern, n + 1);
+    }
+
     try {
       let importedCount = 0;
 
       await prisma.$transaction(
         async (tx) => {
-          for (const row of validRows) {
-            let itemCode = (row.itemCode ?? "").trim() || null;
-            if (!itemCode) {
-              itemCode = await generateItemCode({ itemType: row.itemType, sitePrefix });
-            }
+          for (let i = 0; i < validRows.length; i++) {
+            const row = validRows[i];
+            const itemCode = (row.itemCode ?? "").trim() || autoCodes.get(i)!;
 
             const created = await tx.inventoryItem.create({
               data: {
                 inventorySiteId:  siteId,
                 itemType:         row.itemType,
+                typeId:           row.typeId,
+                subTypeId:        row.subTypeId,
                 itemCode,
                 name:             row.name,
                 description:      row.description,
@@ -187,6 +229,10 @@ export default async function UploadInventoryExcelPage({
       templateFileName="inventory-import-template.xlsx"
       serverError={sp.error ?? null}
       serverSuccess={sp.success ?? null}
+      canManageTypes={isAdminProfile(profile)}
+      typesHere={(await getWarehouseTypeOptions(siteId)).map((t) => ({
+        name: t.name, code: t.code, subTypes: t.subTypes.map((s) => s.name),
+      }))}
     />
   );
 }

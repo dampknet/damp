@@ -3,6 +3,7 @@ import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notifications";
 import { getAutoInventoryStatus } from "@/lib/inventory-status";
 import { generateItemCode, getSitePrefix } from "@/lib/inventory-upload";
+import { warehouseCode } from "@/lib/item-type-registry";
 import type { EquipmentCondition, Prisma } from "@prisma/client";
 
 // Issued = used at the destination + returned to the store + still out.
@@ -14,7 +15,7 @@ const isCondition = (c: unknown): c is EquipmentCondition => typeof c === "strin
 const issueSelect = {
   id: true, groupId: true, inventorySiteId: true, quantityTaken: true, quantityUsed: true, quantityReturned: true,
   takenBy: true, conditionAtIssue: true, status: true, deliveryStatus: true, destinationName: true, destinationSiteId: true, expectedReturnAt: true,
-  inventoryItem: { select: { id: true, name: true, itemType: true, manufacturer: true, model: true, unit: true, uncountable: true, condition: true } },
+  inventoryItem: { select: { id: true, name: true, itemType: true, typeId: true, subTypeId: true, manufacturer: true, model: true, unit: true, uncountable: true, condition: true } },
   inventorySite: { select: { name: true } },
   lines: { select: { id: true, usedAt: true, returnedAt: true, assetInstance: { select: { id: true, entityCode: true, condition: true } } } },
 } satisfies Prisma.WarehouseIssueSelect;
@@ -102,11 +103,12 @@ export async function receiveReturn(input: ReceiveInput, actorEmail: string): Pr
   const newCodes = new Map<EquipmentCondition, string>();
   if (otherConditions.size) {
     const sitePrefix = await getSitePrefix(issue.inventorySiteId);
+    const typeCode   = item.typeId ? await warehouseCode(issue.inventorySiteId, item.typeId) : undefined;
     for (const c of otherConditions) {
       const exists = await prisma.inventoryItem.findFirst({
         where: { inventorySiteId: issue.inventorySiteId, name: item.name, isDeleted: false, condition: c }, select: { id: true },
       });
-      if (!exists) newCodes.set(c, await generateItemCode({ itemType: item.itemType, sitePrefix }));
+      if (!exists) newCodes.set(c, await generateItemCode({ itemType: item.itemType, code: typeCode, sitePrefix }));
     }
   }
 
@@ -125,7 +127,7 @@ export async function receiveReturn(input: ReceiveInput, actorEmail: string): Pr
       newCodes.delete(condition);   // one new line per condition
       const created = await tx.inventoryItem.create({
         data: {
-          inventorySiteId: issue.inventorySiteId, itemType: item.itemType, name: item.name,
+          inventorySiteId: issue.inventorySiteId, itemType: item.itemType, typeId: item.typeId, subTypeId: item.subTypeId, name: item.name,
           itemCode: code,
           manufacturer: item.manufacturer, model: item.model, unit: item.unit,
           quantity: 0, uncountable: false, reorderLevel: 0, status: "OUT_OF_STOCK", condition,

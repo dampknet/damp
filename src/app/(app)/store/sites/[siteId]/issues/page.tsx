@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import IssueLogClient from "./IssueLogClient";
+import { TYPE_NAMES } from "@/lib/item-types";
 
 type SearchParams = {
   q?:      string;
@@ -79,6 +80,7 @@ export default async function SiteIssueLogPage({
           id:       true,
           name:     true,
           itemType: true,
+          ...TYPE_NAMES,
           itemCode: true,
           unit:     true,
         },

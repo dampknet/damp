@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { SECURITY_EVENT_WHERE } from "@/lib/security-events";
 import { Paragraph, Table } from "docx";
+import { typeLabel } from "@/lib/item-types";
 import { sectionTitle, heading, keyFigures, table, emptyNote, gap, type Cell } from "./docx";
 
 type Block = Paragraph | Table;
@@ -106,7 +107,7 @@ export async function warehouseSection(ctx: Ctx, warehouseId: string | null): Pr
       orderBy: { takenAt: "asc" },
       select: {
         quantityTaken: true, takenAt: true, takenBy: true, destinationName: true, deliveryStatus: true, deliveredAt: true,
-        inventoryItem: { select: { name: true, unit: true } },
+        inventoryItem: { select: { name: true, unit: true, itemType: true, typeRef: { select: { name: true } }, subType: { select: { name: true } } } },
         inventorySite: { select: { id: true, name: true } },
       },
     }),
@@ -172,6 +173,7 @@ export async function warehouseSection(ctx: Ctx, warehouseId: string | null): Pr
     ] as Cell[];
   });
 
+  const byType = topBy(issues, (i) => `${i.inventoryItem.typeRef?.name ?? typeLabel({ itemType: i.inventoryItem.itemType })}|${i.inventoryItem.subType?.name ?? ""}`, (i) => i.quantityTaken);
   const topItems = topBy(issues, (i) => `${i.inventoryItem.name}|${i.inventorySite.name}|${unit(i.inventoryItem.unit)}`, (i) => i.quantityTaken);
   const destNames = new Map<string, string>();
   for (const i of issues) if (i.destinationName) destNames.set(i.destinationName.trim().toLowerCase(), destNames.get(i.destinationName.trim().toLowerCase()) ?? i.destinationName);
@@ -203,6 +205,16 @@ export async function warehouseSection(ctx: Ctx, warehouseId: string | null): Pr
           weights: [0.5, 4, 2.2, 1.2, 1.4],
           align:   ["center", "left", "left", "center", "center"],
           rows:    topItems.slice(0, 15).map((t, i) => { const [name, wh, u] = t.key.split("|"); return [i + 1, name, wh, `${t.units} ${u}`, t.times]; }),
+        })
+      : emptyNote("Nothing was issued in this period."),
+    gap(),
+    ...heading("Issued by item type", "Units taken out in this period, by item type and sub-type."),
+    byType.length
+      ? table({
+          headers: ["Item type", "Sub-type", "Issue lines", "Units"],
+          weights: [3, 3, 1.4, 1.4],
+          align:   ["left", "left", "center", "center"],
+          rows:    byType.map((t) => { const [main, sub] = t.key.split("|"); return [{ text: main, bold: true }, sub || { text: "—", color: "999999" }, t.times, t.units]; }),
         })
       : emptyNote("Nothing was issued in this period."),
     gap(),

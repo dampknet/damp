@@ -18,7 +18,8 @@ type InstanceRow = {
 type ItemRow = {
   id:           string;
   name:         string;
-  itemType:     string;
+  itemType:     string;   // display name, e.g. "Equipment › Solar Equipment"
+  tracked:      boolean;  // units tracked one by one (from the item type setting)
   itemCode:     string | null;
   quantity:     number;
   uncountable:  boolean;
@@ -33,6 +34,7 @@ type BucketEntry = {
   id:           string;
   name:         string;
   itemType:     string;
+  tracked:      boolean;
   quantity:     number;
   entityCodes:  string[];
   conditions:   { code: string; condition: string }[];
@@ -83,8 +85,9 @@ function DestinationPicker({
   );
 }
 
-const SITE_PREFIXES = ALL_SITE_PREFIXES;
-const TYPE_SEGS     = ALL_CODE_SEGMENTS;
+// Set from the server for this warehouse (its prefix + short codes); defaults are the standard ones.
+let SITE_PREFIXES: string[] = ALL_SITE_PREFIXES;
+let TYPE_SEGS:     string[] = ALL_CODE_SEGMENTS;
 
 function canonicalise(raw: string): string {
   let s = raw.trim().toUpperCase();
@@ -118,7 +121,7 @@ function conditionColor(c: string) {
 }
 
 export default function IssueInventoryItemClient({
-  site, items, destinations, otherPlaces, canBackdate, today, action,
+  site, items, destinations, otherPlaces, canBackdate, today, action, codeSegments, sitePrefixes,
 }: {
   site:         { id: string; name: string; location: string | null };
   items:        ItemRow[];
@@ -127,7 +130,13 @@ export default function IssueInventoryItemClient({
   canBackdate:  boolean;   // master admins can set the real issue date
   today:        string;    // YYYY-MM-DD (server's today)
   action:       (formData: FormData) => void;
+  codeSegments: string[];  // this warehouse's short codes ("EQUIP-", …) for barcode matching
+  sitePrefixes: string[];  // label prefixes to strip ("KANDA-", …)
 }) {
+  // Barcode matching uses this warehouse's own short codes.
+  SITE_PREFIXES = sitePrefixes;
+  TYPE_SEGS     = codeSegments;
+
   const { mode }     = useThemeMode();
   const dark         = mode === "dark";
   const searchParams = useSearchParams();
@@ -294,6 +303,7 @@ export default function IssueInventoryItemClient({
             id:           foundItemForInstance!.id,
             name:         foundItemForInstance!.name,
             itemType:     foundItemForInstance!.itemType,
+            tracked:      foundItemForInstance!.tracked,
             quantity:     1,
             entityCodes:  [foundInstance!.entityCode],
             conditions:   [{ code: foundInstance!.entityCode, condition: foundInstance!.condition }],
@@ -324,6 +334,7 @@ export default function IssueInventoryItemClient({
           id:            foundBulkItem.id,
           name:          foundBulkItem.name,
           itemType:      foundBulkItem.itemType,
+          tracked:       foundBulkItem.tracked,
           quantity:      1,
           entityCodes:   [],
           conditions:    [],
@@ -429,6 +440,7 @@ export default function IssueInventoryItemClient({
         id:            byItemCode.id,
         name:          byItemCode.name,
         itemType:      byItemCode.itemType,
+        tracked:       byItemCode.tracked,
         quantity:      1,
         entityCodes:   [],
         conditions:    [],
@@ -454,6 +466,7 @@ export default function IssueInventoryItemClient({
         id:            byName.id,
         name:          byName.name,
         itemType:      byName.itemType,
+        tracked:       byName.tracked,
         quantity:      1,
         entityCodes:   [],
         conditions:    [],
@@ -670,7 +683,7 @@ export default function IssueInventoryItemClient({
                     </td>
 
                     <td className="px-6 py-4 text-center">
-                      {b.isBulk || (b.itemType !== "EQUIPMENT" && b.itemType !== "COOLING_INFRASTRUCTURE") ? (
+                      {b.isBulk || !b.tracked ? (
                         <input type="number" min="1"
                           max={b.availableQty ?? undefined}
                           value={b.quantity}
@@ -779,6 +792,7 @@ export default function IssueInventoryItemClient({
                       id:            found.id,
                       name:          found.name,
                       itemType:      found.itemType,
+                      tracked:       found.tracked,
                       quantity:      1,
                       entityCodes:   [],
                       conditions:    [],
