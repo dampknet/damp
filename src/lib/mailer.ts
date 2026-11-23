@@ -60,7 +60,7 @@ export function baseTemplate(content: string) {
       <div style="background:linear-gradient(90deg,#1d5fa8,#3b82f6);height:4px;border-radius:2px;margin-bottom:32px;"></div>
       ${content}
       <div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee7dd;color:#9c9890;font-size:11px;">
-        KNET — Ghana DTT Asset Management Platform
+        KIMS — KNET Inventory Management System
       </div>
     </div>
   `;
@@ -69,13 +69,13 @@ export function baseTemplate(content: string) {
 export async function sendSetPasswordEmail(to: string, setPasswordLink: string, fullName?: string) {
   await sendEmail(
     to,
-    "Set your DAMP password — KNET Asset Management",
+    "Set your KIMS password — KNET Inventory Management System",
     baseTemplate(`
       <h1 style="font-size:22px;font-weight:700;color:#1a1814;margin:0 0 8px;">
-        Welcome to DAMP${fullName ? `, ${esc(fullName)}` : ""}
+        Welcome to KIMS${fullName ? `, ${esc(fullName)}` : ""}
       </h1>
       <p style="color:#6b655d;font-size:14px;margin:0 0 24px;">
-        You've been granted access to the KNET Ghana DTT Asset Management Platform.
+        You've been granted access to KIMS, the KNET Inventory Management System.
         Click below to set your password and get started.
       </p>
       <a href="${esc(setPasswordLink)}"
@@ -94,13 +94,13 @@ export async function sendCompanyAccessEmail(to: string, fullName?: string) {
   const loginUrl = `${process.env.NEXTAUTH_URL}/auth/login`;
   await sendEmail(
     to,
-    "You have been granted access to DAMP — KNET Asset Management",
+    "You have been granted access to KIMS — KNET Inventory Management System",
     baseTemplate(`
       <h1 style="font-size:22px;font-weight:700;color:#1a1814;margin:0 0 8px;">
         Access Granted${fullName ? `, ${esc(fullName)}` : ""}
       </h1>
       <p style="color:#6b655d;font-size:14px;margin:0 0 8px;">
-        You have been granted access to the KNET Ghana DTT Asset Management Platform.
+        You have been granted access to KIMS, the KNET Inventory Management System.
       </p>
       <p style="color:#6b655d;font-size:14px;margin:0 0 24px;">
         Since you have a KNET company account, sign in with your company single sign-on — no separate password needed.

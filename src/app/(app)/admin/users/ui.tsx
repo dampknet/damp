@@ -8,11 +8,12 @@ import {
   updateUserRole, addUser, removeUser,
   setMasterAdmin, suspendUser, reinstateUser, unlockUser,
   createEmergencyAccount, setLocalPassword, removeLocalPassword, setAccessExpiry,
+  changeUserEmail,
 } from "./actions";
 import {
   UserPlus, Users, ShieldCheck, X, Trash2, Search, CheckCircle,
   ChevronRight, Loader2, Crown, Lock, Unlock, Ban, RotateCcw,
-  Key, Clock, Copy, RefreshCw,
+  Key, Clock, Copy, RefreshCw, Mail, AlertTriangle,
 } from "lucide-react";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
@@ -75,10 +76,11 @@ function formatWhen(iso: string | null) {
 }
 
 export default function UsersTable({
-  users, currentUserId,
+  users, currentUserId, companyDomain,
 }: {
   users:         UserRow[];
   currentUserId: string;
+  companyDomain: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const { mode } = useThemeMode();
@@ -107,6 +109,10 @@ export default function UsersTable({
   const [passwordFor,   setPasswordFor]   = useState<UserRow | null>(null);
   const [pwValue,       setPwValue]       = useState("");
   const [pwMustChange,  setPwMustChange]  = useState(true);
+
+  const [emailFor,      setEmailFor]      = useState<UserRow | null>(null);
+  const [emailValue,    setEmailValue]    = useState("");
+  const [emailConfirm,  setEmailConfirm]  = useState(false); // second step: confirm old → new
 
   const [expiryFor,     setExpiryFor]     = useState<UserRow | null>(null);
   const [expiryValue,   setExpiryValue]   = useState("");
@@ -235,6 +241,38 @@ export default function UsersTable({
         setHandover({ email: target.email, password, mustChange });
       } catch (error: any) {
         setFormError(error?.message || "Could not set the password");
+      }
+    });
+  };
+
+  const openEmail = (u: UserRow) => {
+    setEmailValue(u.email);
+    setEmailConfirm(false);
+    setFormError(null);
+    setEmailFor(u);
+  };
+
+  const emailNext      = emailValue.trim().toLowerCase();
+  const emailLooksOk   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNext);
+  const emailOffDomain = !!companyDomain && emailLooksOk && !emailNext.endsWith(`@${companyDomain}`);
+
+  const submitEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailFor) return;
+    setFormError(null);
+    if (!emailLooksOk) { setFormError("Enter a valid email address."); return; }
+    if (emailNext === emailFor.email.toLowerCase()) { setFormError("That is already their email."); return; }
+    if (!emailConfirm) { setEmailConfirm(true); return; }
+    const target = emailFor;
+    startTransition(async () => {
+      try {
+        const r = await changeUserEmail(target.id, emailNext);
+        if (!r.ok) { setFormError(r.message); setEmailConfirm(false); return; }
+        setEmailFor(null);
+        showToast("success", `${target.email} is now ${emailNext}`);
+      } catch (error: any) {
+        setFormError(error?.message || "Could not change the email");
+        setEmailConfirm(false);
       }
     });
   };
@@ -509,6 +547,10 @@ export default function UsersTable({
                             </button>
                           )}
 
+                          <button disabled={isPending} className={actionBtn("neutral")} onClick={() => openEmail(u)}>
+                            <Mail size={12} /> Change Email
+                          </button>
+
                           <button disabled={isPending} className={actionBtn("neutral")} onClick={() => openPassword(u)}>
                             <Key size={12} /> {u.hasLocalPassword ? "Reset Password" : "Set Password"}
                           </button>
@@ -771,6 +813,72 @@ export default function UsersTable({
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: accent }}>
                   {isPending ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {emailFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
+            <div className="h-1 bg-[linear-gradient(90deg,#7c3aed,#3b82f6)]" />
+            <form onSubmit={submitEmail} className="space-y-4 p-6">
+              <div>
+                <h2 className={`text-base font-semibold ${txt}`}>Change Sign-in Email</h2>
+                <p className={`mt-1 text-xs ${muted}`}>
+                  Only the email changes. Their password, role and access settings stay as they are.
+                </p>
+              </div>
+
+              <div>
+                <div className={`mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${muted}`}>Current email</div>
+                <div className={`rounded-xl border ${border} px-3 py-2.5 text-sm ${txt}`}>{emailFor.email}</div>
+              </div>
+
+              <div>
+                <label htmlFor="new-email" className={`mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] ${muted}`}>New email</label>
+                <input id="new-email" type="email" autoFocus value={emailValue} disabled={emailConfirm}
+                  onChange={(e) => { setEmailValue(e.target.value); setFormError(null); }}
+                  placeholder={`name@${companyDomain || "company.com"}`}
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition disabled:opacity-60 ${input}`} />
+              </div>
+
+              {emailOffDomain && (
+                <div className={dark ? "flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" : "flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"}>
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span>This isn&apos;t a @{companyDomain} address, so they won&apos;t be able to use Microsoft sign-in with it — only Google (if it&apos;s a Gmail) or a local password.</span>
+                </div>
+              )}
+
+              {emailConfirm && (
+                <div className={dark ? "rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-200" : "rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-900"}>
+                  <div className="font-semibold">Confirm the change</div>
+                  <div className="mt-1 break-all"><span className="line-through opacity-70">{emailFor.email}</span> → <span className="font-semibold">{emailNext}</span></div>
+                  <div className="mt-1.5 opacity-90">
+                    {emailFor.id === currentUserId
+                      ? "This is your own account: you will be signed out and must sign in again with the new email."
+                      : "If they are signed in, they will be signed out and must sign in again with the new email. Signing in with the old email will stop working."}
+                  </div>
+                </div>
+              )}
+
+              {formError && (
+                <div className={dark ? "rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300" : "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"}>
+                  {formError}
+                </div>
+              )}
+
+              <div className={`flex gap-2 border-t ${border} pt-4`}>
+                <button type="button" onClick={() => (emailConfirm ? setEmailConfirm(false) : setEmailFor(null))}
+                  className={`flex-1 rounded-xl border ${border} py-2.5 text-sm font-semibold ${txt} transition ${hoverBg}`}>
+                  {emailConfirm ? "Back" : "Cancel"}
+                </button>
+                <button type="submit" disabled={isPending}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: accent }}>
+                  {isPending ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : emailConfirm ? "Yes, Change Email" : "Continue"}
                 </button>
               </div>
             </form>

@@ -10,8 +10,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DTT-ASSET MANAGEMENT PLATFORM",
-  description: "Asset Management Platform",
+  title: "KIMS - KNET Inventory Management System",
+  description: "KNET Inventory Management System",
 };
 
 export default function RootLayout({

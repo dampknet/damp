@@ -324,3 +324,40 @@ export async function setAccessExpiry(userId: string, expiresAt: string | null) 
   );
   revalidatePath("/admin/users");
 }
+
+// Change a user's sign-in email (e.g. personal Gmail → company address). Password, role and every other
+// setting stay as they are. Their current session (under the old email) ends; they sign in again with the new one.
+export async function changeUserEmail(userId: string, newEmail: string): Promise<{ ok: boolean; message: string }> {
+  const me = await getCurrentProfile();
+  if (!me?.isMasterAdmin) return { ok: false, message: "Only a master admin can change emails." };
+
+  const target = await prisma.userProfile.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+  if (!target) return { ok: false, message: "User not found." };
+
+  const email = newEmail.toLowerCase().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return { ok: false, message: "Enter a valid email address." };
+  if (email === target.email.toLowerCase()) return { ok: false, message: "That is already their email." };
+
+  const taken = await prisma.userProfile.findUnique({ where: { email }, select: { id: true } });
+  if (taken) return { ok: false, message: `${email} already belongs to another user.` };
+
+  try {
+    await prisma.$transaction([
+      prisma.userProfile.update({ where: { id: userId }, data: { email } }),
+      // Unused "set your password" links were issued for the old address — cancel them.
+      prisma.passwordResetToken.deleteMany({ where: { email: target.email } }),
+    ]);
+  } catch (e) {
+    console.error("[CHANGE EMAIL]", e);
+    return { ok: false, message: "Could not change the email. It may have just been taken by another user." };
+  }
+
+  await securityLog(
+    me.email,
+    `Email changed: ${target.email} → ${email}`,
+    `Changed by ${me.email}. Password and access settings unchanged. Earlier history keeps the old address.`,
+    userId,
+  );
+  revalidatePath("/admin/users");
+  return { ok: true, message: `Email changed to ${email}.` };
+}

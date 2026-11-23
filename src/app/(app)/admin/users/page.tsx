@@ -1,5 +1,6 @@
 import { prisma }             from "@/lib/prisma";
 import { requireMasterAdmin } from "@/lib/auth";
+import { getCompanyDomain }   from "@/lib/system-config";
 import UsersTable             from "./ui";
 
 export default async function AdminUsersPage() {
@@ -37,6 +38,7 @@ export default async function AdminUsersPage() {
         accessExpiresAt:  u.accessExpiresAt?.toISOString() ?? null,
       }))}
       currentUserId={me.id}
+      companyDomain={await getCompanyDomain()}
     />
   );
 }
