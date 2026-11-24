@@ -113,6 +113,20 @@ export async function confirmDeliveries(
       body:       `${summary}.${leftovers && !backNow ? " Unused items are awaiting return." : ""}${cleanNote ? ` Note: ${cleanNote}` : ""}`,
       link:       siteId ? `/sites/${siteId}/store` : `/store/deliveries?place=${encodeURIComponent(destName)}`,
       actorEmail: me.email,
+      siteIds:    [...new Set(rows.map((r) => r.issue.inventorySiteId))], // emails go to people with these warehouses
+      details: {
+        items: rows.map((r) => ({
+          name: r.issue.inventoryItem.name,
+          qty:  `used ${r.used} of ${r.issue.quantityTaken - r.issue.quantityReturned}`,
+        })),
+        rows: [
+          ["Delivered at", destName],
+          ["From", [...new Set(rows.map((r) => r.issue.inventorySite.name))].join(", ")],
+          ["Unused items", leftovers && !backNow ? "Awaiting return to the store" : null],
+          ["Note", cleanNote],
+        ],
+        actorLabel: "Confirmed by",
+      },
     });
   }
 

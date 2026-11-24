@@ -263,6 +263,9 @@ export default async function IssueInventoryItemPage({
       });
 
       const totalUnits = bucket.reduce((sum, b) => sum + (Number(b.quantity) || 1), 0);
+      const unitOf     = new Map((await prisma.inventoryItem.findMany({
+        where: { id: { in: bucket.map((b) => String(b.id)) } }, select: { id: true, unit: true, uncountable: true },
+      })).map((i) => [i.id, i]));
       const itemNames  = bucket.map((b) => String(b.name ?? "")).filter(Boolean);
       await notify({
         type:       "ITEM_ISSUED",
@@ -270,6 +273,22 @@ export default async function IssueInventoryItemPage({
         body:       `${itemNames.slice(0, 4).join(", ")}${itemNames.length > 4 ? ` and ${itemNames.length - 4} more` : ""}. Taken by ${requesterName}, authorized by ${authorizedBy || "—"}. Purpose: ${purpose}`,
         link:       `/store/sites/${siteId}/issue/receipt?groupId=${groupId}`,
         actorEmail: profile?.email ?? null,
+        details: {
+          items: bucket.map((b) => {
+            const it = unitOf.get(String(b.id));
+            const q  = Number(b.quantity) || 1;
+            return { name: String(b.name ?? ""), qty: it?.uncountable ? "—" : `${q} ${it?.unit || "pcs"}` };
+          }),
+          rows: [
+            ["From", siteName],
+            ["To", destinationSummary],
+            ["Purpose", purpose],
+            ["Taken by", requesterContact ? `${requesterName} (${requesterContact})` : requesterName],
+            ["Authorized by", authorizedBy || "—"],
+          ],
+          when:       issuedAt,
+          actorLabel: "Issued by",
+        },
       });
 
       await notifyStockLevels(

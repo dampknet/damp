@@ -1,3 +1,4 @@
+import { notifyStockDrop } from "@/lib/notifications";
 import { editorForItem } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -66,6 +67,8 @@ export async function POST(req: Request) {
       entityType: "INVENTORY_ITEM",
       entityId:   itemId,
     });
+
+    await notifyStockDrop(itemId, confirmedIds.length, profile?.email ?? null);
 
     return NextResponse.json({ ok: true, deleted: confirmedIds.length });
   } catch (error) {

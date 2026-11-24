@@ -210,5 +210,15 @@ export async function recordReturnEffects(r: Extract<ReceiveResult, { ok: true }
     body:       `Brought back by ${input.returnedBy}.${input.note ? ` Note: ${input.note}` : ""}`,
     link:       `/store/sites/${warehouseId}/issues`,
     actorEmail,
+    details: {
+      items: [{ name: r.item, qty: `${r.units}` }],
+      rows: [
+        ["Returned to", r.siteName],
+        ["Coming back from", r.destination],
+        ["Brought back by", input.returnedBy],
+        ["Note", input.note],
+      ],
+      actorLabel: "Received by",
+    },
   });
 }

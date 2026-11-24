@@ -143,6 +143,10 @@ model UserProfile {
   // true = every warehouse at full level; false = only the warehouses in storeAccessList.
   allStores           Boolean   @default(true)
   storeAccessList     UserStoreAccess[]
+  // Email alerts (set by a master admin). Kinds: ISSUED, DELIVERED, RETURNED, STOCK.
+  emailAlerts         Boolean   @default(false)
+  emailAlertKinds     String[]  @default([])
+  alertEmail          String?   // send alerts here instead of the sign-in email (optional)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 }
@@ -627,6 +631,26 @@ model AuthProviderConfig {
   issuer          String?
   updatedBy       String?
   updatedAt       DateTime @updatedAt
+}
+
+// Alert emails waiting to be sent / sent / failed. Sending never blocks the action that raised the alert.
+model EmailOutbox {
+  id             String    @id @default(cuid())
+  toEmail        String
+  userId         String?
+  kind           String    // ISSUED | DELIVERED | RETURNED | STOCK
+  subject        String
+  html           String
+  notificationId String?
+  status         String    @default("PENDING") // PENDING | SENDING | SENT | FAILED
+  attempts       Int       @default(0)
+  lastError      String?
+  nextAttemptAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
 }
 
 model MailConfig {

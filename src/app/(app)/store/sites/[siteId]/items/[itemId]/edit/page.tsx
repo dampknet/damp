@@ -1,3 +1,4 @@
+import { notifyStockLevels } from "@/lib/notifications";
 import { canEditStore, storeEditor } from "@/lib/access";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -135,6 +136,8 @@ export default async function EditInventoryItemPage({
     let conditionChanged  = false;
 
     try {
+      // Stock before the change, so a drop into low / out of stock raises an alert (like issuing does).
+      const before  = await prisma.inventoryItem.findUnique({ where: { id: itemId }, select: { quantity: true } });
       const updated = await prisma.$transaction(async (tx) => {
         const before = await tx.inventoryItem.findUnique({
           where:  { id: itemId },
@@ -217,6 +220,11 @@ export default async function EditInventoryItemPage({
         entityType: "INVENTORY_ITEM",
         entityId:   updated.id,
       });
+
+      const dropped = (before?.quantity ?? 0) - updated.quantity;
+      if (!uncountable && dropped > 0) {
+        await notifyStockLevels([{ itemId: updated.id, taken: dropped }], siteName, siteId, profile?.email ?? null);
+      }
     } catch (e) {
       console.error(e);
       const msg = (e as Error)?.message?.startsWith("Entity code") ? (e as Error).message : "Could not update inventory item";

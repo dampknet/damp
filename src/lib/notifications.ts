@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { queueAlertEmails, type AlertDetails } from "@/lib/alert-email";
 
 export type NotificationType =
   | "ITEM_ISSUED"
@@ -21,9 +22,13 @@ export async function notify(input: {
   body?:       string | null;
   link?:       string | null;
   actorEmail?: string | null;
+  // Warehouses this is about, when the link doesn't say (e.g. a delivery confirmed at a site). Used for emails.
+  siteIds?:    string[];
+  // Facts for the email (items, from/to, who, …) — not stored on the bell notification.
+  details?:    AlertDetails;
 }) {
   try {
-    await prisma.notification.create({
+    const created = await prisma.notification.create({
       data: {
         type:       input.type,
         title:      input.title.slice(0, 300),
@@ -32,6 +37,8 @@ export async function notify(input: {
         actorEmail: input.actorEmail ?? null,
       },
     });
+    // Email the users a master admin has set up for this kind of alert (queued; never blocks).
+    await queueAlertEmails(created, input.siteIds, input.details);
   } catch (e) {
     console.error("[NOTIFY]", (e as Error).message);
   }
@@ -65,6 +72,10 @@ export async function notifyStockLevels(
           body:  "Restock needed.",
           link:  `/store/sites/${siteId}`,
           actorEmail,
+          details: {
+            rows: [["Item", item.name], ["Warehouse", siteName], ["Left", `0 ${unit}`], ["Reorder level", item.reorderLevel ? `${item.reorderLevel} ${unit}` : null], ["Action", "Restock needed"]],
+            actorLabel: "Last change by",
+          },
         });
       } else if (item.reorderLevel > 0 && after > 0 && after <= item.reorderLevel && before > item.reorderLevel) {
         await notify({
@@ -73,9 +84,27 @@ export async function notifyStockLevels(
           body:  `Reorder level is ${item.reorderLevel} ${unit}.`,
           link:  `/store/sites/${siteId}`,
           actorEmail,
+          details: {
+            rows: [["Item", item.name], ["Warehouse", siteName], ["Left", `${after} ${unit}`], ["Reorder level", `${item.reorderLevel} ${unit}`]],
+            actorLabel: "Last change by",
+          },
         });
       }
     }
+  } catch (e) {
+    console.error("[NOTIFY STOCK]", (e as Error).message);
+  }
+}
+
+// Stock went down outside an issue (units deleted, quantity edited): same low / out-of-stock alerts.
+export async function notifyStockDrop(itemId: string, taken: number, actorEmail?: string | null) {
+  if (!itemId || taken <= 0) return;
+  try {
+    const item = await prisma.inventoryItem.findUnique({
+      where:  { id: itemId },
+      select: { inventorySiteId: true, inventorySite: { select: { name: true } } },
+    });
+    if (item) await notifyStockLevels([{ itemId, taken }], item.inventorySite.name, item.inventorySiteId, actorEmail);
   } catch (e) {
     console.error("[NOTIFY STOCK]", (e as Error).message);
   }
