@@ -1,3 +1,4 @@
+import { canEditStore, storeEditor } from "@/lib/access";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, isAdminProfile } from "@/lib/auth";
@@ -57,7 +58,7 @@ export default async function UploadInventoryExcelPage({
 
   const profile  = await getCurrentProfile();
   const role     = profile?.role ?? "VIEWER";
-  const canEdit  = role === "ADMIN" || role === "EDITOR";
+  const canEdit  = canEditStore(profile, siteId); // editor role + full access here
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
@@ -72,7 +73,7 @@ export default async function UploadInventoryExcelPage({
   async function confirmInventoryExcelImport(formData: FormData) {
     "use server";
 
-    const freshProfile = await getCurrentProfile();
+    const freshProfile = await storeEditor(siteId); // re-check: editor + full access here
     const freshRole    = freshProfile?.role ?? "VIEWER";
     if (freshRole !== "ADMIN" && freshRole !== "EDITOR") {
       redirect(`/store/sites/${siteId}/upload?error=${encodeURIComponent("Permission denied")}`);

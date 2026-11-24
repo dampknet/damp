@@ -1,3 +1,4 @@
+import { canEditStore, storeEditor } from "@/lib/access";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
@@ -16,7 +17,7 @@ export default async function RestockInventoryItemPage({
 
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const canEdit = canEditStore(profile, siteId); // editor role + full access here
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
@@ -61,7 +62,7 @@ export default async function RestockInventoryItemPage({
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    if (!(await getEditorProfile())) redirect(`/store/sites/${siteId}`);
+    if (!(await storeEditor(siteId))) redirect(`/store/sites/${siteId}`);
 
     const inventoryItemId  = String(formData.get("inventoryItemId") ?? "").trim();
     const quantityAddedRaw = String(formData.get("quantityAdded")   ?? "").trim();

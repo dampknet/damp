@@ -1,3 +1,4 @@
+import { editorForItem } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEditorProfile } from "@/lib/auth";
@@ -12,6 +13,10 @@ export async function POST(req: Request) {
 
   if (!itemId) {
     return NextResponse.json({ message: "itemId is required" }, { status: 400 });
+  }
+
+  if (!(await editorForItem(itemId))) {
+    return NextResponse.json({ message: "You don't have edit access to that warehouse" }, { status: 403 });
   }
 
   if (!data.entityCode) {

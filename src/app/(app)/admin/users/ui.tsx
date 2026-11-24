@@ -8,12 +8,12 @@ import {
   updateUserRole, addUser, removeUser,
   setMasterAdmin, suspendUser, reinstateUser, unlockUser,
   createEmergencyAccount, setLocalPassword, removeLocalPassword, setAccessExpiry,
-  changeUserEmail,
+  changeUserEmail, setUserAccess,
 } from "./actions";
 import {
   UserPlus, Users, ShieldCheck, X, Trash2, Search, CheckCircle,
   ChevronRight, Loader2, Crown, Lock, Unlock, Ban, RotateCcw,
-  Key, Clock, Copy, RefreshCw, Mail, AlertTriangle,
+  Key, Clock, Copy, RefreshCw, Mail, AlertTriangle, SlidersHorizontal,
 } from "lucide-react";
 
 type Role = "ADMIN" | "EDITOR" | "VIEWER";
@@ -35,7 +35,14 @@ interface UserRow {
   accessExpiresAt:    string | null;
   mustChangePassword: boolean;
   hasLocalPassword:   boolean;
+  siteAccess:         boolean;
+  storeAccess:        boolean;
+  allStores:          boolean;
+  stores:             { id: string; level: "FULL" | "VIEW" }[];
+  accessSummary:      string;
 }
+
+type Warehouse = { id: string; name: string };
 
 type Handover = { email: string; password: string; mustChange: boolean };
 
@@ -76,11 +83,12 @@ function formatWhen(iso: string | null) {
 }
 
 export default function UsersTable({
-  users, currentUserId, companyDomain,
+  users, currentUserId, companyDomain, warehouses,
 }: {
   users:         UserRow[];
   currentUserId: string;
   companyDomain: string;
+  warehouses:    Warehouse[];
 }) {
   const [isPending, startTransition] = useTransition();
   const { mode } = useThemeMode();
@@ -109,6 +117,12 @@ export default function UsersTable({
   const [passwordFor,   setPasswordFor]   = useState<UserRow | null>(null);
   const [pwValue,       setPwValue]       = useState("");
   const [pwMustChange,  setPwMustChange]  = useState(true);
+
+  const [accessFor,     setAccessFor]     = useState<UserRow | null>(null);
+  const [acSites,       setAcSites]       = useState(true);
+  const [acStore,       setAcStore]       = useState(true);
+  const [acAll,         setAcAll]         = useState(true);
+  const [acStores,      setAcStores]      = useState<Record<string, "FULL" | "VIEW">>({});
 
   const [emailFor,      setEmailFor]      = useState<UserRow | null>(null);
   const [emailValue,    setEmailValue]    = useState("");
@@ -241,6 +255,35 @@ export default function UsersTable({
         setHandover({ email: target.email, password, mustChange });
       } catch (error: any) {
         setFormError(error?.message || "Could not set the password");
+      }
+    });
+  };
+
+  const openAccess = (u: UserRow) => {
+    setAcSites(u.siteAccess);
+    setAcStore(u.storeAccess);
+    setAcAll(u.allStores);
+    setAcStores(Object.fromEntries(u.stores.map((s) => [s.id, s.level])));
+    setFormError(null);
+    setAccessFor(u);
+  };
+
+  const submitAccess = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accessFor) return;
+    setFormError(null);
+    if (!acSites && !acStore) { setFormError("Turn on Sites, Store, or both."); return; }
+    const stores = Object.entries(acStores).map(([id, level]) => ({ id, level }));
+    if (acStore && !acAll && !stores.length) { setFormError("Tick at least one warehouse, or choose All stores."); return; }
+    const target = accessFor;
+    startTransition(async () => {
+      try {
+        const r = await setUserAccess(target.id, { siteAccess: acSites, storeAccess: acStore, allStores: acAll, stores });
+        if (!r.ok) { setFormError(r.message); return; }
+        setAccessFor(null);
+        showToast("success", `${target.email}: ${r.message.replace(/^Access saved: /, "")}`);
+      } catch (error: any) {
+        setFormError(error?.message || "Could not save access");
       }
     });
   };
@@ -525,6 +568,9 @@ export default function UsersTable({
                             <option value="VIEWER">VIEWER</option>
                           </select>
                         </div>
+                        <div className={`mt-1.5 max-w-[16rem] text-[11px] leading-snug ${muted}`} title={u.accessSummary}>
+                          {u.accessSummary}
+                        </div>
                       </td>
 
                       <td className="px-6 py-4">
@@ -544,6 +590,12 @@ export default function UsersTable({
                             <button disabled={isPending} className={actionBtn("good")}
                               onClick={() => run(u.id, () => unlockUser(u.id), `${u.email} unlocked`)}>
                               <Unlock size={12} /> Unlock
+                            </button>
+                          )}
+
+                          {!u.isMasterAdmin && (
+                            <button disabled={isPending} className={actionBtn("neutral")} onClick={() => openAccess(u)}>
+                              <SlidersHorizontal size={12} /> Access
                             </button>
                           )}
 
@@ -813,6 +865,110 @@ export default function UsersTable({
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: accent }}>
                   {isPending ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {accessFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className={`flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border ${border} ${surface} shadow-2xl`}>
+            <div className="h-1 shrink-0 bg-[linear-gradient(90deg,#2a7d52,#3b82f6)]" />
+            <form onSubmit={submitAccess} className="flex min-h-0 flex-col">
+              <div className="space-y-5 overflow-y-auto p-6">
+                <div>
+                  <h2 className={`text-base font-semibold ${txt}`}>Access</h2>
+                  <p className={`mt-1 text-xs ${muted}`}>
+                    What <span className="font-semibold">{accessFor.fullName || accessFor.email}</span> can see. Their role ({accessFor.role}) still decides what they can change.
+                  </p>
+                </div>
+
+                <div>
+                  <div className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${muted}`}>Areas</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {([
+                      { key: "sites", label: "Sites", sub: "Broadcast sites, assets, racks, site stores", on: acSites, set: setAcSites },
+                      { key: "store", label: "Store", sub: "Warehouses, issuing, restocking, logs",      on: acStore, set: setAcStore },
+                    ] as const).map((a) => (
+                      <label key={a.key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${a.on ? (dark ? "border-sky-500/40 bg-sky-500/10" : "border-[#1d5fa8]/40 bg-[#e8f0fb]") : border}`}>
+                        <input type="checkbox" checked={a.on} onChange={(e) => a.set(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#1d5fa8]" />
+                        <span>
+                          <span className={`block text-sm font-semibold ${txt}`}>{a.label}</span>
+                          <span className={`block text-[11px] ${muted}`}>{a.sub}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {acStore && (
+                  <div>
+                    <div className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${muted}`}>Warehouses</div>
+                    <label className={`mb-2 flex cursor-pointer items-center gap-2 text-sm font-semibold ${txt}`}>
+                      <input type="radio" name="scope" checked={acAll} onChange={() => setAcAll(true)} className="h-4 w-4 accent-[#1d5fa8]" />
+                      All stores <span className={`text-[11px] font-normal ${muted}`}>(including new ones)</span>
+                    </label>
+                    <label className={`mb-3 flex cursor-pointer items-center gap-2 text-sm font-semibold ${txt}`}>
+                      <input type="radio" name="scope" checked={!acAll} onChange={() => setAcAll(false)} className="h-4 w-4 accent-[#1d5fa8]" />
+                      Only these warehouses
+                    </label>
+
+                    {!acAll && (
+                      <div className={`divide-y rounded-xl border ${border} ${dark ? "divide-white/5" : "divide-[#eee7dd]"}`}>
+                        {warehouses.length === 0 && <div className={`px-3 py-3 text-xs ${muted}`}>No warehouses yet.</div>}
+                        {warehouses.map((w) => {
+                          const level = acStores[w.id];
+                          const on    = !!level;
+                          return (
+                            <div key={w.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                              <label className={`flex min-w-0 cursor-pointer items-center gap-2 text-sm ${txt}`}>
+                                <input type="checkbox" checked={on} className="h-4 w-4 accent-[#1d5fa8]"
+                                  onChange={(e) => setAcStores((m) => {
+                                    const next = { ...m };
+                                    if (e.target.checked) next[w.id] = "FULL"; else delete next[w.id];
+                                    return next;
+                                  })} />
+                                <span className="truncate">{w.name}</span>
+                              </label>
+                              {on && (
+                                <div className={`inline-flex overflow-hidden rounded-lg border text-[11px] font-semibold ${border}`} role="group" aria-label={`Level at ${w.name}`}>
+                                  {(["FULL", "VIEW"] as const).map((lv) => (
+                                    <button key={lv} type="button" onClick={() => setAcStores((m) => ({ ...m, [w.id]: lv }))}
+                                      className={`px-2.5 py-1 transition ${level === lv ? "bg-[#1d5fa8] text-white" : `${txt} ${hoverBg}`}`}>
+                                      {lv === "FULL" ? "Full" : "View only"}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className={`mt-2 text-[11px] ${muted}`}>
+                      <span className="font-semibold">Full</span>: whatever their role allows. <span className="font-semibold">View only</span>: they can look but not change anything there. Unticked warehouses are hidden from them.
+                    </p>
+                  </div>
+                )}
+
+                {formError && (
+                  <div className={dark ? "rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300" : "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"}>
+                    {formError}
+                  </div>
+                )}
+              </div>
+
+              <div className={`flex shrink-0 gap-2 border-t ${border} p-4`}>
+                <button type="button" onClick={() => setAccessFor(null)}
+                  className={`flex-1 rounded-xl border ${border} py-2.5 text-sm font-semibold ${txt} transition ${hoverBg}`}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isPending}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: accent }}>
+                  {isPending ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save Access"}
                 </button>
               </div>
             </form>

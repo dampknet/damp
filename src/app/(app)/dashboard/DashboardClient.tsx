@@ -64,6 +64,8 @@ export default function DashboardClient({
   inventorySiteCards,
   recentActivity,
   canSeeActivity,
+  showSites = true,
+  showStore = true,
 }: {
   role:               Role;
   email:              string | null;
@@ -73,6 +75,8 @@ export default function DashboardClient({
   inventorySiteCards: InventorySiteCard[];
   recentActivity:     ActivityItem[];
   canSeeActivity:     boolean;
+  showSites?:         boolean;   // Sites access
+  showStore?:         boolean;   // Store access
 }) {
   const { mode } = useThemeMode();
   const dark     = mode === "dark";
@@ -134,6 +138,7 @@ export default function DashboardClient({
         </div>
 
         {/* ── KPI CARDS ── */}
+        {showSites && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard dark={dark} href="/sites" label="Total Sites" value={String(stats.sites)}
             stripe={dark ? "bg-[linear-gradient(90deg,#3b82f6,#60a5fa)]" : "bg-[#1d5fa8]"}
@@ -163,11 +168,13 @@ export default function DashboardClient({
             meta="view grouped towers"
           />
         </div>
+        )}
 
-        {/* ── MIDDLE ROW ── */}
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        {/* ── MIDDLE ROW ── (only the areas this user has access to) */}
+        <div className={`${showSites ? "mt-5" : ""} grid gap-4 ${showSites && showStore ? "lg:grid-cols-3" : showSites ? "lg:grid-cols-2" : ""}`}>
 
           {/* Assets card */}
+          {showSites && (
           <Link href="/assets" className="block">
           <Card dark={dark} title="Assets" rightTag={`${stats.assets} total`}>
             <ProgressRow dark={dark} label="Utilization" value={`${stats.assetUtilPct}%`}
@@ -180,8 +187,10 @@ export default function DashboardClient({
             </div>
           </Card>
           </Link>
+          )}
 
           {/* ✅ NEW: Inventory Sites card — replaces old Store card */}
+          {showStore && (
           <div className={dark
             ? "rounded-2xl border border-white/8 bg-white/5 p-5 shadow-sm backdrop-blur-xl"
             : "rounded-2xl border border-[#e0dbd2] bg-white p-5 shadow-sm"
@@ -233,8 +242,10 @@ export default function DashboardClient({
               )}
             </div>
           </div>
+          )}
 
           {/* Site Health card */}
+          {showSites && (
           <Card dark={dark} title="Site Health" rightTag={`${stats.activePct}% up`}>
             <ProgressRow dark={dark} label="Active"
               value={`${stats.sitesActive} / ${stats.sites}`} width={stats.activePct}
@@ -249,6 +260,7 @@ export default function DashboardClient({
               fill={dark ? "bg-[linear-gradient(90deg,#ea6c00,#f97316)]" : "bg-[#c8611a]"}
             />
           </Card>
+          )}
         </div>
 
         {/* ── BOTTOM ROW ── */}
@@ -320,21 +332,21 @@ export default function DashboardClient({
           <Card dark={dark} title="Quick Actions">
             {/* Without Recent Activity this card spans the row, so lay the actions out side by side */}
             <div className={canSeeActivity ? "" : "grid gap-3 md:grid-cols-3 [&>*]:mb-0"}>
-            <QuickAction dark={dark} href="/sites" title="Go to Sites"
+            {showSites && <QuickAction dark={dark} href="/sites" title="Go to Sites"
               subtitle={`Manage all ${stats.sites} sites`}
               iconBg={dark ? "bg-[rgba(59,130,246,0.12)]" : "bg-[#e8f0fb]"}
               iconColor="text-[#1d5fa8]" icon="🗺"
-            />
-            <QuickAction dark={dark} href="/store" title="Go to Store"
+            />}
+            {showStore && <QuickAction dark={dark} href="/store" title="Go to Store"
               subtitle={`${stats.totalInventoryItems} inventory items`}
               iconBg={dark ? "bg-[rgba(245,158,11,0.12)]" : "bg-[#fdf6e3]"}
               iconColor="text-[#b08b2c]" icon="📦"
-            />
-            <QuickAction dark={dark} href="/sites?group=status" title="Review Down Sites"
+            />}
+            {showSites && <QuickAction dark={dark} href="/sites?group=status" title="Review Down Sites"
               subtitle={`${stats.sitesDown} currently offline`}
               iconBg={dark ? "bg-[rgba(248,113,113,0.12)]" : "bg-[#fdecea]"}
               iconColor="text-[#c0392b]" icon="⚠️"
-            />
+            />}
             </div>
           </Card>
         </div>

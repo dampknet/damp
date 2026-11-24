@@ -1,3 +1,4 @@
+import { canEditStore, storeEditor } from "@/lib/access";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
@@ -18,7 +19,7 @@ export default async function IssueInventoryItemPage({
 }) {
   const { siteId } = await params;
   const profile  = await getCurrentProfile();
-  const canEdit  = profile?.role === "ADMIN" || profile?.role === "EDITOR";
+  const canEdit  = canEditStore(profile, siteId); // editor role + full access here
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
@@ -94,7 +95,7 @@ export default async function IssueInventoryItemPage({
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    const actor = await getEditorProfile();
+    const actor = await storeEditor(siteId);
     if (!actor) redirect(`/store/sites/${siteId}`);
 
     // Master admins may back-date an issue (paper waybills written before items were in the system).
@@ -126,6 +127,21 @@ export default async function IssueInventoryItemPage({
 
     if (!Array.isArray(bucket) || bucket.length === 0) {
       redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("No items in bucket")}`);
+    }
+
+    // Every item (and every scanned unit) must belong to THIS warehouse — never trust ids sent by the browser.
+    {
+      const ids   = [...new Set(bucket.map((e: any) => String(e?.id ?? "")))];
+      const codes = bucket.flatMap((e: any) => (Array.isArray(e?.entityCodes) ? e.entityCodes.map(String) : []));
+      const [ownItems, ownUnits] = await Promise.all([
+        prisma.inventoryItem.count({ where: { id: { in: ids }, inventorySiteId: siteId, isDeleted: false } }),
+        codes.length
+          ? prisma.assetInstance.count({ where: { entityCode: { in: codes }, inventoryItem: { inventorySiteId: siteId } } })
+          : Promise.resolve(0),
+      ]);
+      if (ownItems !== ids.length || ownUnits !== new Set(codes).size) {
+        redirect(`/store/sites/${siteId}/issue?error=${encodeURIComponent("Some items or units don't belong to this warehouse.")}`);
+      }
     }
 
     // ✅ Generate a groupId so all items in this trip are linked

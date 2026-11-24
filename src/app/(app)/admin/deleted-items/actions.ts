@@ -1,5 +1,6 @@
 "use server";
 
+import { accessOf, canEditStore, warehouseOfItem } from "@/lib/access";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -16,10 +17,25 @@ async function requireAdmin() {
   return me;
 }
 
+// Restricted admins: sites/assets need Sites access, warehouse items need full access to that warehouse,
+// Central Stock items are master-only.
+async function assertCanTouch(me: NonNullable<Awaited<ReturnType<typeof getCurrentProfile>>>, entityType: EntityType, id: string) {
+  if (me.isMasterAdmin) return;
+  if (entityType === "SITE" || entityType === "ASSET") {
+    if (!accessOf(me).sites) throw new Error("You don't have Sites access.");
+  } else if (entityType === "INVENTORY_ITEM") {
+    const site = await warehouseOfItem(id);
+    if (!site || !canEditStore(me, site)) throw new Error("You don't have edit access to that warehouse.");
+  } else {
+    throw new Error("Only a master admin can manage Central Stock items.");
+  }
+}
+
 export async function restoreDeletedItem(entityType: EntityType, id: string) {
   const me = await requireAdmin();
 
   if (!id) throw new Error("Item id is required.");
+  await assertCanTouch(me, entityType, id);
 
   if (entityType === "SITE") {
     const item = await prisma.site.findUnique({
@@ -176,6 +192,7 @@ export async function permanentlyDeleteItem(entityType: EntityType, id: string) 
   const me = await requireAdmin();
 
   if (!id) throw new Error("Item id is required.");
+  await assertCanTouch(me, entityType, id);
 
   if (entityType === "SITE") {
     const item = await prisma.site.findUnique({

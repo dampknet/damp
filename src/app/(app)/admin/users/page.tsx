@@ -1,6 +1,7 @@
 import { prisma }             from "@/lib/prisma";
 import { requireMasterAdmin } from "@/lib/auth";
 import { getCompanyDomain }   from "@/lib/system-config";
+import { describeAccess }     from "@/lib/access";
 import UsersTable             from "./ui";
 
 export default async function AdminUsersPage() {
@@ -25,13 +26,21 @@ export default async function AdminUsersPage() {
       accessExpiresAt:    true,
       mustChangePassword: true,
       passwordHash:       true,
+      siteAccess:         true,
+      storeAccess:        true,
+      allStores:          true,
+      storeAccessList:    { select: { inventorySiteId: true, level: true } },
     },
   });
+  const warehouses = await prisma.inventorySite.findMany({ where: { isDeleted: false }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const whName     = new Map(warehouses.map((w) => [w.id, w.name]));
 
   return (
     <UsersTable
-      users={users.map(({ passwordHash, ...u }) => ({
+      users={users.map(({ passwordHash, storeAccessList, ...u }) => ({
         ...u,
+        stores:        storeAccessList.filter((a) => whName.has(a.inventorySiteId)).map((a) => ({ id: a.inventorySiteId, level: a.level })),
+        accessSummary: describeAccess(u, storeAccessList.filter((a) => whName.has(a.inventorySiteId)).map((a) => ({ name: whName.get(a.inventorySiteId)!, level: a.level }))),
         hasLocalPassword: !!passwordHash,
         lockedUntil:      u.lockedUntil?.toISOString()     ?? null,
         lastLoginAt:      u.lastLoginAt?.toISOString()     ?? null,
@@ -39,6 +48,7 @@ export default async function AdminUsersPage() {
       }))}
       currentUserId={me.id}
       companyDomain={await getCompanyDomain()}
+      warehouses={warehouses}
     />
   );
 }

@@ -1,3 +1,4 @@
+import { storeEditor, warehouseOfIssue } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -12,6 +13,11 @@ export async function POST(req: Request) {
     const { issueId, lineId } = await req.json();
     if (!issueId) {
       return NextResponse.json({ error: "issueId required" }, { status: 400 });
+    }
+
+    const issueSite = await warehouseOfIssue(issueId);
+    if (!issueSite || !(await storeEditor(issueSite))) {
+      return NextResponse.json({ error: "You don't have edit access to that warehouse" }, { status: 403 });
     }
 
     const issue = await prisma.warehouseIssue.findUnique({

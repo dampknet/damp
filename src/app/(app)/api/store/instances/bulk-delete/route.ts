@@ -1,3 +1,4 @@
+import { editorForItem } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -19,6 +20,10 @@ export async function POST(req: Request) {
 
     if (!ids.length || !itemId) {
       return NextResponse.json({ error: "ids and itemId are required" }, { status: 400 });
+    }
+
+    if (!(await editorForItem(itemId))) {
+      return NextResponse.json({ error: "You don't have edit access to that warehouse" }, { status: 403 });
     }
 
     // Fetch instances + parent item name for audit log

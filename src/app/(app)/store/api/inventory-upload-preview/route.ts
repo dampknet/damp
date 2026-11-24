@@ -1,3 +1,4 @@
+import { storeEditor } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { parseInventoryFile } from "@/lib/inventory-upload";
@@ -21,6 +22,10 @@ export async function POST(req: Request) {
 
     if (!siteId) {
       return NextResponse.json({ error: "siteId is required" }, { status: 400 });
+    }
+
+    if (!(await storeEditor(siteId))) {
+      return NextResponse.json({ error: "You don't have edit access to this warehouse" }, { status: 403 });
     }
 
     if (!(file instanceof File)) {

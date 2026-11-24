@@ -1,3 +1,4 @@
+import { activityScope, storeFilter, type Access } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { SECURITY_EVENT_WHERE } from "@/lib/security-events";
 import { Paragraph, Table } from "docx";
@@ -5,7 +6,7 @@ import { typeLabel } from "@/lib/item-types";
 import { sectionTitle, heading, keyFigures, table, emptyNote, gap, type Cell } from "./docx";
 
 type Block = Paragraph | Table;
-type Ctx   = { start: Date; end: Date; isMasterAdmin: boolean };
+type Ctx   = { start: Date; end: Date; isMasterAdmin: boolean; access: Access };
 
 const DAY  = 86_400_000;
 const MAX_LIST = 1500;
@@ -41,7 +42,7 @@ function deliveryLabel(status: string | null, deliveredAt: Date | null) {
 export async function activitySection(ctx: Ctx): Promise<Block[]> {
   const [logs, people] = await Promise.all([
     prisma.activityLog.findMany({
-      where:  { createdAt: { gte: ctx.start, lte: ctx.end }, ...(ctx.isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE }) },
+      where:  { AND: [{ createdAt: { gte: ctx.start, lte: ctx.end } }, ctx.isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE }, activityScope(ctx.access)] },
       select: { type: true, title: true, entityType: true, actorEmail: true },
     }),
     prisma.userProfile.findMany({ select: { email: true, fullName: true } }),
@@ -94,11 +95,12 @@ export async function activitySection(ctx: Ctx): Promise<Block[]> {
 /* ──────────────────────────────── Warehouses ──────────────────────────────── */
 
 export async function warehouseSection(ctx: Ctx, warehouseId: string | null): Promise<Block[]> {
-  const scope = warehouseId ? { inventorySiteId: warehouseId } : {};
+  // One warehouse, or every warehouse this user may see.
+  const scope = { inventorySiteId: warehouseId ?? storeFilter(ctx.access) };
 
   const [warehouses, issues, returns, restocks, alertItems] = await Promise.all([
     prisma.inventorySite.findMany({
-      where:   warehouseId ? { id: warehouseId } : { isDeleted: false },
+      where:   warehouseId ? { id: warehouseId } : { isDeleted: false, id: storeFilter(ctx.access) },
       orderBy: { name: "asc" },
       select:  { id: true, name: true },
     }),

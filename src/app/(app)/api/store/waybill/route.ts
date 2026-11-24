@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -160,8 +161,9 @@ export async function GET(req: Request) {
   if (!groupId) return NextResponse.json({ error: "groupId required" }, { status: 400 });
 
   // Fetch all warehouse issues in this group
+  // Only for issues from warehouses this user may see.
   const issues = await prisma.warehouseIssue.findMany({
-    where: { groupId },
+    where: { groupId, inventorySiteId: storeFilter(accessOf(profile)) },
     select: {
       id:               true,
       quantityTaken:    true,

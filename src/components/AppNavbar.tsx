@@ -1,3 +1,4 @@
+import { accessOf } from "@/lib/access";
 import { requireCurrentProfile } from "@/lib/auth";
 import { canSeeNotifications } from "@/lib/notifications";
 import AppNavbarClient from "@/components/AppNavbarClient";
@@ -18,6 +19,8 @@ export default async function AppNavbar() {
       hasLocalPassword={profile.hasLocalPassword}
       displayName={displayName}
       showNotifications={canSeeNotifications(profile)}
+      showSites={accessOf(profile).sites}
+      showStore={accessOf(profile).store}
     />
   );
 }

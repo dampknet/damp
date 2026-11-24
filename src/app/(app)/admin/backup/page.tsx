@@ -5,6 +5,6 @@ import BackupPage from "./BackupPage";
 export default async function BackupPageWrapper() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/auth/login");
-  if (profile.role !== "ADMIN") redirect("/dashboard");
+  if (!profile.isMasterAdmin) redirect("/admin"); // backups hold every account and all warehouses
   return <BackupPage />;
 }

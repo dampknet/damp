@@ -1,5 +1,6 @@
 "use server";
 
+import { storeEditor } from "@/lib/access";
 import { revalidatePath }   from "next/cache";
 import { getEditorProfile } from "@/lib/auth";
 import {
@@ -26,9 +27,10 @@ export type ReturnDetails = {
 
 // Details for the "Receive returned items" window.
 export async function getReturnDetails(issueId: string): Promise<ReturnDetails | { error: string }> {
-  if (!(await getEditorProfile())) return { error: "Only admins and editors can receive returns." };
   const i = await loadIssueForReturn(String(issueId ?? ""));
   if (!i) return { error: "Issued item not found." };
+  // Returns go back into that warehouse: editor role + full access there.
+  if (!(await storeEditor(i.inventorySiteId))) return { error: "You don't have edit access to the warehouse this came from." };
   return {
     issueId:          i.id,
     itemName:         i.inventoryItem.name,
@@ -49,11 +51,10 @@ export async function getReturnDetails(issueId: string): Promise<ReturnDetails |
 
 // Store staff receive leftovers back into stock.
 export async function receiveReturnAction(input: ReceiveInput): Promise<{ ok: boolean; message: string }> {
-  const me = await getEditorProfile();
-  if (!me) return { ok: false, message: "Only admins and editors can receive returns." };
-
   const issue = await loadIssueForReturn(String(input?.issueId ?? ""));
   if (!issue) return { ok: false, message: "Issued item not found." };
+  const me = await storeEditor(issue.inventorySiteId);
+  if (!me) return { ok: false, message: "You don't have edit access to the warehouse this came from." };
 
   const res = await receiveReturn(input, me.email);
   if (!res.ok) return res;

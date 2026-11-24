@@ -5,7 +5,8 @@ import { getCurrentProfile } from "@/lib/auth";
 export async function GET() {
   try {
     const profile = await getCurrentProfile();
-    if (!profile || profile.role !== "ADMIN") {
+    // Master admins only: the file holds every account and all inventory.
+    if (!profile?.isMasterAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -26,6 +27,7 @@ export async function GET() {
       issueReturns,
       itemTypes,
       warehouseItemTypes,
+      userStoreAccess,
     ] = await Promise.all([
       prisma.inventorySite.findMany({ orderBy: { createdAt: "asc" } }),
       prisma.inventoryItem.findMany({ orderBy: { createdAt: "asc" } }),
@@ -48,6 +50,7 @@ export async function GET() {
       // Main types first, then sub-types, so a restore can insert parents before children.
       prisma.itemType.findMany({ orderBy: [{ parentId: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }] }),
       prisma.warehouseItemType.findMany(),
+      prisma.userStoreAccess.findMany(),
     ]);
 
     const includeHashes = profile.isMasterAdmin;
@@ -78,6 +81,7 @@ export async function GET() {
           issueReturns:        issueReturns.length,
           itemTypes:           itemTypes.length,
           warehouseItemTypes:  warehouseItemTypes.length,
+          userStoreAccess:     userStoreAccess.length,
         },
       },
       categories,
@@ -93,6 +97,7 @@ export async function GET() {
       sites,
       assets,
       userProfiles: safeProfiles,
+      userStoreAccess,
       activityLogs,
       storeItems,
       issueReturns,

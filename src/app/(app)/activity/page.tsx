@@ -1,3 +1,4 @@
+import { accessOf, activityScope, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { SECURITY_EVENT_WHERE, SECURITY_ACTION_TYPES, SECURITY_ALERT_WHERE, isSecurityAlert } from "@/lib/security-events";
@@ -145,6 +146,7 @@ export default async function ActivityPage({
   // Audit trail: ADMIN and master admin only.
   const profile       = await requireAdmin();
   const isMasterAdmin = profile.isMasterAdmin;
+  const access        = accessOf(profile);   // restricted admins only see their warehouses / sites
   const view          = isMasterAdmin && sp.view === "security" ? "security" : "all";
   const type          = !isMasterAdmin && SECURITY_ACTION_TYPES.includes(rawType) ? "" : rawType;
 
@@ -158,12 +160,12 @@ export default async function ActivityPage({
 
   const [inventorySites, broadcastSites] = await Promise.all([
     prisma.inventorySite.findMany({
-      where:   { isDeleted: false },
+      where:   { isDeleted: false, id: storeFilter(access) },
       orderBy: { name: "asc" },
       select:  { id: true, name: true },
     }),
     prisma.site.findMany({
-      where:   { isDeleted: false },
+      where:   access.sites ? { isDeleted: false } : { id: { in: [] } },
       orderBy: { name: "asc" },
       select:  { id: true, name: true },
     }),
@@ -181,6 +183,7 @@ export default async function ActivityPage({
       where: {
         AND: [
           isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE },
+          activityScope(access),
           q ? {
             OR: [
               { title:      { contains: q, mode: "insensitive" } },

@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import CheckedOutEquipmentClient from "./CheckedOutEquipmentClient";
@@ -15,11 +16,13 @@ export default async function GlobalCheckedOutEquipmentPage({
 
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
+  const W       = storeFilter(accessOf(profile)); // warehouses this user may see
 
   // ✅ Read from WarehouseIssue — open issues marked as returnable
   const rawItems = await prisma.warehouseIssue.findMany({
     where: {
       status:           "OPEN",
+      inventorySiteId:  W,
       expectedReturnAt: { not: null },  // only returnable items
       AND: q ? [{
         OR: [

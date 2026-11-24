@@ -1,3 +1,4 @@
+import { accessOf, notificationScope } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -9,11 +10,13 @@ export async function GET(req: Request) {
   if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canSeeNotifications(profile)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const scope = notificationScope(accessOf(profile)); // only this user's warehouses
   const limit = Math.min(50, Math.max(1, Number(new URL(req.url).searchParams.get("limit")) || 10));
 
   const [unread, rows] = await Promise.all([
-    prisma.notification.count({ where: { reads: { none: { userId: profile.id } } } }),
+    prisma.notification.count({ where: { reads: { none: { userId: profile.id } }, ...scope } }),
     prisma.notification.findMany({
+      where:   scope,
       orderBy: { createdAt: "desc" },
       take:    limit,
       select: {

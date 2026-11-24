@@ -1,3 +1,4 @@
+import { canEditStore } from "@/lib/access";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -20,7 +21,7 @@ export default async function SiteIssueLogPage({
   const sp         = (await searchParams) ?? {};
   const profile    = await getCurrentProfile();
   const role       = profile?.role ?? "VIEWER";
-  const canEdit    = role === "ADMIN" || role === "EDITOR";
+  const canEdit    = canEditStore(profile, siteId); // editor role + full access here
   const q          = (sp.q ?? "").trim();
   const status     = sp.status ?? "ALL";
 

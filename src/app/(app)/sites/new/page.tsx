@@ -1,3 +1,4 @@
+import { canEditSites, sitesEditor } from "@/lib/access";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, getEditorProfile } from "@/lib/auth";
@@ -7,7 +8,7 @@ import NewSiteClient from "./NewSiteClient";
 export default async function NewSitePage() {
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const canEdit = canEditSites(profile); // editor role + Sites access
 
   if (!canEdit) redirect("/sites");
 
@@ -15,7 +16,7 @@ export default async function NewSitePage() {
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    if (!(await getEditorProfile())) redirect("/sites");
+    if (!(await sitesEditor())) redirect("/sites");
 
     const name = String(formData.get("name") ?? "").trim();
     const regMFreqRaw = String(formData.get("regMFreq") ?? "").trim();

@@ -13,6 +13,8 @@ type Props = {
   hasLocalPassword: boolean;
   displayName:      string;
   showNotifications: boolean;
+  showSites:         boolean;
+  showStore:         boolean;
 };
 
 const LINKS = [
@@ -28,7 +30,11 @@ export default function AppNavbarClient({
   hasLocalPassword,
   displayName,
   showNotifications,
+  showSites,
+  showStore,
 }: Props) {
+  // Only the areas this user has access to.
+  const links = LINKS.filter((l) => (l.href === "/sites" ? showSites : l.href === "/store" ? showStore : true));
   const { mode } = useThemeMode();
   const isDark = mode === "dark";
 
@@ -81,7 +87,7 @@ export default function AppNavbarClient({
               : "border-[#e7dfd4] bg-white"
           }`}
         >
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <NavItem key={l.href} href={l.href} label={l.label} isDark={isDark} />
           ))}
         </nav>
@@ -106,7 +112,7 @@ export default function AppNavbarClient({
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-4 py-2">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <NavItem key={l.href} href={l.href} label={l.label} isDark={isDark} mobile />
           ))}
         </div>

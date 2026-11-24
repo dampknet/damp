@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -46,8 +47,8 @@ export async function GET(req: Request) {
     const issueId = searchParams.get("issueId");
     if (!issueId) return NextResponse.json({ error: "issueId required" }, { status: 400 });
 
-    const issue = await prisma.warehouseIssue.findUnique({
-      where:  { id: issueId },
+    const issue = await prisma.warehouseIssue.findFirst({
+      where:  { id: issueId, inventorySiteId: storeFilter(accessOf(profile)) }, // only warehouses this user may see
       select: {
         id:            true,
         takenBy:       true,

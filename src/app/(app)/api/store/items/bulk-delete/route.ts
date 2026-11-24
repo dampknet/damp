@@ -1,3 +1,4 @@
+import { storeEditor } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -19,6 +20,15 @@ export async function DELETE(req: Request) {
 
     if (!itemIds.length) {
       return NextResponse.json({ error: "No item IDs provided" }, { status: 400 });
+    }
+
+    // Every item must be in a warehouse this user can edit.
+    const owners = await prisma.inventoryItem.findMany({ where: { id: { in: itemIds } }, select: { inventorySiteId: true } });
+    const sites  = [...new Set(owners.map((o) => o.inventorySiteId))];
+    for (const site of sites) {
+      if (!(await storeEditor(site))) {
+        return NextResponse.json({ error: "You don't have edit access to that warehouse" }, { status: 403 });
+      }
     }
 
     // Fetch items to confirm they exist and aren't already deleted

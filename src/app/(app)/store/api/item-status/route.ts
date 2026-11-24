@@ -7,7 +7,7 @@ export async function PATCH(req: Request) {
   try {
     const profile = await getCurrentProfile();
     const role = profile?.role ?? "VIEWER";
-    const canEdit = role === "ADMIN" || role === "EDITOR";
+    const canEdit = !!profile?.isMasterAdmin && role === "ADMIN"; // Central Stock: master admins only
 
     if (!canEdit) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

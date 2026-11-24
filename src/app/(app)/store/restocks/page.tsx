@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import GlobalRestockLogClient from "./GlobalRestockLogClient";
@@ -18,9 +19,11 @@ export default async function GlobalRestockLogPage({
   const profile  = await getCurrentProfile();
   const role     = profile?.role ?? "VIEWER";
   const canEdit  = role === "ADMIN" || role === "EDITOR";
+  const W       = storeFilter(accessOf(profile)); // warehouses this user may see
 
   const rawRestocks = await prisma.inventoryRestock.findMany({
     where: q ? {
+      inventorySiteId: W,
       OR: [
         { supplier:    { contains: q, mode: "insensitive" } },
         { receivedBy:  { contains: q, mode: "insensitive" } },
@@ -36,7 +39,7 @@ export default async function GlobalRestockLogPage({
         },
         { inventorySite: { name: { contains: q, mode: "insensitive" } } },
       ],
-    } : {},
+    } : { inventorySiteId: W },
     orderBy: { dateReceived: "desc" },
     select: {
       id:           true,
@@ -81,7 +84,7 @@ export default async function GlobalRestockLogPage({
     };
   });
 
-  const totalRestocks      = await prisma.inventoryRestock.count();
+  const totalRestocks      = await prisma.inventoryRestock.count({ where: { inventorySiteId: W } });
   const totalQuantityAdded = restocks.reduce((sum, row) => sum + row.quantityAdded, 0);
 
   const exportRows = restocks.map((row, index) => ({

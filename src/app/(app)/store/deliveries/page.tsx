@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentProfile } from "@/lib/auth";
 import { getDeliveries } from "@/lib/deliveries";
@@ -9,6 +10,7 @@ export default async function PendingDeliveriesPage({
   searchParams?: Promise<{ site?: string; place?: string }>;
 }) {
   const profile = await requireCurrentProfile();
+  const W       = storeFilter(accessOf(profile)); // warehouses this user may see
   const sp      = (await searchParams) ?? {};
   const site    = (sp.site  ?? "").trim();
   const place   = site ? "" : (sp.place ?? "").trim();
@@ -20,10 +22,10 @@ export default async function PendingDeliveriesPage({
     : {};
 
   const [rows, groups] = await Promise.all([
-    getDeliveries({ deliveryStatus: "PENDING", ...scope }, 1000),
+    getDeliveries({ deliveryStatus: "PENDING", inventorySiteId: W, ...scope }, 1000),
     prisma.warehouseIssue.groupBy({
       by:     ["destinationSiteId", "destinationName"],
-      where:  { deliveryStatus: "PENDING" },
+      where:  { deliveryStatus: "PENDING", inventorySiteId: W },
       _count: { _all: true },
       _sum:   { quantityTaken: true },
     }),

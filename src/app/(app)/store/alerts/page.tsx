@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import AlertsClient from "./AlertsClient";
@@ -17,10 +18,12 @@ export default async function StoreAlertsPage({
 
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
+  const W       = storeFilter(accessOf(profile)); // warehouses this user may see
 
   const rawItems = await prisma.inventoryItem.findMany({
     where: {
       isDeleted: false,
+      inventorySiteId: W,
       OR: [{ status: "LOW_STOCK" }, { status: "OUT_OF_STOCK" }],
       ...(q ? {
         AND: [{
@@ -61,10 +64,10 @@ export default async function StoreAlertsPage({
   });
 
   const lowStockCount = await prisma.inventoryItem.count({
-    where: { status: "LOW_STOCK",   isDeleted: false },
+    where: { status: "LOW_STOCK",   isDeleted: false, inventorySiteId: W },
   });
   const outOfStockCount = await prisma.inventoryItem.count({
-    where: { status: "OUT_OF_STOCK", isDeleted: false },
+    where: { status: "OUT_OF_STOCK", isDeleted: false, inventorySiteId: W },
   });
 
   const items = rawItems.map((row) => ({

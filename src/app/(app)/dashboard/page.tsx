@@ -1,3 +1,4 @@
+import { accessOf, activityScope, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, isAdminProfile } from "@/lib/auth";
 import { SECURITY_EVENT_WHERE } from "@/lib/security-events";
@@ -26,6 +27,7 @@ export default async function DashboardPage() {
   const role    = profile?.role ?? "VIEWER";
   // Recent Activity is part of the audit trail: admins only, security events for master admins only.
   const canSeeActivity = isAdminProfile(profile);
+  const access         = accessOf(profile);   // Sites / Store areas and which warehouses
 
   const dateLabel = new Date().toLocaleString("en-US", {
     month: "long",
@@ -60,14 +62,14 @@ export default async function DashboardPage() {
     prisma.storeItem.count({ where: { status: "NOT_RECEIVED" } }),
     canSeeActivity
       ? prisma.activityLog.findMany({
-          where:   profile?.isMasterAdmin ? {} : { NOT: SECURITY_EVENT_WHERE },
+          where:   profile?.isMasterAdmin ? {} : { AND: [{ NOT: SECURITY_EVENT_WHERE }, activityScope(accessOf(profile))] },
           orderBy: { createdAt: "desc" },
           take: 5,
         })
       : Promise.resolve([]),
     // ✅ Fetch inventory sites with item counts
     prisma.inventorySite.findMany({
-      where:   { isDeleted: false },
+      where:   { isDeleted: false, id: storeFilter(access) },
       orderBy: { name: "asc" },
       select: {
         id:   true,
@@ -134,6 +136,8 @@ export default async function DashboardPage() {
       inventorySiteCards={inventorySiteCards}  // ✅ NEW
       recentActivity={recentActivity}
       canSeeActivity={canSeeActivity}
+      showSites={access.sites}
+      showStore={access.store}
     />
   );
 }

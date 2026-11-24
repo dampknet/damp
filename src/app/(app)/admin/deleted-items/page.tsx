@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -9,10 +10,12 @@ export default async function DeletedItemsPage() {
 
   if (!me) redirect("/auth/login");
   if (me.role !== "ADMIN") redirect("/sites");
+  const access = accessOf(me);   // restricted admins only see their own areas and warehouses
+  const NONE   = { in: [] as string[] };
 
   const [sites, assets, inventoryItems, storeItems] = await Promise.all([
     prisma.site.findMany({
-      where:   { isDeleted: true },
+      where:   { isDeleted: true, ...(access.sites ? {} : { id: NONE }) },
       orderBy: [{ deletedAt: "desc" }],
       select: {
         id:             true,
@@ -24,7 +27,7 @@ export default async function DeletedItemsPage() {
     }),
 
     prisma.asset.findMany({
-      where:   { isDeleted: true },
+      where:   { isDeleted: true, ...(access.sites ? {} : { id: NONE }) },
       orderBy: [{ deletedAt: "desc" }],
       select: {
         id:             true,
@@ -38,7 +41,7 @@ export default async function DeletedItemsPage() {
     }),
 
     prisma.inventoryItem.findMany({
-      where:   { isDeleted: true },
+      where:   { isDeleted: true, inventorySiteId: storeFilter(access) },
       orderBy: [{ deletedAt: "desc" }],
       select: {
         id:             true,
@@ -57,7 +60,7 @@ export default async function DeletedItemsPage() {
     }),
 
     prisma.storeItem.findMany({
-      where:   { isDeleted: true },
+      where:   { isDeleted: true, ...(access.master ? {} : { id: NONE }) },
       orderBy: [{ deletedAt: "desc" }],
       select: {
         id:             true,

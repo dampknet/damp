@@ -1,3 +1,4 @@
+import { accessOf, notificationScope } from "@/lib/access";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentProfile } from "@/lib/auth";
@@ -18,8 +19,9 @@ export default async function NotificationsPage({
   const filter = sp.filter === "unread" ? "unread" : "all";
   const page   = Math.max(1, Number(sp.page) || 1);
 
-  const unreadWhere = { reads: { none: { userId: profile.id } } };
-  const where       = filter === "unread" ? unreadWhere : {};
+  const scope       = notificationScope(accessOf(profile)); // only this user's warehouses
+  const unreadWhere = { reads: { none: { userId: profile.id } }, ...scope };
+  const where       = filter === "unread" ? unreadWhere : scope;
 
   const [total, unread, rows] = await Promise.all([
     prisma.notification.count({ where }),

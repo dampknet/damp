@@ -1,3 +1,4 @@
+import { canEditStore, storeEditor } from "@/lib/access";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile, getEditorProfile, isAdminProfile } from "@/lib/auth";
@@ -17,7 +18,7 @@ export default async function NewInventoryItemPage({
 
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const canEdit = canEditStore(profile, siteId); // editor role + full access here
 
   if (!canEdit) redirect(`/store/sites/${siteId}`);
 
@@ -35,7 +36,7 @@ export default async function NewInventoryItemPage({
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    const actor = await getEditorProfile();
+    const actor = await storeEditor(siteId);
     if (!actor) redirect(`/store/sites/${siteId}`);
 
     const typeIdRaw      = String(formData.get("typeId")           ?? "").trim();

@@ -5,7 +5,8 @@ import { getCurrentProfile } from "@/lib/auth";
 export async function POST(req: Request) {
   try {
     const profile = await getCurrentProfile();
-    if (!profile || profile.role !== "ADMIN") {
+    // Master admins only: a restore can write records into any warehouse.
+    if (!profile?.isMasterAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -28,8 +29,9 @@ export async function POST(req: Request) {
     if (!profile.isMasterAdmin) {
       if (body.userProfiles?.length) skipped.push("user accounts");
       if (body.activityLogs?.length) skipped.push("activity history");
-      body.userProfiles = [];
-      body.activityLogs = [];
+      body.userProfiles    = [];
+      body.activityLogs    = [];
+      body.userStoreAccess = [];
     }
 
     // ── Restore in dependency order (parents before children) ────────────────
@@ -87,6 +89,12 @@ export async function POST(req: Request) {
         skipDuplicates: true,
       });
       results.inventorySites = body.inventorySites.length;
+    }
+
+    // 4a. Which warehouses each user may see (depends on UserProfile + InventorySite)
+    if (body.userStoreAccess?.length) {
+      await prisma.userStoreAccess.createMany({ data: body.userStoreAccess, skipDuplicates: true });
+      results.userStoreAccess = body.userStoreAccess.length;
     }
 
     // 4b. Which warehouses use which item types (depends on InventorySite + ItemType)

@@ -1,3 +1,4 @@
+import { editorForItem } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -13,6 +14,10 @@ export async function POST(req: Request) {
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return new NextResponse("No IDs provided", { status: 400 });
+    }
+
+    if (!(await editorForItem(itemId))) {
+      return new NextResponse("You don't have edit access to that warehouse", { status: 403 });
     }
 
     // We use a transaction to ensure both steps happen or none happen

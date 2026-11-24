@@ -137,8 +137,34 @@ model UserProfile {
   lastLoginAt         DateTime?
   lastLoginIp         String?
   lastLoginMethod     String?
+  // Area access (master admins always have both). At least one is on.
+  siteAccess          Boolean   @default(true)
+  storeAccess         Boolean   @default(true)
+  // true = every warehouse at full level; false = only the warehouses in storeAccessList.
+  allStores           Boolean   @default(true)
+  storeAccessList     UserStoreAccess[]
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+enum StoreAccessLevel {
+  FULL // whatever the user's role allows
+  VIEW // read-only at this warehouse
+}
+
+// Which warehouses a user may see (used when UserProfile.allStores is false).
+model UserStoreAccess {
+  id              String           @id @default(cuid())
+  userId          String
+  inventorySiteId String
+  level           StoreAccessLevel @default(FULL)
+  createdAt       DateTime         @default(now())
+
+  user          UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventorySite InventorySite @relation(fields: [inventorySiteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, inventorySiteId])
+  @@index([inventorySiteId])
 }
 
 model Account {
@@ -239,9 +265,12 @@ model ActivityLog {
   entityType String?
   entityId   String?
   actorEmail String?
+  // Warehouse this entry is about (filled by a database trigger) — limits what restricted users see.
+  inventorySiteId String?
   createdAt  DateTime     @default(now())
 
   @@index([createdAt])
+  @@index([inventorySiteId])
   @@index([type])
   @@index([actorEmail])
   @@index([entityType])
@@ -338,6 +367,7 @@ model InventorySite {
   issues          InventoryIssue[]
   warehouseIssues WarehouseIssue[]
   itemTypes       WarehouseItemType[]
+  userAccess      UserStoreAccess[]
 
   @@unique([name, isDeleted])
   @@index([isDeleted])
@@ -552,9 +582,13 @@ model Notification {
   body       String?
   link       String?
   actorEmail String?
+  // Warehouse this is about (filled by a database trigger from the link) — only its users are notified.
+  inventorySiteId String?
   createdAt  DateTime @default(now())
 
   reads NotificationRead[]
+
+  @@index([inventorySiteId])
 
   @@index([createdAt])
 }

@@ -9,6 +9,7 @@ import crypto                from "crypto";
 import bcrypt                from "bcryptjs";
 import { validatePassword }  from "@/lib/passwords";
 import { getCompanyDomain }  from "@/lib/system-config";
+import { describeAccess }    from "@/lib/access";
 
 const VALID_ROLES = ["ADMIN", "EDITOR", "VIEWER"];
 
@@ -360,4 +361,43 @@ export async function changeUserEmail(userId: string, newEmail: string): Promise
   );
   revalidatePath("/admin/users");
   return { ok: true, message: `Email changed to ${email}.` };
+}
+
+// Sites / Store access and which warehouses (Full or View only). Master admins always have everything.
+export async function setUserAccess(userId: string, input: {
+  siteAccess: boolean; storeAccess: boolean; allStores: boolean; stores: { id: string; level: "FULL" | "VIEW" }[];
+}): Promise<{ ok: boolean; message: string }> {
+  const me = await getCurrentProfile();
+  if (!me?.isMasterAdmin) return { ok: false, message: "Only a master admin can change access." };
+
+  const target = await prisma.userProfile.findUnique({ where: { id: userId }, select: { id: true, email: true, isMasterAdmin: true } });
+  if (!target) return { ok: false, message: "User not found." };
+  if (target.isMasterAdmin) return { ok: false, message: "Master admins always have access to everything." };
+
+  const siteAccess  = !!input?.siteAccess;
+  const storeAccess = !!input?.storeAccess;
+  if (!siteAccess && !storeAccess) return { ok: false, message: "Turn on Sites, Store, or both — otherwise they can't use anything." };
+  const allStores   = storeAccess ? !!input?.allStores : true;
+
+  // Only real, live warehouses; one entry each.
+  const wanted = new Map<string, "FULL" | "VIEW">();
+  for (const s of Array.isArray(input?.stores) ? input.stores : []) {
+    if (typeof s?.id === "string" && (s.level === "FULL" || s.level === "VIEW")) wanted.set(s.id, s.level);
+  }
+  const live   = await prisma.inventorySite.findMany({ where: { id: { in: [...wanted.keys()] }, isDeleted: false }, select: { id: true, name: true } });
+  const stores = live.map((w) => ({ id: w.id, name: w.name, level: wanted.get(w.id)! }));
+  if (storeAccess && !allStores && !stores.length) return { ok: false, message: "Tick at least one warehouse, or choose All stores." };
+
+  await prisma.$transaction([
+    prisma.userProfile.update({ where: { id: userId }, data: { siteAccess, storeAccess, allStores } }),
+    prisma.userStoreAccess.deleteMany({ where: { userId } }),
+    ...(storeAccess && !allStores
+      ? [prisma.userStoreAccess.createMany({ data: stores.map((s) => ({ userId, inventorySiteId: s.id, level: s.level })) })]
+      : []),
+  ]);
+
+  const summary = describeAccess({ isMasterAdmin: false, siteAccess, storeAccess, allStores }, storeAccess && !allStores ? stores : []);
+  await securityLog(me.email, `Access changed: ${target.email}`, `${summary}. Changed by ${me.email}.`, userId);
+  revalidatePath("/admin/users");
+  return { ok: true, message: `Access saved: ${summary}` };
 }

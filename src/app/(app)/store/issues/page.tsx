@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
 import GlobalIssueLogClient from "./GlobalIssueLogClient";
@@ -22,9 +23,11 @@ export default async function GlobalIssueLogPage({
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
+  const W       = storeFilter(accessOf(profile)); // warehouses this user may see
 
   const rawIssues = await prisma.warehouseIssue.findMany({
     where: {
+      inventorySiteId: W,
       AND: [
         q ? {
           OR: [
@@ -114,11 +117,12 @@ export default async function GlobalIssueLogPage({
   }));
 
   const [openCount, returnedCount, equipmentCount, othersCount] = await Promise.all([
-    prisma.warehouseIssue.count({ where: { status: "OPEN" } }),
-    prisma.warehouseIssue.count({ where: { status: "RETURNED" } }),
-    prisma.warehouseIssue.count({ where: { inventoryItem: { typeRef: { is: { tracked: true } } } } }),
+    prisma.warehouseIssue.count({ where: { status: "OPEN", inventorySiteId: W } }),
+    prisma.warehouseIssue.count({ where: { status: "RETURNED", inventorySiteId: W } }),
+    prisma.warehouseIssue.count({ where: { inventorySiteId: W, inventoryItem: { typeRef: { is: { tracked: true } } } } }),
     prisma.warehouseIssue.count({
       where: {
+        inventorySiteId: W,
         inventoryItem: { typeRef: { is: { tracked: false } } },
       },
     }),

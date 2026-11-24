@@ -1,16 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { canEditStore } from "@/lib/access";
 import ItemTypesClient, { type MainTypeView } from "./ItemTypesClient";
 
 export default async function ItemTypesPage() {
-  await requireAdmin();
+  const me = await requireAdmin();
+  // Restricted admins manage only the warehouses they have full access to.
+  const editable = (id: string) => canEditStore(me, id);
 
-  const [warehouses, types, links, items] = await Promise.all([
+  const [allWarehouses, types, links, items] = await Promise.all([
     prisma.inventorySite.findMany({ where: { isDeleted: false }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.itemType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, parentId: true, legacyKey: true, defaultCode: true, tracked: true } }),
     prisma.warehouseItemType.findMany({ select: { inventorySiteId: true, itemTypeId: true, code: true, enabled: true } }),
     prisma.inventoryItem.findMany({ where: { isDeleted: false }, select: { inventorySiteId: true, typeId: true, subTypeId: true, itemCode: true } }),
   ]);
+  const warehouses = allWarehouses.filter((w) => editable(w.id));
 
   const linkKey = (w: string, t: string) => `${w}|${t}`;
   const link    = new Map(links.map((l) => [linkKey(l.inventorySiteId, l.itemTypeId), l]));

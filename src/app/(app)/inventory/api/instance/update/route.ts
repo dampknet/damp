@@ -1,3 +1,4 @@
+import { editorForInstance } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -15,6 +16,10 @@ export async function PATCH(req: Request) {
 
     if (!instanceId) {
       return NextResponse.json({ error: "Instance ID is required" }, { status: 400 });
+    }
+
+    if (!(await editorForInstance(instanceId))) {
+      return NextResponse.json({ error: "You don't have edit access to that warehouse" }, { status: 403 });
     }
 
     // Prepare update data

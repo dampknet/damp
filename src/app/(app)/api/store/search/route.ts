@@ -1,3 +1,4 @@
+import { accessOf, storeFilter } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -17,6 +18,7 @@ export async function GET(req: Request) {
   const items = await prisma.inventoryItem.findMany({
     where: {
       isDeleted: false,
+      inventorySiteId: storeFilter(accessOf(profile)), // only warehouses this user may see
       OR: [
         { name:         { contains: q, mode: "insensitive" } },
         { description:  { contains: q, mode: "insensitive" } },

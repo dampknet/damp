@@ -1,3 +1,4 @@
+import { canEditSites } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -8,7 +9,7 @@ export async function PATCH(req: Request) {
   try {
     const profile = await getCurrentProfile();
     const role = profile?.role ?? "VIEWER";
-    const canEdit = role === "ADMIN" || role === "EDITOR";
+    const canEdit = canEditSites(profile); // editor role + Sites access
 
     if (!canEdit) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

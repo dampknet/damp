@@ -5,12 +5,15 @@ import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
 import { getAwaitingReturns } from "@/lib/deliveries";
 import { enableStandardTypes } from "@/lib/item-type-registry";
+import { accessOf, storeFilter } from "@/lib/access";
 import StoreDashboardClient from "./StoreDashboardClient";
 
 export default async function StoreDashboardPage() {
   const profile = await getCurrentProfile();
   const role    = profile?.role ?? "VIEWER";
   const canEdit = role === "ADMIN" || role === "EDITOR";
+  const W       = storeFilter(accessOf(profile)); // only the warehouses this user may see
+  const I       = { inventorySiteId: W };          // same, for item/issue/restock rows
 
   const [
     inventorySites,
@@ -25,7 +28,7 @@ export default async function StoreDashboardPage() {
     pendingDeliveries,
   ] = await Promise.all([
     prisma.inventorySite.findMany({
-      where:   { isDeleted: false },
+      where:   { isDeleted: false, id: W },
       orderBy: { name: "asc" },
       select: {
         id:          true,
@@ -35,23 +38,24 @@ export default async function StoreDashboardPage() {
         _count:      { select: { items: { where: { isDeleted: false } } } },
       },
     }),
-    prisma.inventoryItem.count({ where: { isDeleted: false } }),
-    prisma.inventoryItem.count({ where: { isDeleted: false, typeRef: { is: { tracked: true } } } }),   // tracked item types (Equipment, …)
-    prisma.inventoryItem.count({ where: { isDeleted: false, typeRef: { is: { tracked: false } } } }),
+    prisma.inventoryItem.count({ where: { isDeleted: false, ...I } }),
+    prisma.inventoryItem.count({ where: { isDeleted: false, ...I, typeRef: { is: { tracked: true } } } }),   // tracked item types (Equipment, …)
+    prisma.inventoryItem.count({ where: { isDeleted: false, ...I, typeRef: { is: { tracked: false } } } }),
     prisma.inventoryItem.count({
       where: {
         isDeleted:   false,
         uncountable: false,
+        ...I,
         OR: [{ status: "LOW_STOCK" }, { status: "OUT_OF_STOCK" }],
       },
     }),
-    prisma.warehouseIssue.count({ where: { status: "OPEN", expectedReturnAt: { not: null } } }),
+    prisma.warehouseIssue.count({ where: { status: "OPEN", expectedReturnAt: { not: null }, ...I } }),
     prisma.storeItem.count(),
-    prisma.inventoryRestock.count(),
-    prisma.warehouseIssue.count(),
-    prisma.warehouseIssue.count({ where: { deliveryStatus: "PENDING" } }),
+    prisma.inventoryRestock.count({ where: I }),
+    prisma.warehouseIssue.count({ where: I }),
+    prisma.warehouseIssue.count({ where: { deliveryStatus: "PENDING", ...I } }),
   ]);
-  const awaitingReturns = (await getAwaitingReturns()).reduce((s, r) => s + r.awaitingReturn, 0);
+  const awaitingReturns = (await getAwaitingReturns(I)).reduce((s, r) => s + r.awaitingReturn, 0);
 
   const isAdmin = !!profile?.isMasterAdmin; // deleting warehouses is master-admin only
 
@@ -159,10 +163,9 @@ export default async function StoreDashboardPage() {
   async function createInventorySite(formData: FormData) {
     "use server";
 
-    // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    if (!(await getEditorProfile())) redirect("/store");
-
-    if (!canEdit) redirect("/store");
+    // Master admins only, re-checked on submit.
+    const creator = await getCurrentProfile();
+    if (!creator?.isMasterAdmin) redirect("/store?siteError=Only+a+master+admin+can+create+sites");
 
     const name        = String(formData.get("name")        ?? "").trim();
     const location    = String(formData.get("location")    ?? "").trim();
@@ -223,7 +226,7 @@ export default async function StoreDashboardPage() {
       }}
       siteCards={siteCards}
       isAdmin={isAdmin}
-      createSiteAction={canEdit ? createInventorySite : undefined}
+      createSiteAction={isAdmin ? createInventorySite : undefined}
       updateSiteAction={isAdmin ? updateInventorySite : undefined}
       deleteSiteAction={isAdmin ? deleteInventorySite : undefined}
     />

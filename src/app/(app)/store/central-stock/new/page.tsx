@@ -15,7 +15,8 @@ export default async function NewStoreItemPage() {
     "use server";
 
     // Re-check the caller on submit (role or suspension may have changed since the page loaded).
-    if (!(await getEditorProfile())) redirect("/store/central-stock");
+    const me = await getEditorProfile();
+    if (!me?.isMasterAdmin) redirect("/store/central-stock");
 
     const itemNoRaw = String(formData.get("itemNo") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();

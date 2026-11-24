@@ -1,3 +1,4 @@
+import { canEditSites } from "@/lib/access";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -19,7 +20,7 @@ export default async function SiteAssetsPage({
 
   const profile = await getCurrentProfile();
   const role = profile?.role ?? "VIEWER";
-  const canEdit = role === "ADMIN" || role === "EDITOR";
+  const canEdit = canEditSites(profile); // editor role + Sites access
 
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();

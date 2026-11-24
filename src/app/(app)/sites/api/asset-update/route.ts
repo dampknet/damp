@@ -1,3 +1,4 @@
+import { sitesEditor } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEditorProfile } from "@/lib/auth";
@@ -5,7 +6,7 @@ import type { AssetStatus } from "@prisma/client";
 
 export async function PATCH(req: Request) {
   try {
-    if (!(await getEditorProfile())) {
+    if (!(await sitesEditor())) { // editor role + Sites access
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

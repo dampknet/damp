@@ -1,3 +1,4 @@
+import { editorForInstance } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -14,6 +15,10 @@ export async function PATCH(
   }
 
   const json = await req.json();
+
+  if (!(await editorForInstance(instanceId))) {
+    return NextResponse.json({ message: "You don't have edit access to that warehouse" }, { status: 403 });
+  }
 
   try {
     // If updating entityCode, check for duplicates

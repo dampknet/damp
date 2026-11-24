@@ -1,3 +1,4 @@
+import { accessOf, notificationScope } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentProfile } from "@/lib/auth";
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
 
   if (body?.all === true) {
     const unread = await prisma.notification.findMany({
-      where:  { reads: { none: { userId: profile.id } } },
+      where:  { reads: { none: { userId: profile.id } }, ...notificationScope(accessOf(profile)) },
       select: { id: true },
     });
     if (unread.length) {

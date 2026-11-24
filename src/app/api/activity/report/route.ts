@@ -1,3 +1,4 @@
+import { accessOf, canViewStore } from "@/lib/access";
 import { NextResponse } from "next/server";
 import { Document, Packer, Paragraph, Table, AlignmentType } from "docx";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +31,12 @@ export async function POST(req: Request) {
     const period = resolvePeriod(String(body.period ?? "THIS_MONTH"), body.from, body.to);
     if ("error" in period) return NextResponse.json({ error: period.error }, { status: 400 });
 
-    const ctx = { start: period.start, end: period.end, isMasterAdmin: profile.isMasterAdmin };
+    const access = accessOf(profile);
+    const ctx    = { start: period.start, end: period.end, isMasterAdmin: profile.isMasterAdmin, access };
+
+    // Reports only cover what this user may see.
+    if (type === "SITES" && !access.sites)      return NextResponse.json({ error: "You don't have Sites access." }, { status: 403 });
+    if (type === "WAREHOUSES" && !access.store) return NextResponse.json({ error: "You don't have Store access." }, { status: 403 });
 
     // Scope: a single warehouse / site, or everything.
     const warehouseId = type === "WAREHOUSES" && body.warehouseId && body.warehouseId !== "ALL" ? String(body.warehouseId) : null;
@@ -40,6 +46,7 @@ export async function POST(req: Request) {
     if (type === "WAREHOUSES") {
       const w = warehouseId ? await prisma.inventorySite.findUnique({ where: { id: warehouseId }, select: { name: true } }) : null;
       if (warehouseId && !w) return NextResponse.json({ error: "Warehouse not found" }, { status: 400 });
+      if (warehouseId && !canViewStore(access, warehouseId)) return NextResponse.json({ error: "You don't have access to that warehouse." }, { status: 403 });
       scopeLabel = w ? `Warehouse: ${w.name}` : "All warehouses";
     } else if (type === "SITES") {
       if (siteScope === "OTHER") scopeLabel = "Other places (not one of the 42 sites)";
@@ -54,8 +61,8 @@ export async function POST(req: Request) {
 
     const blocks: (Paragraph | Table)[] = [];
     if (type === "FULL") {
-      blocks.push(...await siteStoresSection(ctx, "ALL"), pageBreak());
-      blocks.push(...await warehouseSection(ctx, null), pageBreak());
+      if (access.sites) blocks.push(...await siteStoresSection(ctx, "ALL"), pageBreak());
+      if (access.store) blocks.push(...await warehouseSection(ctx, null), pageBreak());
       blocks.push(...await activitySection(ctx));
     } else if (type === "SITES") {
       blocks.push(...await siteStoresSection(ctx, siteScope));

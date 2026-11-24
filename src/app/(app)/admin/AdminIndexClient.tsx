@@ -43,7 +43,7 @@ export default function AdminIndexClient({
       hoverCl:    dark ? "group-hover:text-rose-400" : "group-hover:text-rose-700",
     },
     {
-      masterOnly: false,
+      masterOnly: true,
       href:       "/admin/backup",
       emoji:      "💾",
       label:      "Data Backup & Recovery",

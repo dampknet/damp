@@ -1,5 +1,6 @@
 "use server";
 
+import { accessOf, canEditStore } from "@/lib/access";
 import { revalidatePath }    from "next/cache";
 import { prisma }            from "@/lib/prisma";
 import { getCurrentProfile, isAdminProfile } from "@/lib/auth";
@@ -35,6 +36,7 @@ export async function createItemType(input: {
   if (!name) return { ok: false, message: "Enter a name." };
   const parentId = input.parentId || null;
   const warehouseIds = [...new Set((input.warehouseIds ?? []).filter((x) => typeof x === "string"))];
+  if (warehouseIds.some((w) => !canEditStore(me, w))) return { ok: false, message: "You can only switch types on at warehouses you have full access to." };
 
   // No duplicates: same name under the same parent (case-insensitive). Offer the existing one instead.
   const same = await prisma.itemType.findFirst({
@@ -80,6 +82,7 @@ export async function createItemType(input: {
 export async function renameItemType(id: string, newName: string): Promise<Result> {
   const me = await requireTypeAdmin();
   if (!me) return { ok: false, message: "Only admins can rename item types." };
+  if (!accessOf(me).all) return { ok: false, message: "Item types are shared by every warehouse — only admins with All stores can rename them." };
   const name = normalizeName(String(newName ?? ""));
   if (!name) return { ok: false, message: "Enter a name." };
   const t = await prisma.itemType.findUnique({ where: { id }, select: { name: true, parentId: true } });
@@ -95,6 +98,7 @@ export async function renameItemType(id: string, newName: string): Promise<Resul
 export async function setTracked(id: string, tracked: boolean): Promise<Result> {
   const me = await requireTypeAdmin();
   if (!me) return { ok: false, message: "Only admins can change item types." };
+  if (!accessOf(me).all) return { ok: false, message: "Item types are shared by every warehouse — only admins with All stores can change this." };
   const t = await prisma.itemType.findUnique({ where: { id }, select: { name: true, parentId: true } });
   if (!t || t.parentId) return { ok: false, message: "Only main item types have this setting." };
   await prisma.itemType.update({ where: { id }, data: { tracked } });
@@ -107,6 +111,7 @@ export async function setTracked(id: string, tracked: boolean): Promise<Result> 
 export async function setWarehouseType(siteId: string, typeId: string, input: { enabled?: boolean; code?: string }): Promise<Result> {
   const me = await requireTypeAdmin();
   if (!me) return { ok: false, message: "Only admins can change item types." };
+  if (!canEditStore(me, siteId)) return { ok: false, message: "You don't have full access to that warehouse." };
 
   const [type, site] = await Promise.all([
     prisma.itemType.findUnique({ where: { id: typeId }, select: { id: true, name: true, parentId: true, defaultCode: true } }),
@@ -156,6 +161,7 @@ export async function setWarehouseType(siteId: string, typeId: string, input: { 
 export async function deleteItemType(id: string): Promise<Result> {
   const me = await requireTypeAdmin();
   if (!me) return { ok: false, message: "Only admins can delete item types." };
+  if (!accessOf(me).all) return { ok: false, message: "Item types are shared by every warehouse — only admins with All stores can delete them." };
   const t = await prisma.itemType.findUnique({
     where:  { id },
     select: { name: true, legacyKey: true, _count: { select: { children: true, items: true, subItems: true } } },
