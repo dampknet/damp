@@ -83,6 +83,9 @@ function LoginFormInner() {
       email:    email.trim().toLowerCase(),
       password,
       redirect: false,
+      // Without this, next-auth answers with the current address. After an inactivity sign-out that is
+      // /auth/login?error=idle…, and it then reports "idle" as a sign-in error even though sign-in worked.
+      callbackUrl: returnTo,
     });
 
     if (res?.error) {
